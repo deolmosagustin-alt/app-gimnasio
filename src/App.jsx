@@ -6276,7 +6276,7 @@ label.ajuste-rotulo { display: block; }
 .piso-goma { position: relative; margin: 0 -16px; min-height: 64px; display: flex; align-items: flex-end; padding: 0 16px 8px; overflow: hidden; box-shadow: 0 -1px 0 rgba(0,0,0,.55); }
 .piso-goma-dibujo { position: absolute; inset: 0; width: 100%; height: 100%; }
 .piso-goma-caucho { fill: #1c1d20; }
-.piso-goma-junta { fill: none; stroke: #0b0c0d; stroke-width: 1.6; stroke-linejoin: round; }
+.piso-goma-junta { fill: none; stroke: #0b0c0d; stroke-width: 1.4; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .piso-goma .escalera-enlace { position: relative; z-index: 1; margin: 0; color: #e9eaee; text-shadow: 0 1px 2px rgba(0,0,0,.7); }
 .light-mode .ciclo-cajones.en-pared { background:
     radial-gradient(circle, rgba(70,73,79,.7) 0 1.6px, rgba(255,255,255,.5) 2.1px, transparent 2.6px) 8px 8px / 14px 14px,
@@ -6286,28 +6286,26 @@ label.ajuste-rotulo { display: block; }
 .light-mode .ciclo-cajones.en-pared .escalera-cabeza :is(p, span):not(.num-display) { color: rgba(29,36,51,.72); }
 .light-mode .piso-goma-caucho { fill: #34363b; }
 
-/* Rutinas: la tarjeta entera es el rack de las pesas rusas, de chapa gris
-   como el casillero: los parantes perforados a los costados, el estante con
-   las pesas y sus etiquetas de cartón, y el travesaño con la chapa de la
-   rutina. */
-.rutina-activa.es-rack { --pintura-rack: #50535a; position: relative; overflow: hidden; padding-left: 28px; padding-right: 28px;
-  background: repeating-linear-gradient(90deg, rgba(255,255,255,.02) 0 2px, transparent 2px 5px), linear-gradient(170deg, #2b2d32, #232529);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), 0 12px 30px -18px rgba(0,0,0,.8); }
-.rutina-activa.es-rack::before, .rutina-activa.es-rack::after { content: ""; position: absolute; top: 0; bottom: 0; width: 14px; z-index: 0;
-  background:
-    radial-gradient(circle, rgba(0,0,0,.6) 0 2px, transparent 2.6px) 50% 10px / 14px 22px repeat-y,
-    linear-gradient(90deg, #36383d, #5a5d63 45%, #6a6d73 60%, #3a3c41); }
-.rutina-activa.es-rack::before { left: 7px; }
-.rutina-activa.es-rack::after { right: 7px; }
+/* Rutinas: el rack abierto donde se apoyan las pesas rusas, como los de las
+   mancuernas, ocupando la tarjeta: sin pared atrás (la placa de siempre),
+   las dos patas de caño cuadrado bajan desde el estante hasta el piso de
+   goma del pie, con sus regatones; el estante es la bandeja inclinada, con
+   su labio adelante, y abajo el travesaño con la chapa de la rutina. */
+.rutina-activa.es-rack { position: relative; overflow: hidden; padding-bottom: 0; padding-left: 26px; padding-right: 26px; }
 .rutina-activa.es-rack > * { position: relative; z-index: 1; }
-.rutina-activa.es-rack .rack-pesas { padding: 0 0 6px; }
+.rutina-activa.es-rack::before, .rutina-activa.es-rack::after { content: ""; position: absolute; z-index: 0; top: 104px; bottom: 30px; width: 11px; border-radius: 2px 2px 0 0;
+  background: linear-gradient(90deg, #303237, #5c5f65 40%, #6c6f75 55%, #34363b); box-shadow: 0 6px 0 -1px #111214; }
+.rutina-activa.es-rack::before { left: 12px; }
+.rutina-activa.es-rack::after { right: 12px; }
+.rutina-activa.es-rack .rack-pesas { padding: 0 0 4px; }
 .rutina-activa.es-rack .rack-pesas::before, .rutina-activa.es-rack .rack-pesas::after { display: none; }
-.rutina-activa.es-rack .estante.en-rack::before { left: -22px; right: -22px; }
-.rutina-activa.es-rack .rack-pesas-travesano { margin: 0 -22px; height: 16px; }
-.rutina-activa.es-rack .rutina-activa-linea { color: rgba(242,243,245,.72); }
-.light-mode .rutina-activa.es-rack { background: repeating-linear-gradient(90deg, rgba(0,0,0,.02) 0 2px, transparent 2px 5px), linear-gradient(170deg, #e3e5e9, #d5d8dd); }
-.light-mode .rutina-activa.es-rack::before, .light-mode .rutina-activa.es-rack::after { background: radial-gradient(circle, rgba(60,63,70,.55) 0 2px, transparent 2.6px) 50% 10px / 14px 22px repeat-y, linear-gradient(90deg, #a7aab0, #c9ccd1 45%, #d6d8dd 60%, #a9acb2); }
-.light-mode .rutina-activa.es-rack .rutina-activa-linea { color: rgba(29,36,51,.7); }
+.rutina-activa.es-rack .estante.en-rack::before { left: -20px; right: -20px; height: 30px; border-radius: 4px;
+  background: linear-gradient(#50535a 0 7px, #2c2e33 7px 9px, transparent 9px), repeating-linear-gradient(90deg, rgba(255,255,255,.022) 0 2px, transparent 2px 5px), linear-gradient(#3a3d42, #2a2c31);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.14), inset 0 -2px 0 rgba(0,0,0,.4), 0 10px 14px -10px rgba(0,0,0,.9); }
+.rutina-activa.es-rack .rack-pesas-travesano { margin: 0 -20px; height: 12px; }
+.rutina-activa.es-rack > .piso-goma { margin: 0 -26px; min-height: 34px; }
+.light-mode .rutina-activa.es-rack::before, .light-mode .rutina-activa.es-rack::after { background: linear-gradient(90deg, #9da0a6, #c9ccd1 45%, #d6d8dd 60%, #a3a6ac); box-shadow: 0 6px 0 -1px #3a3c41; }
+.light-mode .rutina-activa.es-rack .estante.en-rack::before { background: linear-gradient(#c9ccd1 0 7px, #9da0a6 7px 9px, transparent 9px), linear-gradient(#e2e4e8, #cfd2d7); box-shadow: inset 0 1px 0 #fff, inset 0 -2px 0 rgba(0,0,0,.12), 0 10px 14px -10px rgba(0,0,0,.35); }
 
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
@@ -14595,24 +14593,25 @@ function IconoCajones({ size = 16 }) {
 // mate con las motas de colores del reciclado, unidas por las juntas de
 // rompecabezas. Va de punta a punta, abajo de los cajones.
 const MOTAS_GOMA = [[22.4, 37.0, 0.73, "#d9d9d3"], [23.5, 7.4, 0.76, "#d9d9d3"], [31.7, 3.8, 0.63, "#5f9e78"], [32.4, 27.7, 0.48, "#5b7fd1"], [38.6, 26.2, 0.82, "#9a9ca2"], [0.6, 21.1, 0.49, "#5b7fd1"], [9.7, 1.2, 0.73, "#c25a5c"], [33.7, 20.8, 0.83, "#d9d9d3"], [26.5, 18.3, 0.62, "#d9d9d3"], [39.8, 33.6, 0.87, "#9a9ca2"], [9.2, 11.6, 0.49, "#c25a5c"], [16.0, 33.9, 0.68, "#9a9ca2"], [33.9, 0.0, 0.58, "#9a9ca2"], [18.8, 39.2, 0.69, "#9a9ca2"], [25.2, 31.1, 0.61, "#5b7fd1"], [13.3, 38.6, 0.90, "#5b7fd1"], [9.9, 4.0, 0.49, "#5b7fd1"], [7.1, 22.4, 0.72, "#9a9ca2"], [29.3, 5.2, 0.84, "#c25a5c"], [16.8, 8.5, 0.61, "#5b7fd1"], [32.1, 12.2, 0.98, "#9a9ca2"], [15.8, 34.2, 0.84, "#c25a5c"], [39.6, 8.5, 0.60, "#5b7fd1"], [13.2, 11.9, 0.49, "#9a9ca2"], [23.3, 9.7, 0.81, "#5b7fd1"], [18.1, 38.4, 0.74, "#d9d9d3"], [34.7, 7.3, 0.54, "#d9d9d3"], [32.7, 10.0, 0.56, "#9a9ca2"], [37.6, 7.9, 1.02, "#d1b25a"], [24.1, 16.9, 0.51, "#9a9ca2"], [38.5, 9.5, 0.87, "#5b7fd1"], [32.9, 23.9, 0.63, "#c25a5c"], [28.8, 2.8, 0.59, "#5b7fd1"], [34.1, 24.6, 0.62, "#d9d9d3"]];
-const JUNTAS_GOMA = ["M133 0 L133 3 L136.2 3 L136.2 7 L133 7 L133 13 L129.8 13 L129.8 17 L133 17 L133 23 L136.2 23 L136.2 27 L133 27 L133 33 L129.8 33 L129.8 37 L133 37 L133 43 L136.2 43 L136.2 47 L133 47 L133 53 L129.8 53 L129.8 57 L133 57 L133 63 L136.2 63 L136.2 67 L133 67 L133 72", "M266 0 L266 3 L269.2 3 L269.2 7 L266 7 L266 13 L262.8 13 L262.8 17 L266 17 L266 23 L269.2 23 L269.2 27 L266 27 L266 33 L262.8 33 L262.8 37 L266 37 L266 43 L269.2 43 L269.2 47 L266 47 L266 53 L262.8 53 L262.8 57 L266 57 L266 63 L269.2 63 L269.2 67 L266 67 L266 72", "M0 38 L3 38 L3 40.6 L7 40.6 L7 38 L13 38 L13 35.4 L17 35.4 L17 38 L23 38 L23 40.6 L27 40.6 L27 38 L33 38 L33 35.4 L37 35.4 L37 38 L43 38 L43 40.6 L47 40.6 L47 38 L53 38 L53 35.4 L57 35.4 L57 38 L63 38 L63 40.6 L67 40.6 L67 38 L73 38 L73 35.4 L77 35.4 L77 38 L83 38 L83 40.6 L87 40.6 L87 38 L93 38 L93 35.4 L97 35.4 L97 38 L103 38 L103 40.6 L107 40.6 L107 38 L113 38 L113 35.4 L117 35.4 L117 38 L123 38 L123 40.6 L127 40.6 L127 38 L133 38 L133 35.4 L137 35.4 L137 38 L143 38 L143 40.6 L147 40.6 L147 38 L153 38 L153 35.4 L157 35.4 L157 38 L163 38 L163 40.6 L167 40.6 L167 38 L173 38 L173 35.4 L177 35.4 L177 38 L183 38 L183 40.6 L187 40.6 L187 38 L193 38 L193 35.4 L197 35.4 L197 38 L203 38 L203 40.6 L207 40.6 L207 38 L213 38 L213 35.4 L217 35.4 L217 38 L223 38 L223 40.6 L227 40.6 L227 38 L233 38 L233 35.4 L237 35.4 L237 38 L243 38 L243 40.6 L247 40.6 L247 38 L253 38 L253 35.4 L257 35.4 L257 38 L263 38 L263 40.6 L267 40.6 L267 38 L273 38 L273 35.4 L277 35.4 L277 38 L283 38 L283 40.6 L287 40.6 L287 38 L293 38 L293 35.4 L297 35.4 L297 38 L303 38 L303 40.6 L307 40.6 L307 38 L313 38 L313 35.4 L317 35.4 L317 38 L323 38 L323 40.6 L327 40.6 L327 38 L333 38 L333 35.4 L337 35.4 L337 38 L343 38 L343 40.6 L347 40.6 L347 38 L353 38 L353 35.4 L357 35.4 L357 38 L363 38 L363 40.6 L367 40.6 L367 38 L373 38 L373 35.4 L377 35.4 L377 38 L383 38 L383 40.6 L387 40.6 L387 38 L393 38 L393 35.4 L397 35.4 L397 38 L400 38"];
+const JUNTAS_GOMA = ["M-221.5 0 L-400.0 72", "M-137.2 0 L-280.0 72", "M-52.9 0 L-160.0 72", "M31.4 0 L-40.0 72", "M115.7 0 L80.0 72", "M200.0 0 L200.0 72", "M284.3 0 L320.0 72", "M368.6 0 L440.0 72", "M452.9 0 L560.0 72", "M537.2 0 L680.0 72", "M621.5 0 L800.0 72", "M0 9 L400 9", "M0 25 L400 25", "M0 47 L400 47"];
 function PisoGoma({ children = null }) {
   const uid = `pg${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   return (
     <div className="piso-goma">
       <svg className="piso-goma-dibujo" viewBox="0 0 400 72" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
         <defs>
-          <pattern id={`${uid}-m`} width="40" height="40" patternUnits="userSpaceOnUse">
+          <pattern id={`${uid}-m`} width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="scale(1 .62)">
             {MOTAS_GOMA.map(([x, y, rr, c], k) => <circle key={k} cx={x} cy={y} r={rr} fill={c} opacity=".55" />)}
           </pattern>
           <linearGradient id={`${uid}-l`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#000" stopOpacity=".55" />
-            <stop offset=".25" stopColor="#000" stopOpacity="0" />
-            <stop offset="1" stopColor="#fff" stopOpacity=".03" />
+            <stop offset="0" stopColor="#000" stopOpacity=".7" />
+            <stop offset=".35" stopColor="#000" stopOpacity=".15" />
+            <stop offset="1" stopColor="#fff" stopOpacity=".05" />
           </linearGradient>
         </defs>
         <rect width="400" height="72" className="piso-goma-caucho" />
         <rect width="400" height="72" fill={`url(#${uid}-m)`} />
+        <rect width="400" height="72" fill={`url(#${uid}-m)`} transform="translate(0 30) scale(1 1.5)" opacity=".7" />
         {JUNTAS_GOMA.map((d, k) => <path key={k} d={d} className="piso-goma-junta" />)}
         <rect width="400" height="72" fill={`url(#${uid}-l)`} />
       </svg>
@@ -30023,6 +30022,8 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
               <WeeklyScheduleEditor dayOrder={activeDef.dayOrder} days={activeDef.days} schedule={activeSchedule} onChange={updateActiveScheduleDay} />
             </div>
           )}
+          {/* El rack se para en el piso de goma, de punta a punta. */}
+          <PisoGoma />
         </section>
       )}
 
