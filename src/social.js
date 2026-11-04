@@ -130,12 +130,13 @@ export async function buscarPorNombre(texto, myUid) {
   const clave = [...palabras].sort((a, b) => b.length - a.length)[0].slice(0, 15);
   if (clave.length >= 2) {
     try {
-      const snap = await getDocs(query(collectionGroup(db, "basic"), where("busqueda", "array-contains", clave), limit(25)));
-      snap.docs.forEach((d) => {
-        const uid = d.ref.parent.parent.id;
-        const basic = d.data();
-        if (uid !== myUid && coincide(basic.name)) resultados.set(uid, { uid, basic });
-      });
+      // La colección "buscador" (una ficha por persona: nombre y el
+      // principio de cada palabra); después, el perfil público de los que
+      // coinciden, para la foto y el rango.
+      const snap = await getDocs(query(collection(db, "buscador"), where("busqueda", "array-contains", clave), limit(25)));
+      const uids = snap.docs.filter((d) => d.id !== myUid && coincide(d.data().name)).map((d) => d.id).slice(0, 15);
+      const basics = await Promise.all(uids.map((u) => getPublicBasic(u)));
+      uids.forEach((u, k) => { if (basics[k] && !resultados.has(u)) resultados.set(u, { uid: u, basic: basics[k] }); });
     } catch (err) {
       console.warn("[social] No se pudo buscar por nombre:", err?.message || err);
     }
@@ -167,9 +168,6 @@ function profileToPublicBasic(profile, topRank) {
     name: profile.name || null,
     avatarData: profile.avatarData || null,
     topRank: topRank || null,
-    // Para que te encuentren por el nombre del casillero (04/11): el
-    // principio de cada palabra, sin tildes ni mayúsculas.
-    busqueda: tokensDeNombre(profile.name),
     updatedAt: new Date().toISOString(),
   };
 }
@@ -237,6 +235,9 @@ export async function syncPublicProfile(uid, profile, activeRoutineSnapshot, top
     const full = JSON.parse(JSON.stringify(profileToPublicFull(profile, activeRoutineSnapshot)));
     await escribirSiCambio(`${uid}/basic`, doc(db, "users", uid, "public", "basic"), basic);
     await escribirSiCambio(`${uid}/full`, doc(db, "users", uid, "public", "full"), full);
+    // La ficha del buscador (04/11): sólo el nombre y el principio de cada
+    // palabra, en una colección propia que se puede consultar.
+    await escribirSiCambio(`${uid}/buscador`, doc(db, "buscador", uid), { name: String(profile.name || "").slice(0, 80), busqueda: tokensDeNombre(profile.name), updatedAt: new Date().toISOString() });
   } catch (err) {
     console.warn("[social] No se pudo sincronizar el perfil público:", err?.message || err);
   }
@@ -343,9 +344,10 @@ export async function clearDiscoverablePhone(phoneHash) {
 // siendo tu amigo/alumno, solo deja de compartir datos nuevos hasta que
 // vuelva a elegir un @usuario.
 export async function unpublishProfile(uid, usernameLower) {
-  ULTIMO_ESPEJO.delete(`${uid}/basic`); ULTIMO_ESPEJO.delete(`${uid}/full`);
+  ULTIMO_ESPEJO.delete(`${uid}/basic`); ULTIMO_ESPEJO.delete(`${uid}/full`); ULTIMO_ESPEJO.delete(`${uid}/buscador`);
   try {
     if (usernameLower) await releaseUsername(usernameLower);
+    await deleteDoc(doc(db, "buscador", uid)).catch(() => {});
     await deleteDoc(doc(db, "users", uid, "public", "basic"));
     await deleteDoc(doc(db, "users", uid, "public", "full"));
   } catch (err) {
@@ -589,9 +591,10 @@ export async function borrarReto(id) {
 // si algo falla, queda basura huérfana (mismo criterio que ya usa el resto
 // de la app para este tipo de limpieza).
 export async function cleanupSocialData(uid, usernameLower, phoneHash = null) {
-  ULTIMO_ESPEJO.delete(`${uid}/basic`); ULTIMO_ESPEJO.delete(`${uid}/full`);
+  ULTIMO_ESPEJO.delete(`${uid}/basic`); ULTIMO_ESPEJO.delete(`${uid}/full`); ULTIMO_ESPEJO.delete(`${uid}/buscador`);
   try {
     if (usernameLower) await releaseUsername(usernameLower);
+    await deleteDoc(doc(db, "buscador", uid)).catch(() => {});
     if (phoneHash) await clearDiscoverablePhone(phoneHash);
     await deleteDoc(doc(db, "users", uid, "public", "basic"));
     await deleteDoc(doc(db, "users", uid, "public", "full"));

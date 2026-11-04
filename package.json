@@ -12,6 +12,7 @@
     "capturas": "node scripts/capturas.mjs",
     "color": "node scripts/color.mjs",
     "reglas": "npx -y firebase-tools@latest deploy --only firestore:rules",
+    "reglas:probar": "node -e \"require('fs').copyFileSync('firestore.rules','scripts/emu/firestore.rules')\" && npx -y firebase-tools@latest emulators:exec --config scripts/emu/firebase.json --only firestore,auth --project demo-gymapp \"node scripts/emu/probar-buscador.mjs\"",
     "imagen": "node scripts/generar-imagen.mjs",
     "play": "node scripts/play.mjs",
     "test": "vitest run",
