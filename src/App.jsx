@@ -6706,7 +6706,7 @@ label.ajuste-rotulo { display: block; }
 .collarin-mango { fill: none; stroke: #b4b7bd; stroke-width: 3.2; stroke-linecap: round; }
 .collarin-puno { fill: color-mix(in oklab, var(--c, #14B8A6) 58%, #33353a); stroke: rgba(0,0,0,.4); stroke-width: .8; }
 .collarin-puno-luz { stroke: rgba(255,255,255,.28); stroke-width: 1.4; stroke-linecap: round; }
-.cinturon-pared { position: absolute; z-index: 1; right: 7%; top: 52px; width: 19%; max-width: 82px; height: auto; filter: drop-shadow(2px 4px 3px rgba(0,0,0,.55)); }
+.cinturon-pared { position: absolute; z-index: 1; right: 9%; top: 70px; width: 14%; max-width: 60px; rotate: 4deg; transform-origin: 50% 4%; height: auto; filter: drop-shadow(2px 4px 3px rgba(0,0,0,.55)); }
 .cp-placa { fill: #6f7279; stroke: #3d4045; stroke-width: .8; }
 .cp-tornillo { fill: #3d4045; }
 .cp-pua { fill: #8d9097; }
@@ -6749,8 +6749,17 @@ label.ajuste-rotulo { display: block; }
     radial-gradient(ellipse at 30% 60%, rgba(255,255,255,.04), transparent 50%),
     #3a3b3e;
   box-shadow: 0 -1px 0 rgba(0,0,0,.5); }
+.light-mode .piso-rack-base { fill: #b6b7b5; }
 .light-mode .rutina-activa.rack-nuevo .rack-kb::before { background: linear-gradient(rgba(0,0,0,.14), transparent 40%, rgba(255,255,255,.2)), repeating-linear-gradient(90deg, transparent 0 calc(25% - 1px), rgba(0,0,0,.14) calc(25% - 1px) 25%), #b4b5b3; }
 
+
+/* ── VISTA PREVIA 18 (04/11): el rodillo en perspectiva y el piso del rack ── */
+.rodillo-fondo { fill: #0d0e10; }
+.rodillo-relieve rect { stroke: rgba(0,0,0,.35); stroke-width: .4; }
+.rodillo-brillo { stroke: rgba(255,255,255,.2); stroke-width: 1.6; stroke-linecap: round; }
+.rutina-activa.rack-nuevo .rack-kb::before { display: none; }
+.piso-rack { position: absolute; z-index: 0; left: -16px; right: -16px; bottom: -10px; width: calc(100% + 32px); height: 12%; }
+.piso-rack-junta { stroke: rgba(0,0,0,.5); stroke-width: 1.2; vector-effect: non-scaling-stroke; }
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -14336,6 +14345,18 @@ function RackKettlebells({ dias = [], nombre = "", onElegir = null, etiqueta = "
   const rotulo = (texto) => (String(texto).length > 9 ? { textLength: 64, lengthAdjust: "spacingAndGlyphs" } : {});
   return (
     <div className="rack-kb" role="group" aria-label={etiqueta}>
+      {/* EL PISO DE CEMENTO ALISADO, en perspectiva: las juntas de corte que
+          se abren hacia adelante, la de través al fondo y la luz del foco. */}
+      <svg className="piso-rack" viewBox="0 0 400 40" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id={`${uid}-cem`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#2c2d30" /><stop offset=".45" stopColor="#3a3b3e" /><stop offset="1" stopColor="#46474a" /></linearGradient>
+          <radialGradient id={`${uid}-luz`} cx=".5" cy=".9" r=".6"><stop offset="0" stopColor="#fff" stopOpacity=".07" /><stop offset="1" stopColor="#fff" stopOpacity="0" /></radialGradient>
+        </defs>
+        <rect width="400" height="40" fill={`url(#${uid}-cem)`} className="piso-rack-base" />
+        <rect width="400" height="40" fill={`url(#${uid}-luz)`} />
+        {["M-49.2 0 L-160 40", "M89.2 0 L40 40", "M200.0 0 L200 40", "M310.8 0 L360 40", "M449.2 0 L560 40", "M0 14 L400 14"].map((d, k) => <path key={k} d={d} className="piso-rack-junta" />)}
+        <rect width="400" height="3" fill="#000" opacity=".4" />
+      </svg>
       <svg className="rack-kb-fondo" viewBox="0 0 360 290" aria-hidden="true">
         <defs>
           <linearGradient id={`${uid}-c`} x1="0" x2="1">
@@ -14399,26 +14420,28 @@ function RackKettlebells({ dias = [], nombre = "", onElegir = null, etiqueta = "
           <path d="M341 38 C337 64 337 102 343 126 C346 135 351 135 352 126 C356 102 353 66 343 38 Z" className="rack-kb-banda-hueco" />
           <path d="M339 46 C336 70 336 98 340 118" className="rack-kb-banda-brillo" />
         </g>
-        {/* EL RODILLO DE ESPUMA (como el GRID de TriggerPoint): el cilindro
-            de goma EVA con la cuadrícula en relieve de tres tamaños, la luz
-            que da la vuelta y la punta con el núcleo hueco de plástico. */}
         <defs>
           <linearGradient id={`${uid}-rodillo`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#3a3d44" /><stop offset=".3" stopColor="#262830" /><stop offset=".75" stopColor="#15161a" /><stop offset="1" stopColor="#0c0d0f" />
+            <stop offset="0" stopColor="#40434a" /><stop offset=".28" stopColor="#2a2c33" /><stop offset=".7" stopColor="#16171b" /><stop offset="1" stopColor="#0b0c0e" />
           </linearGradient>
           <linearGradient id={`${uid}-rodillo-relieve`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#4d79c9" /><stop offset=".35" stopColor="#3b63ad" /><stop offset="1" stopColor="#1f3866" />
+            <stop offset="0" stopColor="#5d89d6" /><stop offset=".4" stopColor="#3d66b0" /><stop offset="1" stopColor="#1c335e" />
           </linearGradient>
         </defs>
-        <g className="rack-kb-rodillo">
-          <ellipse cx="80" cy="283" rx="44" ry="3.6" fill="#000" opacity=".5" />
-          <rect x="42" y="256" width="72" height="26" rx="4" fill={`url(#${uid}-rodillo)`} />
-          <g fill={`url(#${uid}-rodillo-relieve)`}><rect x="47.0" y="257" width="5.6" height="24" rx="1.4" className="rodillo-bloque" /><rect x="54.2" y="257" width="5.6" height="7" rx="1.2" className="rodillo-bloque" /><rect x="54.2" y="265.5" width="5.6" height="7" rx="1.2" className="rodillo-bloque" /><rect x="54.2" y="274" width="5.6" height="7" rx="1.2" className="rodillo-bloque" /><rect x="61.4" y="257" width="5.6" height="4" rx="1" className="rodillo-bloque chico" /><rect x="61.4" y="262" width="5.6" height="4" rx="1" className="rodillo-bloque chico" /><rect x="61.4" y="267" width="5.6" height="4" rx="1" className="rodillo-bloque chico" /><rect x="61.4" y="272" width="5.6" height="4" rx="1" className="rodillo-bloque chico" /><rect x="61.4" y="277" width="5.6" height="4" rx="1" className="rodillo-bloque chico" /><rect x="68.6" y="257" width="5.6" height="24" rx="1.4" className="rodillo-bloque" /><rect x="75.8" y="257" width="5.6" height="7" rx="1.2" className="rodillo-bloque" /><rect x="75.8" y="265.5" width="5.6" height="7" rx="1.2" className="rodillo-bloque" /><rect x="75.8" y="274" width="5.6" height="7" rx="1.2" className="rodillo-bloque" /><rect x="83.0" y="257" width="5.6" height="4" rx="1" className="rodillo-bloque chico" /><rect x="83.0" y="262" width="5.6" height="4" rx="1" className="rodillo-bloque chico" /><rect x="83.0" y="267" width="5.6" height="4" rx="1" className="rodillo-bloque chico" /><rect x="83.0" y="272" width="5.6" height="4" rx="1" className="rodillo-bloque chico" /><rect x="83.0" y="277" width="5.6" height="4" rx="1" className="rodillo-bloque chico" /><rect x="90.2" y="257" width="5.6" height="24" rx="1.4" className="rodillo-bloque" /><rect x="97.4" y="257" width="5.6" height="7" rx="1.2" className="rodillo-bloque" /><rect x="97.4" y="265.5" width="5.6" height="7" rx="1.2" className="rodillo-bloque" /><rect x="97.4" y="274" width="5.6" height="7" rx="1.2" className="rodillo-bloque" /><rect x="104.6" y="257" width="5.6" height="4" rx="1" className="rodillo-bloque chico" /><rect x="104.6" y="262" width="5.6" height="4" rx="1" className="rodillo-bloque chico" /><rect x="104.6" y="267" width="5.6" height="4" rx="1" className="rodillo-bloque chico" /><rect x="104.6" y="272" width="5.6" height="4" rx="1" className="rodillo-bloque chico" /><rect x="104.6" y="277" width="5.6" height="4" rx="1" className="rodillo-bloque chico" /></g>
-          <rect x="43" y="258" width="70" height="2.6" rx="1.3" fill="#fff" opacity=".18" />
-          <ellipse cx="114" cy="269" rx="5.4" ry="13" fill="#0f1013" />
-          <ellipse cx="42" cy="269" rx="5.6" ry="13" className="rodillo-punta" />
-          <ellipse cx="42" cy="269" rx="3.4" ry="7.8" className="rodillo-nucleo" />
-          <ellipse cx="42" cy="269" rx="2.2" ry="5.2" className="rodillo-tubo" />
+        {/* EL RODILLO DE ESPUMA (como el GRID de TriggerPoint), en
+            perspectiva y apoyado adelante de la pata izquierda del rack, en
+            diagonal: el cilindro entre sus dos bocas, la cuadrícula en relieve
+            que se achica al dar la vuelta, la luz de arriba y la boca de
+            adelante con el núcleo hueco. */}
+        <g className="rack-kb-rodillo" transform="translate(4 271) rotate(-6)">
+          <ellipse cx="46" cy="16" rx="50" ry="5" fill="#000" opacity=".5" />
+          <ellipse cx="2" cy="0" rx="5.5" ry="12" className="rodillo-fondo" />
+          <path d="M2 -12 L86 -12 A5.5 12 0 0 1 86 12 L2 12 Z" fill={`url(#${uid}-rodillo)`} />
+          <g fill={`url(#${uid}-rodillo-relieve)`} className="rodillo-relieve"><rect x="12.0" y="-10.77" width="6.6" height="1.30" rx="0.50" /><rect x="19.4" y="-10.77" width="4.6" height="1.30" rx="0.50" /><rect x="26.8" y="-10.77" width="3.2" height="1.30" rx="0.50" /><rect x="34.2" y="-10.77" width="6.6" height="1.30" rx="0.50" /><rect x="41.6" y="-10.77" width="4.6" height="1.30" rx="0.50" /><rect x="49.0" y="-10.77" width="3.2" height="1.30" rx="0.50" /><rect x="56.4" y="-10.77" width="6.6" height="1.30" rx="0.50" /><rect x="63.8" y="-10.77" width="4.6" height="1.30" rx="0.50" /><rect x="71.2" y="-10.77" width="3.2" height="1.30" rx="0.50" /><rect x="78.6" y="-10.77" width="6.6" height="1.30" rx="0.50" /><rect x="12.0" y="-8.03" width="6.6" height="2.86" rx="1.10" /><rect x="19.4" y="-8.03" width="4.6" height="2.86" rx="1.10" /><rect x="26.8" y="-8.03" width="3.2" height="2.86" rx="1.10" /><rect x="34.2" y="-8.03" width="6.6" height="2.86" rx="1.10" /><rect x="41.6" y="-8.03" width="4.6" height="2.86" rx="1.10" /><rect x="49.0" y="-8.03" width="3.2" height="2.86" rx="1.10" /><rect x="56.4" y="-8.03" width="6.6" height="2.86" rx="1.10" /><rect x="63.8" y="-8.03" width="4.6" height="2.86" rx="1.10" /><rect x="71.2" y="-8.03" width="3.2" height="2.86" rx="1.10" /><rect x="78.6" y="-8.03" width="6.6" height="2.86" rx="1.10" /><rect x="12.0" y="-4.28" width="6.6" height="4.16" rx="1.20" /><rect x="19.4" y="-4.28" width="4.6" height="4.16" rx="1.20" /><rect x="26.8" y="-4.28" width="3.2" height="4.16" rx="1.20" /><rect x="34.2" y="-4.28" width="6.6" height="4.16" rx="1.20" /><rect x="41.6" y="-4.28" width="4.6" height="4.16" rx="1.20" /><rect x="49.0" y="-4.28" width="3.2" height="4.16" rx="1.20" /><rect x="56.4" y="-4.28" width="6.6" height="4.16" rx="1.20" /><rect x="63.8" y="-4.28" width="4.6" height="4.16" rx="1.20" /><rect x="71.2" y="-4.28" width="3.2" height="4.16" rx="1.20" /><rect x="78.6" y="-4.28" width="6.6" height="4.16" rx="1.20" /><rect x="12.0" y="0.12" width="6.6" height="4.16" rx="1.20" /><rect x="19.4" y="0.12" width="4.6" height="4.16" rx="1.20" /><rect x="26.8" y="0.12" width="3.2" height="4.16" rx="1.20" /><rect x="34.2" y="0.12" width="6.6" height="4.16" rx="1.20" /><rect x="41.6" y="0.12" width="4.6" height="4.16" rx="1.20" /><rect x="49.0" y="0.12" width="3.2" height="4.16" rx="1.20" /><rect x="56.4" y="0.12" width="6.6" height="4.16" rx="1.20" /><rect x="63.8" y="0.12" width="4.6" height="4.16" rx="1.20" /><rect x="71.2" y="0.12" width="3.2" height="4.16" rx="1.20" /><rect x="78.6" y="0.12" width="6.6" height="4.16" rx="1.20" /><rect x="12.0" y="5.17" width="6.6" height="2.86" rx="1.10" /><rect x="19.4" y="5.17" width="4.6" height="2.86" rx="1.10" /><rect x="26.8" y="5.17" width="3.2" height="2.86" rx="1.10" /><rect x="34.2" y="5.17" width="6.6" height="2.86" rx="1.10" /><rect x="41.6" y="5.17" width="4.6" height="2.86" rx="1.10" /><rect x="49.0" y="5.17" width="3.2" height="2.86" rx="1.10" /><rect x="56.4" y="5.17" width="6.6" height="2.86" rx="1.10" /><rect x="63.8" y="5.17" width="4.6" height="2.86" rx="1.10" /><rect x="71.2" y="5.17" width="3.2" height="2.86" rx="1.10" /><rect x="78.6" y="5.17" width="6.6" height="2.86" rx="1.10" /><rect x="12.0" y="9.47" width="6.6" height="1.30" rx="0.50" /><rect x="19.4" y="9.47" width="4.6" height="1.30" rx="0.50" /><rect x="26.8" y="9.47" width="3.2" height="1.30" rx="0.50" /><rect x="34.2" y="9.47" width="6.6" height="1.30" rx="0.50" /><rect x="41.6" y="9.47" width="4.6" height="1.30" rx="0.50" /><rect x="49.0" y="9.47" width="3.2" height="1.30" rx="0.50" /><rect x="56.4" y="9.47" width="6.6" height="1.30" rx="0.50" /><rect x="63.8" y="9.47" width="4.6" height="1.30" rx="0.50" /><rect x="71.2" y="9.47" width="3.2" height="1.30" rx="0.50" /><rect x="78.6" y="9.47" width="6.6" height="1.30" rx="0.50" /></g>
+          <path d="M4 -9.5 L84 -9.5" className="rodillo-brillo" />
+          <ellipse cx="86" cy="0" rx="5.5" ry="12" className="rodillo-punta" />
+          <ellipse cx="86.4" cy="0" rx="3.4" ry="7.6" className="rodillo-nucleo" />
+          <ellipse cx="86.7" cy="0" rx="2.1" ry="5" className="rodillo-tubo" />
         </g>
         {/* La chapa con el nombre de la rutina, atornillada al travesaño. */}
         <rect x="95" y="10" width="170" height="27" rx="4" className="rack-kb-chapa" />
@@ -16236,11 +16259,11 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             <circle cx="30" cy="6.5" r="1.7" className="cp-tornillo" /><circle cx="50" cy="6.5" r="1.7" className="cp-tornillo" />
             <path d="M36 10 h8 v10 h-8 z" className="cp-pua" />
             {/* La punta de atrás: la fila de agujeros de la palanca. */}
-            <path d="M24 21 L56 21 L57 128 Q57 136 49 136 L32 136 Q24 136 24 128 Z" fill="url(#cp-gamuza2)" className="cp-borde" />
+            <path d="M24 21 L56 21 C58 60 60 96 57 128 Q56 136 48 136 L31 136 Q23 136 24 128 C27 96 26 60 24 21 Z" fill="url(#cp-gamuza2)" className="cp-borde" />
             <path d="M24 21 L56 21 L56 24 L24 24 Z" fill="url(#cp-canto)" />
             {[86, 97, 108, 119].map((y) => <g key={y}><circle cx="34" cy={y} r="2.1" className="cp-agujero" /><circle cx="46" cy={y} r="2.1" className="cp-agujero" /></g>)}
             {/* La punta de adelante, más corta y un poco corrida: se ve su grueso. */}
-            <path d="M19 21 L53 21 L53 96 Q53 101 48 101 L24 101 Q19 101 19 96 Z" fill="url(#cp-gamuza)" className="cp-borde" />
+            <path d="M19 21 L53 21 C54.5 48 55 74 53 96 Q52.5 101 47.5 101 L23.5 101 Q18.5 101 19 96 C20.5 74 20 48 19 21 Z" fill="url(#cp-gamuza)" className="cp-borde" />
             <rect x="19" y="21" width="34" height="80" fill="url(#cp-pelo)" />
             <path d="M53 21 L56 23 L56 97 L53 99 Z" fill="url(#cp-canto)" />
             <path d="M22 26 V96 M50 26 V96" className="cp-costura" />
@@ -16264,6 +16287,22 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
                 alto="clamp(84px, 25cqi, 140px)"
                 detalle
               />
+              {/* EL COLLARÍN DE RESORTE, acostado en la goma (como los de York o
+                  Marcy): el aro de cuatro vueltas de alambre, los dos mangos de
+                  metal que salen de sus puntas y los puños de goma del color
+                  del día. */}
+              <svg className="collarin-suelto" viewBox="0 0 100 40" aria-hidden="true">
+                <ellipse cx="34" cy="30" rx="30" ry="7" fill="#000" opacity=".5" />
+                <ellipse cx="26" cy="25.0" rx="18" ry="7.5" className="collarin-vuelta" /><ellipse cx="26" cy="23.5" rx="18" ry="7.5" className="collarin-vuelta" /><ellipse cx="26" cy="22.0" rx="18" ry="7.5" className="collarin-vuelta" /><ellipse cx="26" cy="20.5" rx="18" ry="7.5" className="collarin-vuelta" />
+                <ellipse cx="26" cy="21" rx="15" ry="5.2" className="collarin-agujero" />
+                <path d="M10 22 Q12 16.5 22 15.6" className="collarin-luz" />
+                <path d="M43 18.5 L74 10" className="collarin-mango" />
+                <path d="M43.5 25.5 L75 24" className="collarin-mango" />
+                <rect x="70" y="5" width="24" height="9" rx="4.5" transform="rotate(-15 82 9.5)" className="collarin-puno" />
+                <rect x="71" y="19.5" width="24" height="9" rx="4.5" transform="rotate(-3 83 24)" className="collarin-puno" />
+                <path d="M74 7.4 L90 3.2" transform="rotate(-0 0 0)" className="collarin-puno-luz" />
+                <path d="M75 21.6 L91 20.8" className="collarin-puno-luz" />
+              </svg>
               {/* EL PISO DE GOMA, en perspectiva: las baldosas encastradas, con
                   las juntas que se abren hacia adelante, las motas más chicas
                   al fondo y el canto biselado. */}
