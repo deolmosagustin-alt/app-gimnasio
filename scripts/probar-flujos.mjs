@@ -142,12 +142,12 @@ try {
     ok("queda guardada como serie de descarga", marcas.length === 1 && enLogs, `${marcas.length} marca, en el historial: ${enLogs}`);
     ok("la barra carga un disco", (await page.locator(".dia-seccion .barra-cargada .disco-lugar .disco-entra").count()) === 1);
     ok("ofrece terminar la descarga de hoy", (await page.getByRole("button", { name: /Terminar la descarga de hoy/ }).count()) === 1);
-    // Pasar a entrenamiento normal y volver.
-    await page.getByRole("button", { name: "Entrenamiento", exact: true }).click();
+    // Pasar a entrenamiento normal y volver: con el sello de la semana.
+    await page.locator(".sello-semana").click();
     await page.waitForTimeout(900);
     ok("se pasa a entrenamiento normal en el lugar", (await page.locator(".dia-seccion.en-descarga").count()) === 0 && (await page.locator(".dia-seccion .barra-cargada .disco-lugar.afuera").count()) === 0);
     console.log(`    ${await captura(page, "descarga-normal")}`);
-    await page.getByRole("button", { name: /Descarga/ }).filter({ hasText: "Descarga" }).first().click();
+    await page.locator(".sello-semana").click();
     await page.waitForTimeout(900);
     ok("y se vuelve a la descarga", (await page.locator(".dia-seccion.en-descarga").count()) === 1);
     await context.close();
@@ -171,7 +171,7 @@ try {
       const despues = await page.evaluate(() => localStorage.getItem("gym_cycle_start_v2"));
       const semanas = Math.round((new Date(antes) - new Date(despues)) / (7 * 86400000));
       ok("adelantarla corre el inicio del ciclo", semanas === 2, `${semanas} semanas antes`);
-      ok("y esta semana pasa a ser la de descarga", (await page.locator(".dia-seccion.en-descarga").count()) === 1 && (await page.getByRole("button", { name: "Entrenamiento", exact: true }).count()) === 1);
+      ok("y esta semana pasa a ser la de descarga", (await page.locator(".dia-seccion.en-descarga").count()) === 1 && (await page.locator(".sello-semana.descarga").count()) === 1);
       console.log(`    ${await captura(page, "descarga-adelantada")}`);
     }
     await context.close();
