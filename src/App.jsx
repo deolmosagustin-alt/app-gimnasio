@@ -6698,7 +6698,7 @@ label.ajuste-rotulo { display: block; }
 
 
 /* ── VISTA PREVIA 15 (04/11): collarín, piso, cinturón y soga, investigados ── */
-.collarin-suelto { width: 20%; max-width: 86px; left: 5%; bottom: 12px; rotate: -4deg; }
+.collarin-suelto { width: 18%; max-width: 78px; left: 5%; bottom: 12px; rotate: -4deg; }
 .collarin-vuelta { fill: none; stroke: #8e9197; stroke-width: 2.2; }
 .collarin-vuelta:last-of-type { stroke: #b8bbc1; }
 .collarin-agujero { fill: rgba(0,0,0,.35); }
@@ -6706,7 +6706,7 @@ label.ajuste-rotulo { display: block; }
 .collarin-mango { fill: none; stroke: #b4b7bd; stroke-width: 3.2; stroke-linecap: round; }
 .collarin-puno { fill: color-mix(in oklab, var(--c, #14B8A6) 58%, #33353a); stroke: rgba(0,0,0,.4); stroke-width: .8; }
 .collarin-puno-luz { stroke: rgba(255,255,255,.28); stroke-width: 1.4; stroke-linecap: round; }
-.cinturon-pared { position: absolute; z-index: 1; right: 9%; top: 70px; width: 14%; max-width: 60px; rotate: 4deg; transform-origin: 50% 4%; height: auto; filter: drop-shadow(2px 4px 3px rgba(0,0,0,.55)); }
+.cinturon-pared { position: absolute; z-index: 1; right: 9%; top: 66px; width: 15.5%; max-width: 66px; rotate: 4deg; transform-origin: 50% 4%; height: auto; filter: drop-shadow(2px 4px 3px rgba(0,0,0,.55)); }
 .cp-placa { fill: #6f7279; stroke: #3d4045; stroke-width: .8; }
 .cp-tornillo { fill: #3d4045; }
 .cp-pua { fill: #8d9097; }
@@ -6760,6 +6760,14 @@ label.ajuste-rotulo { display: block; }
 .rutina-activa.rack-nuevo .rack-kb::before { display: none; }
 .piso-rack { position: absolute; z-index: 0; left: -16px; right: -16px; bottom: -10px; width: calc(100% + 32px); height: 12%; }
 .piso-rack-junta { stroke: rgba(0,0,0,.5); stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+
+/* ── VISTA PREVIA 19 (04/11): el rodillo parado ── */
+.rodillo-grano circle { fill: #0b1220; opacity: .35; }
+.rodillo-franja { fill: color-mix(in oklab, #3B82F6 62%, #23252b); }
+.rodillo-luz { stroke: rgba(255,255,255,.17); stroke-width: 2.4; stroke-linecap: round; }
+.rodillo-luz.fina { stroke: rgba(255,255,255,.06); stroke-width: 1.2; }
+.rodillo-boca { fill: #5a7cb8; stroke: rgba(0,0,0,.45); stroke-width: .6; }
+.light-mode .rodillo-boca { fill: #6d8dc6; }
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -14427,21 +14435,23 @@ function RackKettlebells({ dias = [], nombre = "", onElegir = null, etiqueta = "
           <linearGradient id={`${uid}-rodillo-relieve`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stopColor="#5d89d6" /><stop offset=".4" stopColor="#3d66b0" /><stop offset="1" stopColor="#1c335e" />
           </linearGradient>
+          <linearGradient id={`${uid}-rod-cuerpo`} x1="0" x2="1">
+            <stop offset="0" stopColor="#1a2a47" /><stop offset=".2" stopColor="#2f4a7a" /><stop offset=".42" stopColor="#4a6ba6" /><stop offset=".66" stopColor="#2f4a7a" /><stop offset="1" stopColor="#152238" />
+          </linearGradient>
         </defs>
-        {/* EL RODILLO DE ESPUMA (como el GRID de TriggerPoint), en
-            perspectiva y apoyado adelante de la pata izquierda del rack, en
-            diagonal: el cilindro entre sus dos bocas, la cuadrícula en relieve
-            que se achica al dar la vuelta, la luz de arriba y la boca de
-            adelante con el núcleo hueco. */}
-        <g className="rack-kb-rodillo" transform="translate(4 271) rotate(-6)">
-          <ellipse cx="46" cy="16" rx="50" ry="5" fill="#000" opacity=".5" />
-          <ellipse cx="2" cy="0" rx="5.5" ry="12" className="rodillo-fondo" />
-          <path d="M2 -12 L86 -12 A5.5 12 0 0 1 86 12 L2 12 Z" fill={`url(#${uid}-rodillo)`} />
-          <g fill={`url(#${uid}-rodillo-relieve)`} className="rodillo-relieve"><rect x="12.0" y="-10.77" width="6.6" height="1.30" rx="0.50" /><rect x="19.4" y="-10.77" width="4.6" height="1.30" rx="0.50" /><rect x="26.8" y="-10.77" width="3.2" height="1.30" rx="0.50" /><rect x="34.2" y="-10.77" width="6.6" height="1.30" rx="0.50" /><rect x="41.6" y="-10.77" width="4.6" height="1.30" rx="0.50" /><rect x="49.0" y="-10.77" width="3.2" height="1.30" rx="0.50" /><rect x="56.4" y="-10.77" width="6.6" height="1.30" rx="0.50" /><rect x="63.8" y="-10.77" width="4.6" height="1.30" rx="0.50" /><rect x="71.2" y="-10.77" width="3.2" height="1.30" rx="0.50" /><rect x="78.6" y="-10.77" width="6.6" height="1.30" rx="0.50" /><rect x="12.0" y="-8.03" width="6.6" height="2.86" rx="1.10" /><rect x="19.4" y="-8.03" width="4.6" height="2.86" rx="1.10" /><rect x="26.8" y="-8.03" width="3.2" height="2.86" rx="1.10" /><rect x="34.2" y="-8.03" width="6.6" height="2.86" rx="1.10" /><rect x="41.6" y="-8.03" width="4.6" height="2.86" rx="1.10" /><rect x="49.0" y="-8.03" width="3.2" height="2.86" rx="1.10" /><rect x="56.4" y="-8.03" width="6.6" height="2.86" rx="1.10" /><rect x="63.8" y="-8.03" width="4.6" height="2.86" rx="1.10" /><rect x="71.2" y="-8.03" width="3.2" height="2.86" rx="1.10" /><rect x="78.6" y="-8.03" width="6.6" height="2.86" rx="1.10" /><rect x="12.0" y="-4.28" width="6.6" height="4.16" rx="1.20" /><rect x="19.4" y="-4.28" width="4.6" height="4.16" rx="1.20" /><rect x="26.8" y="-4.28" width="3.2" height="4.16" rx="1.20" /><rect x="34.2" y="-4.28" width="6.6" height="4.16" rx="1.20" /><rect x="41.6" y="-4.28" width="4.6" height="4.16" rx="1.20" /><rect x="49.0" y="-4.28" width="3.2" height="4.16" rx="1.20" /><rect x="56.4" y="-4.28" width="6.6" height="4.16" rx="1.20" /><rect x="63.8" y="-4.28" width="4.6" height="4.16" rx="1.20" /><rect x="71.2" y="-4.28" width="3.2" height="4.16" rx="1.20" /><rect x="78.6" y="-4.28" width="6.6" height="4.16" rx="1.20" /><rect x="12.0" y="0.12" width="6.6" height="4.16" rx="1.20" /><rect x="19.4" y="0.12" width="4.6" height="4.16" rx="1.20" /><rect x="26.8" y="0.12" width="3.2" height="4.16" rx="1.20" /><rect x="34.2" y="0.12" width="6.6" height="4.16" rx="1.20" /><rect x="41.6" y="0.12" width="4.6" height="4.16" rx="1.20" /><rect x="49.0" y="0.12" width="3.2" height="4.16" rx="1.20" /><rect x="56.4" y="0.12" width="6.6" height="4.16" rx="1.20" /><rect x="63.8" y="0.12" width="4.6" height="4.16" rx="1.20" /><rect x="71.2" y="0.12" width="3.2" height="4.16" rx="1.20" /><rect x="78.6" y="0.12" width="6.6" height="4.16" rx="1.20" /><rect x="12.0" y="5.17" width="6.6" height="2.86" rx="1.10" /><rect x="19.4" y="5.17" width="4.6" height="2.86" rx="1.10" /><rect x="26.8" y="5.17" width="3.2" height="2.86" rx="1.10" /><rect x="34.2" y="5.17" width="6.6" height="2.86" rx="1.10" /><rect x="41.6" y="5.17" width="4.6" height="2.86" rx="1.10" /><rect x="49.0" y="5.17" width="3.2" height="2.86" rx="1.10" /><rect x="56.4" y="5.17" width="6.6" height="2.86" rx="1.10" /><rect x="63.8" y="5.17" width="4.6" height="2.86" rx="1.10" /><rect x="71.2" y="5.17" width="3.2" height="2.86" rx="1.10" /><rect x="78.6" y="5.17" width="6.6" height="2.86" rx="1.10" /><rect x="12.0" y="9.47" width="6.6" height="1.30" rx="0.50" /><rect x="19.4" y="9.47" width="4.6" height="1.30" rx="0.50" /><rect x="26.8" y="9.47" width="3.2" height="1.30" rx="0.50" /><rect x="34.2" y="9.47" width="6.6" height="1.30" rx="0.50" /><rect x="41.6" y="9.47" width="4.6" height="1.30" rx="0.50" /><rect x="49.0" y="9.47" width="3.2" height="1.30" rx="0.50" /><rect x="56.4" y="9.47" width="6.6" height="1.30" rx="0.50" /><rect x="63.8" y="9.47" width="4.6" height="1.30" rx="0.50" /><rect x="71.2" y="9.47" width="3.2" height="1.30" rx="0.50" /><rect x="78.6" y="9.47" width="6.6" height="1.30" rx="0.50" /></g>
-          <path d="M4 -9.5 L84 -9.5" className="rodillo-brillo" />
-          <ellipse cx="86" cy="0" rx="5.5" ry="12" className="rodillo-punta" />
-          <ellipse cx="86.4" cy="0" rx="3.4" ry="7.6" className="rodillo-nucleo" />
-          <ellipse cx="86.7" cy="0" rx="2.1" ry="5" className="rodillo-tubo" />
+        {/* EL RODILLO DE ESPUMA, parado y apoyado contra la pata izquierda
+            del rack, como se guardan en los gimnasios: el cilindro de goma
+            EVA lisa con su grano, la sombra que da la vuelta, la boca de
+            arriba con el núcleo hueco y una franja de color en la punta. */}
+        <ellipse cx="58" cy="286.8" rx="33" ry="3.8" fill="#000" opacity=".55" />
+        <g className="rack-kb-rodillo" transform="translate(86 285) rotate(-56)">
+          <path d="M-13.5 0 L-13.5 -70 A13.5 4.6 0 0 1 13.5 -70 L13.5 0 A13.5 4.6 0 0 1 -11 0 Z" fill={`url(#${uid}-rod-cuerpo)`} />
+          <g className="rodillo-grano"><circle cx="-5.3" cy="-63.2" r="0.49" /><circle cx="-6.9" cy="-65.6" r="0.49" /><circle cx="8.4" cy="-17.2" r="0.62" /><circle cx="-5.6" cy="-34.6" r="0.45" /><circle cx="-6.5" cy="-63.0" r="0.43" /><circle cx="8.5" cy="-15.3" r="0.63" /><circle cx="6.0" cy="-57.2" r="0.46" /><circle cx="2.5" cy="-21.7" r="0.65" /><circle cx="7.6" cy="-64.3" r="0.56" /><circle cx="3.4" cy="-36.6" r="0.41" /><circle cx="-0.5" cy="-64.1" r="0.68" /><circle cx="7.3" cy="-33.9" r="0.46" /><circle cx="8.2" cy="-32.2" r="0.66" /><circle cx="7.0" cy="-36.4" r="0.49" /><circle cx="2.0" cy="-41.6" r="0.41" /><circle cx="-3.9" cy="-16.4" r="0.37" /><circle cx="-9.1" cy="-28.7" r="0.45" /><circle cx="0.7" cy="-38.9" r="0.47" /><circle cx="9.9" cy="-57.1" r="0.49" /><circle cx="-5.9" cy="-28.2" r="0.45" /><circle cx="-2.9" cy="-20.7" r="0.46" /><circle cx="1.2" cy="-10.3" r="0.39" /><circle cx="-8.8" cy="-54.9" r="0.62" /><circle cx="2.3" cy="-54.3" r="0.47" /><circle cx="-6.4" cy="-39.7" r="0.36" /><circle cx="3.9" cy="-10.9" r="0.68" /><circle cx="4.7" cy="-6.6" r="0.36" /><circle cx="-4.2" cy="-6.2" r="0.62" /><circle cx="-1.8" cy="-7.7" r="0.57" /><circle cx="6.4" cy="-50.6" r="0.42" /><circle cx="-1.1" cy="-61.0" r="0.48" /><circle cx="9.2" cy="-48.1" r="0.35" /><circle cx="-9.1" cy="-58.8" r="0.62" /><circle cx="-2.7" cy="-50.8" r="0.38" /><circle cx="9.6" cy="-42.0" r="0.42" /><circle cx="-8.8" cy="-66.4" r="0.41" /><circle cx="3.5" cy="-60.1" r="0.36" /><circle cx="-0.2" cy="-53.6" r="0.70" /><circle cx="-7.6" cy="-35.1" r="0.62" /><circle cx="-1.8" cy="-4.8" r="0.52" /><circle cx="-5.2" cy="-42.9" r="0.36" /><circle cx="-1.6" cy="-53.6" r="0.66" /><circle cx="6.6" cy="-37.1" r="0.36" /><circle cx="-4.9" cy="-54.0" r="0.42" /><circle cx="-5.4" cy="-12.6" r="0.40" /><circle cx="-9.0" cy="-8.7" r="0.55" /></g>
+          <path d="M-8.5 -68 L-8.5 -3" className="rodillo-luz" />
+          <path d="M5 -66 L5 -6" className="rodillo-luz fina" />
+          <ellipse cx="0" cy="-70" rx="13.5" ry="4.6" className="rodillo-boca" />
+          <ellipse cx="0" cy="-70" rx="7" ry="2.4" className="rodillo-nucleo" />
+          <ellipse cx="0" cy="-70" rx="4.6" ry="1.6" className="rodillo-tubo" />
         </g>
         {/* La chapa con el nombre de la rutina, atornillada al travesaño. */}
         <rect x="95" y="10" width="170" height="27" rx="4" className="rack-kb-chapa" />
