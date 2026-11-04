@@ -6531,8 +6531,9 @@ label.ajuste-rotulo { display: block; }
 .rack-kb { position: relative; width: 100%; aspect-ratio: 360 / 290; }
 .rack-kb-fondo, .rack-kb-frente { position: absolute; inset: 0; width: 100%; height: 100%; }
 .rack-kb-frente { pointer-events: none; z-index: 2; }
-.rack-kb-pesa { position: absolute; z-index: 1; width: 15%; display: block; padding: 0; background: none; transition: transform var(--dur-chico) var(--resorte, ease); }
-.rack-kb-pesa .pesa-rusa { width: 100%; height: auto; display: block; }
+.rack-kb-pesa { position: absolute; z-index: 1; width: 20.5%; display: flex !important; align-items: flex-start; justify-content: center; border-radius: 12px; -webkit-tap-highlight-color: transparent; display: block; padding: 0; background: none; transition: transform var(--dur-chico) var(--resorte, ease); }
+.rack-kb-pesa .pesa-rusa { width: 73%; height: auto; display: block; }
+.rack-kb-pesa:focus-visible { outline: 2px solid color-mix(in oklab, var(--c, var(--tono)) 70%, white); outline-offset: -2px; }
 .rack-kb-pesa.con-pesa { --d: color-mix(in oklab, var(--dia) 62%, #8a8c92); }
 .light-mode .rack-kb-pesa.con-pesa { --d: color-mix(in oklab, var(--dia) 72%, #a7a9ae); }
 .rack-kb-pesa.hoy { transform: translateY(-9%); }
@@ -6599,7 +6600,7 @@ label.ajuste-rotulo { display: block; }
 .rack-kb-carton { fill: #d6c9a8; stroke: rgba(0,0,0,.25); stroke-width: .6; }
 .rack-kb-ojal { fill: #3a342b; }
 .rack-kb-etiqueta { animation: etiquetaHamaca 3.4s ease-in-out infinite; animation-delay: calc(var(--i, 0) * -0.45s); }
-.rack-kb-que { font: 800 11px 'Mona Sans Variable', system-ui, sans-serif; font-stretch: 82%; fill: color-mix(in oklab, var(--dia, #5d5e64) 55%, #2b2620); }
+.rack-kb-que { font: 800 11px 'Mona Sans Variable', system-ui, sans-serif; font-stretch: 82%; fill: #2b2620; }
 .rack-kb-dia { font: 800 12px 'Mona Sans Variable', system-ui, sans-serif; }
 .rack-kb-banda { fill: none; stroke: color-mix(in oklab, #c25a5c 75%, #2a2b2e); stroke-width: 4; stroke-linecap: round; }
 @media (prefers-reduced-motion: reduce) { .rack-kb-etiqueta { animation: none; } }
@@ -6774,6 +6775,51 @@ label.ajuste-rotulo { display: block; }
 .sello-semana:active { transform: scale(.94); }
 @keyframes selloEstampa { 0% { transform: scale(1.7); opacity: 0; } 55% { transform: scale(.94); opacity: 1; } 75% { transform: scale(1.03); } 100% { transform: none; } }
 @media (prefers-reduced-motion: reduce) { .sello-semana { animation: none; } }
+
+
+/* ── LA RUTINA EN NÚMEROS (04/11) ── */
+.analitica-rutina { display: grid; gap: 22px; }
+.analitica-rutina > section { display: grid; gap: 10px; }
+.analitica-cabeza { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.analitica-cabeza > span { font-size: 13px; color: var(--text-faint); white-space: nowrap; }
+.duracion-grafico { position: relative; display: grid; gap: 10px; }
+.duracion-ticks { position: relative; height: 14px; }
+.duracion-ticks em { position: absolute; top: 0; translate: -50% 0; font-style: normal; font-size: 11px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.duracion-ticks em:first-child { translate: 0 0; }
+.duracion-ticks em:last-child { translate: -100% 0; }
+.duracion-fila:not(.escala) .duracion-pista { background: linear-gradient(90deg, transparent calc(33.33% - .5px), var(--hairline) calc(33.33% - .5px) calc(33.33% + .5px), transparent calc(33.33% + .5px) calc(66.66% - .5px), var(--hairline) calc(66.66% - .5px) calc(66.66% + .5px), transparent calc(66.66% + .5px)), var(--velo-fuerte); }
+.duracion-fila { position: relative; display: grid; grid-template-columns: 92px minmax(0, 1fr) 4.4em; align-items: center; gap: 10px; }
+.duracion-nombre { font-size: 12px; font-weight: 700; line-height: 1.15; color: var(--text-muted); overflow-wrap: normal; word-break: normal; text-wrap: balance; }
+.duracion-pista { position: relative; height: 12px; border-radius: 6px; background: var(--velo-fuerte); overflow: hidden; }
+.duracion-pista i { display: block; height: 100%; border-radius: 6px; background: color-mix(in oklab, var(--c, var(--tono)) 72%, white); }
+.duracion-fila b { text-align: right; font-size: 17px; font-weight: 800; color: var(--text-strong); }
+.duracion-fila b small { font-size: 11px; font-weight: 600; color: var(--text-faint); }
+.rangos-barra { display: flex; gap: 3px; height: 16px; border-radius: 8px; overflow: hidden; }
+.rango-tramo { display: block; min-width: 6px; }
+.rango-tramo.fuerza { background: color-mix(in oklab, var(--c, var(--tono)) 72%, white); }
+.rango-tramo.hipertrofia { background: color-mix(in oklab, var(--c, var(--tono)) 45%, #8a8c92); }
+.rango-tramo.resistencia { background: color-mix(in oklab, var(--text-strong) 28%, transparent); }
+.rangos-leyenda { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.rango-ley { display: grid; grid-template-columns: auto 1fr; align-items: baseline; column-gap: 6px; }
+.rango-ley > i { width: 10px; height: 10px; border-radius: 3px; align-self: center; grid-row: span 2; }
+.rango-ley b { font-size: 20px; font-weight: 800; color: var(--text-strong); line-height: 1; }
+.rango-ley > span { grid-column: 2; display: grid; font-size: 12px; font-weight: 700; color: var(--text-muted); line-height: 1.2; }
+.rango-ley small { font-size: 11px; font-weight: 500; color: var(--text-faint); }
+.rango-ley.vacio { opacity: .45; }
+.frecuencia-lista { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; }
+.frecuencia-fila { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; min-height: 30px; padding: 4px 10px; border-radius: 10px; background: var(--panel-sunken); }
+.frecuencia-nombre { font-size: 13px; font-weight: 700; color: var(--text-strong); }
+.frecuencia-fila b { font-size: 16px; font-weight: 800; color: var(--text-strong); min-width: 1.8em; text-align: right; }
+.frecuencia-fila b small { font-size: 11px; color: var(--text-faint); }
+.frecuencia-fila.poca .frecuencia-nombre, .frecuencia-fila.poca b { color: var(--text-faint); }
+.frecuencia-fila .marcas { color: color-mix(in oklab, var(--c, var(--tono)) 70%, white); }
+.light-mode .frecuencia-fila .marcas { color: color-mix(in oklab, var(--c, var(--tono)) 70%, black); }
+@media (max-width: 359px) { .frecuencia-lista { grid-template-columns: minmax(0, 1fr); } }
+/* Balance y Cronograma, debajo del rack, con aire y planos. */
+.rutina-activa.rack-nuevo { padding-bottom: 16px !important; }
+.rack-acciones { margin-top: 6px; }
+.rack-acciones .boton-tonal { min-height: 48px; border-radius: 14px; font-size: 15px; font-weight: 700; background: color-mix(in oklab, var(--c, var(--tono)) 12%, var(--surface-2)); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--c, var(--tono)) 22%, transparent); }
+.rack-acciones .boton-tonal[aria-expanded="true"] { background: color-mix(in oklab, var(--c, var(--tono)) 24%, var(--surface-2)); }
 
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
@@ -14455,7 +14501,7 @@ function RackKettlebells({ dias = [], nombre = "", onElegir = null, etiqueta = "
       </svg>
       {lugares.map(({ d, x, base }, i) => {
         const texto = `${d.nombre || d.corto}: ${d.dia ? d.dia.label : "descanso"}${d.hoy ? " (hoy)" : ""}`;
-        const estilo = { left: `${((x - 27) / 360) * 100}%`, top: `${((base - 49.7) / 290) * 100}%`, ...(d.dia ? { "--dia": d.dia.color } : null) };
+        const estilo = { left: `${((x - 37) / 360) * 100}%`, top: `${((base - 52) / 290) * 100}%`, height: `${(110 / 290) * 100}%`, ...(d.dia ? { "--dia": d.dia.color } : null) };
         const clase = `rack-kb-pesa ${d.dia ? "con-pesa" : ""} ${d.hoy ? "hoy" : ""}`;
         return onElegir && d.dia
           ? <button key={d.clave || i} onClick={() => onElegir(d)} className={clase} style={estilo} aria-label={`${texto}. Tocá para entrenarlo`}><PesaRusa /></button>
@@ -30326,6 +30372,107 @@ function haceCuanto(dias) {
 // seriesSemanalesPorMusculo). COLAPSADO por defecto (los 3 primeros y "ver
 // todos"); abajo, los que quedan por debajo de la raya, para que se vean
 // aunque la lista esté cerrada.
+// LA RUTINA EN NÚMEROS (04/11, pedido: "mejorar la estética de las
+// analíticas cuando entrás a una rutina, con más métricas y gráficos que
+// queden bien"): tres lecturas que no estaban, con las piezas de la app.
+//  · Cuánto dura cada día: una estimación con las series, el tiempo de cada
+//    una por sus reps (3 s por rep) y el descanso que piden (2:30 en las de
+//    fuerza, 1:30 en las demás), más 5 min de entrada en calor.
+//  · En qué rango trabaja: las series de fuerza (hasta 5 reps), de
+//    hipertrofia (6 a 15) y de resistencia (más de 15), en una sola barra.
+//  · Cuántas veces por semana toca cada región, en marcas de tiza: la
+//    evidencia (Schoenfeld et al., 2016) favorece dos o más por semana.
+function analiticaDeRutina(routineDef) {
+  const dias = (routineDef?.dayOrder || Object.keys(routineDef?.days || {})).filter((dk) => routineDef?.days?.[dk]);
+  const veces = vecesPorSemana(routineDef);
+  const rangos = { fuerza: 0, hipertrofia: 0, resistencia: 0 };
+  const regiones = Object.fromEntries(REGIONES.map((rg) => [rg, 0]));
+  const duraciones = dias.map((dk) => {
+    const day = routineDef.days[dk];
+    let seg = 5 * 60;
+    const tocadas = new Set();
+    (day.exercises || []).forEach((ex) => {
+      const reg = REGION_DE_GRUPO[EXERCISE_LIBRARY_BY_ID[ex.libId || ex.id]?.group];
+      if (reg) tocadas.add(reg);
+      (ex.sets || []).forEach((st) => {
+        const rr = rangoDeReps(st.repRange) || [8, 12];
+        const medio = (rr[0] + rr[1]) / 2;
+        seg += medio * 3 + (medio <= 5 ? 150 : 90);
+        const v = veces[dk] || 0;
+        if (medio <= 5) rangos.fuerza += v; else if (medio <= 15) rangos.hipertrofia += v; else rangos.resistencia += v;
+      });
+    });
+    tocadas.forEach((reg) => { if (reg in regiones) regiones[reg] += veces[dk] || 0; });
+    return { dk, label: day.label, minutos: Math.round(seg / 60) };
+  });
+  return { duraciones, rangos, regiones };
+}
+function AnaliticaRutina({ routineDef }) {
+  const { duraciones, rangos, regiones } = useMemo(() => analiticaDeRutina(routineDef), [routineDef]);
+  if (!duraciones.length) return null;
+  const maxMin = Math.max(30, ...duraciones.map((d) => d.minutos));
+  const escala = Math.ceil(maxMin / 15) * 15;
+  const totalSeries = rangos.fuerza + rangos.hipertrofia + rangos.resistencia;
+  const tramos = [
+    { k: "fuerza", l: "Fuerza", sub: "hasta 5 reps", n: rangos.fuerza },
+    { k: "hipertrofia", l: "Hipertrofia", sub: "6 a 15 reps", n: rangos.hipertrofia },
+    { k: "resistencia", l: "Resistencia", sub: "más de 15", n: rangos.resistencia },
+  ];
+  const listaRegiones = REGIONES.map((rg) => ({ rg, n: regiones[rg] || 0 })).sort((a, b) => b.n - a.n);
+  return (
+    <div className="analitica-rutina">
+      <section aria-label="Cuánto dura cada día">
+        <div className="analitica-cabeza"><h4 className="seccion-titulo">Cuánto dura cada día</h4><span>estimado</span></div>
+        <div className="duracion-grafico" role="img" aria-label={duraciones.map((d) => `${d.label}: ${d.minutos} minutos`).join(", ")}>
+          <div className="duracion-fila escala" aria-hidden="true">
+            <span />
+            <span className="duracion-ticks">{[0, escala / 3, (escala * 2) / 3, escala].map((m) => <em key={m} style={{ left: `${(m / escala) * 100}%` }}>{Math.round(m)}</em>)}</span>
+            <span />
+          </div>
+          {duraciones.map((d, i) => (
+            <div key={d.dk} className="duracion-fila">
+              <span className="duracion-nombre">{d.label}</span>
+              <span className="duracion-pista"><i className="grow-bar" style={{ width: `${(d.minutos / escala) * 100}%`, animationDelay: `${i * 70}ms` }} /></span>
+              <b className="num-display">{d.minutos}<small> min</small></b>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {totalSeries > 0 && (
+        <section aria-label="En qué rango de repeticiones trabaja">
+          <div className="analitica-cabeza"><h4 className="seccion-titulo">En qué rango trabaja</h4><span>{totalSeries} series por semana</span></div>
+          <div className="rangos-barra" role="img" aria-label={tramos.map((t) => `${t.l}: ${t.n} series`).join(", ")}>
+            {tramos.filter((t) => t.n > 0).map((t) => <i key={t.k} className={`rango-tramo ${t.k}`} style={{ flexGrow: t.n }} />)}
+          </div>
+          <div className="rangos-leyenda">
+            {tramos.map((t) => (
+              <span key={t.k} className={`rango-ley ${t.n ? "" : "vacio"}`}>
+                <i className={`rango-tramo ${t.k}`} aria-hidden="true" />
+                <b className="num-display">{Math.round((t.n / totalSeries) * 100)}%</b>
+                <span>{t.l}<small>{t.sub}</small></span>
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section aria-label="Cuántas veces por semana toca cada región">
+        <div className="analitica-cabeza"><h4 className="seccion-titulo">Cuántas veces por semana</h4><span>lo ideal: 2 o más</span></div>
+        <div className="frecuencia-lista">
+          {listaRegiones.map(({ rg, n }) => (
+            <div key={rg} className={`frecuencia-fila ${n < 2 ? "poca" : ""}`}>
+              <span className="frecuencia-nombre">{rg}</span>
+              <MarcasTiza dias={n} max={7} alto={14} decorativa />
+              <b className="num-display">{n}<small>×</small></b>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function BalanceMuscular({ routineDef, compacto = true }) {
   const [expandido, setExpandido] = useState(false);
   const { musculos, directas } = useMemo(() => seriesSemanalesPorMusculo(routineDef), [routineDef]);
@@ -30420,6 +30567,11 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
             <h4 className="seccion-titulo">Cómo reparte el trabajo</h4>
             <BarraEquilibrio routineDef={routineDef} />
             <BalanceMuscular routineDef={routineDef} />
+          </section>
+
+          <section className="space-y-3" aria-label="La rutina en números">
+            <h4 className="seccion-titulo">La rutina en números</h4>
+            <AnaliticaRutina routineDef={routineDef} />
           </section>
         </div>
 
@@ -30749,7 +30901,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
           })()}
 
           {/* Balance y cronograma, a un toque. */}
-          <div className="grid grid-cols-2 gap-2 botones-par">
+          <div className="grid grid-cols-2 gap-2 botones-par rack-acciones">
             <button onClick={() => setShowBalance((v) => !v)} className="boton-tonal" aria-expanded={showBalance}>
               <Activity size={15} /> {showBalance ? "Ocultar" : "Balance"}
             </button>
@@ -30764,6 +30916,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
                   barra se inclina. Abajo, el detalle por músculo. */}
               <BarraEquilibrio routineDef={activeDef} />
               <BalanceMuscular routineDef={activeDef} />
+              <AnaliticaRutina routineDef={activeDef} />
             </div>
           )}
 

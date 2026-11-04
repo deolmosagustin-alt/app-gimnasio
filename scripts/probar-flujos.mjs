@@ -72,7 +72,10 @@ async function abrir(pestana, { fecha = "2026-11-05", ancho = 390, alto = 844, a
     }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ["class"] });
   });
   await page.goto(`${url}/?demo=${pestana}${extra}`);
-  await page.waitForTimeout(1500);
+  // 2,5 s: la primera carga marca la descarga como vista unos 450 ms después
+  // de armar Rutina; con menos espera, esa marca podía llegar después de
+  // borrarla abajo y la segunda carga ya abría transformada.
+  await page.waitForTimeout(2500);
   // El inicio del ciclo y, de nuevo, la app (sin ?demo, que volvería a cargar el perfil de muestra).
   await page.evaluate((c) => { localStorage.setItem("gym_cycle_start_v2", c); localStorage.removeItem("modusfit_descarga_vista"); }, ciclo);
   await page.goto(`${url}/?pestana=${pestana}${extra}`);
