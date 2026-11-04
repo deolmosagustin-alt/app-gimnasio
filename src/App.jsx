@@ -6233,6 +6233,60 @@ label.ajuste-rotulo { display: block; }
   .campana-record-pieza { animation-name: campanaApareceQuieta; }
 }
 
+/* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
+   rueda y el aplauso con magnesio) */
+/* A1: la barra sube de los ganchos cuando se va el molinete. */
+.dia-barra.se-desengancha .barra-cargada { animation: barraDesengancha 1.3s cubic-bezier(.3,.7,.4,1) 1.75s both; }
+@keyframes barraDesengancha { 0% { transform: none; } 30% { transform: translateY(-12px); } 45% { transform: translateY(-9px) scaleX(1.004); } 70% { transform: translateY(-11px); } 100% { transform: none; } }
+/* A3: los últimos tres segundos en LED. */
+.led-cuenta { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 210px); z-index: 120; translate: -50% 0; pointer-events: none; display: grid; place-items: center; width: 132px; height: 116px; border-radius: 16px; background: #0a0a0b; box-shadow: inset 0 0 0 3px #2f3136, 0 18px 40px -14px rgba(0,0,0,.9); }
+.led-cuenta-numero { font-size: calc(84px * 1); font-weight: 800; line-height: 1; color: #ff5a55; text-shadow: 0 0 18px rgba(255,80,75,.65), 0 0 2px #ffb3b0; animation: ledDestello .9s ease-out both; }
+@keyframes ledDestello { 0% { opacity: 0; transform: scale(1.25); } 18% { opacity: 1; transform: scale(1); } 80% { opacity: 1; } 100% { opacity: .55; } }
+/* A4: la cinta sale del carrete; la pesa de la balanza se balancea. */
+.cinta.se-desenrolla { animation: cintaSale 1s cubic-bezier(.25,.8,.3,1) .1s both; }
+@keyframes cintaSale { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+.cinta.se-desenrolla .cinta-marca:not(.fantasma) { animation: aparece .3s ease-out 1.05s both; }
+.balanza-pesa.llega { animation: pesaLlega 1.2s cubic-bezier(.3,.7,.4,1) .15s both; }
+@keyframes pesaLlega { 0% { transform: translateX(-46px); } 45% { transform: translateX(8px); } 65% { transform: translateX(-4px); } 82% { transform: translateX(2px); } 100% { transform: none; } }
+@keyframes aparece { from { opacity: 0; } to { opacity: 1; } }
+/* A5: la puerta del casillero gira sobre la bisagra. */
+.casillero-puerta { position: absolute; inset: 0; z-index: 3; border-radius: inherit; pointer-events: none; transform-origin: left center; background: repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 2px, transparent 2px 5px), #2e3036; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 0 0 6px rgba(0,0,0,.2); animation: puertaAbre .95s cubic-bezier(.45,.05,.3,1) .2s both; }
+.casillero-puerta-manija { position: absolute; right: 16px; top: 50%; width: 8px; height: 34px; translate: 0 -50%; border-radius: 4px; background: #8d9097; }
+.light-mode .casillero-puerta { background: repeating-linear-gradient(90deg, rgba(0,0,0,.02) 0 2px, transparent 2px 5px), #cfd2d8; }
+@keyframes puertaAbre { 0% { transform: perspective(1800px) rotateY(0); opacity: 1; } 75% { opacity: 1; } 100% { transform: perspective(1800px) rotateY(-96deg); opacity: 0; visibility: hidden; } }
+/* A6: la firma se escribe sola cuando alguien llega. */
+.planilla-firma.se-escribe { animation: firmaEscribe 1.1s steps(9) .2s both; }
+@keyframes firmaEscribe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+/* A8: la chinche baja y clava la hoja. */
+.hoja-clavada.se-clava .chinche { animation: chincheBaja .6s cubic-bezier(.3,.7,.4,1) both; }
+.hoja-clavada.se-clava { animation: hojaSeAsienta .9s ease-out .35s both; }
+@keyframes chincheBaja { 0% { transform: translateY(-34px) scale(1.25); opacity: 0; } 55% { transform: translateY(3px) scale(.96); opacity: 1; } 100% { transform: none; } }
+@keyframes hojaSeAsienta { 0% { transform: rotate(0); } 30% { transform: rotate(-2.2deg); } 60% { transform: rotate(1.2deg); } 100% { transform: none; } }
+/* A9: el borrador pasa por la pizarra. */
+.pizarra-ia-borrador-pasa { position: absolute; z-index: 2; top: 18px; left: 0; width: 74px; height: 34px; border-radius: 4px; pointer-events: none; background: linear-gradient(#3a3c42 0 62%, #d8d6cf 62%); box-shadow: 0 4px 6px rgba(0,0,0,.4); animation: borradorPasa .9s ease-in-out both; }
+@keyframes borradorPasa { 0% { transform: translate(-80px, 0); } 50% { transform: translate(calc(50cqi + 40px), 26px); } 100% { transform: translate(calc(100cqi + 80px), 4px); } }
+.pizarra-ia { container-type: inline-size; overflow: hidden; }
+.pizarra-ia.borrando .pizarra-ia-saludo, .pizarra-ia.borrando .pizarra-ia-pregunta { animation: tizaVuelve 1.4s ease-out both; }
+@keyframes tizaVuelve { 0%, 45% { clip-path: inset(0 100% 0 0); } 100% { clip-path: inset(0 0 0 0); } }
+/* A10: la nota se despega de una punta y vuela a la charla. */
+.ia-tarjeta.postit.se-despega { transform-origin: top left; animation: notaVuela .46s cubic-bezier(.5,0,.75,.4) both; }
+@keyframes notaVuela { 0% { transform: none; } 30% { transform: rotate(-7deg) translate(-3px, -6px); } 100% { transform: translate(30px, 140px) rotate(9deg) scale(.55); opacity: 0; } }
+/* A11: el carnet baja por el lector y se prende la luz verde. */
+.carnet-con-lector { position: relative; display: grid; }
+.carnet-con-lector.pasa .carnet { animation: carnetPasa 1s cubic-bezier(.3,.7,.4,1) both; }
+@keyframes carnetPasa { 0% { transform: translateY(-26px); clip-path: inset(26px 0 0 0 round 28px); } 60% { transform: translateY(3px); clip-path: inset(0 0 0 0 round 28px); } 100% { transform: none; } }
+.carnet-lector { position: absolute; z-index: 2; top: -6px; left: 50%; translate: -50% 0; width: 120px; height: 12px; border-radius: 6px; background: #2a2c31; box-shadow: inset 0 2px 0 #0d0e10; display: grid; place-items: center end; padding-right: 8px; pointer-events: none; animation: aparece .2s ease-out both, lectorSeVa .4s ease-in 1.7s forwards; }
+.carnet-lector i { width: 6px; height: 6px; border-radius: 999px; background: #3a3c42; animation: luzVerde .1s steps(1) .7s forwards; }
+@keyframes luzVerde { to { background: #5fd38a; box-shadow: 0 0 8px #5fd38a; } }
+@keyframes lectorSeVa { to { opacity: 0; } }
+/* A12: la medalla nueva cae colgada y se balancea. */
+.vitrina-lugar.se-cuelga .medalla-mes, .vitrina-lugar.se-cuelga > svg, .vitrina-lugar.se-cuelga .medalla { transform-origin: 50% -30px; animation: medallaCuelga 1.5s cubic-bezier(.3,.7,.4,1) .3s both; }
+@keyframes medallaCuelga { 0% { transform: translateY(-60px); opacity: 0; } 30% { transform: translateY(0) rotate(9deg); opacity: 1; } 50% { transform: rotate(-6deg); } 68% { transform: rotate(3deg); } 84% { transform: rotate(-1deg); } 100% { transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .dia-barra.se-desengancha .barra-cargada, .led-cuenta-numero, .cinta.se-desenrolla, .cinta.se-desenrolla .cinta-marca, .balanza-pesa.llega, .planilla-firma.se-escribe, .hoja-clavada.se-clava, .hoja-clavada.se-clava .chinche, .pizarra-ia.borrando .pizarra-ia-saludo, .pizarra-ia.borrando .pizarra-ia-pregunta, .ia-tarjeta.postit.se-despega, .carnet-con-lector.pasa .carnet, .vitrina-lugar.se-cuelga * { animation: none; }
+  .casillero-puerta, .pizarra-ia-borrador-pasa, .carnet-lector { display: none; }
+}
+
 /* LA BARRA AL RACK */
 .rack-velo { animation: molineteVelo 2.1s ease-in-out both; }
 .rack { display: block; width: 280px; height: 190px; overflow: visible; }
@@ -10391,7 +10445,15 @@ function FilaDescansoDock({ timerId, embebido = false }) {
   const base = datos?.color || "#14B8A6";
   const color = listo ? "#10B981" : urgente ? "#F59E0B" : base;
   const enPausa = estado === "paused";
-  const relojGrande = grande && <RelojDescansoGrande timerId={timerId} onClose={() => setGrande(false)} />;
+  // LOS ÚLTIMOS TRES SEGUNDOS EN LED (A3): el número grande, rojo, como el
+  // reloj de pared de los gimnasios, con un destello por segundo (la
+  // vibración ya la da VigilanteDescansos).
+  const ultimos = estado === "running" && restante > 0 && restante <= 3 ? Math.ceil(restante) : 0;
+  const led = ultimos > 0 && typeof document !== "undefined" && createPortal(
+    <div className="led-cuenta" aria-hidden="true"><span key={ultimos} className="led-cuenta-numero num-display">{ultimos}</span></div>,
+    document.body,
+  );
+  const relojGrande = <>{grande && <RelojDescansoGrande timerId={timerId} onClose={() => setGrande(false)} />}{led}</>;
   const envolver = (contenido) => (embebido
     ? <div className="dock-descanso dock-descanso-embebido relative" style={{ "--c": color }}>{contenido}{relojGrande}</div>
     : <div className="dock-tarjeta dock-descanso session-bar-in" style={{ "--c": color }}>{contenido}{relojGrande}</div>);
@@ -11442,6 +11504,17 @@ function VitrinaMedallas({ logs, trainingSessions }) {
     });
   }, [logs, trainingSessions]);
   const datosAbierto = useMemo(() => (abierto ? computePrefixRecap(logs || {}, trainingSessions || [], abierto) : null), [abierto, logs, trainingSessions]);
+  // LA MEDALLA QUE SE CUELGA (A12): la del último mes cerrado cae colgada
+  // de su cinta y se balancea, una sola vez por medalla.
+  const [colgando] = useState(() => {
+    const ultima = [...meses].reverse().find((x) => !x.enCurso && x.dias > 0)?.prefijo || null;
+    if (!ultima) return null;
+    try {
+      if (localStorage.getItem("modusfit_medalla_colgada") === ultima) return null;
+      localStorage.setItem("modusfit_medalla_colgada", ultima);
+      return ultima;
+    } catch { return null; }
+  });
   if (!meses.some((x) => x.dias > 0)) return null;
   const ganadas = meses.filter((x) => !x.enCurso && x.dias > 0).length;
   const hayAntes = meses.slice(0, 6).some((x) => x.dias > 0);
@@ -11454,7 +11527,7 @@ function VitrinaMedallas({ logs, trainingSessions }) {
       </div>
       <div className="vitrina-estante">
         {colgados.map((x) => (!x.enCurso && x.dias > 0 ? (
-          <button key={x.prefijo} onClick={() => { setResumenEntero(false); setAbierto(x.prefijo); }} className="vitrina-lugar con-medalla" aria-label={`${capitalizar(NOMBRES_MES[x.mes])} de ${x.anio}: ${x.dias} ${x.dias === 1 ? "día" : "días"}. Ver el resumen`}>
+          <button key={x.prefijo} onClick={() => { setResumenEntero(false); setAbierto(x.prefijo); }} className={`vitrina-lugar con-medalla ${colgando === x.prefijo ? "se-cuelga" : ""}`} aria-label={`${capitalizar(NOMBRES_MES[x.mes])} de ${x.anio}: ${x.dias} ${x.dias === 1 ? "día" : "días"}. Ver el resumen`}>
             <span className="vitrina-clavo" aria-hidden="true" />
             <MedallaMes chica numero={x.dias} />
             <span className="vitrina-mes">{MESES_CORTOS[x.mes]}</span>
@@ -13420,6 +13493,8 @@ function MarcasTiza({ dias = 0, max = 10, alto = 16, decorativa = false, classNa
 // La balanza de cursor. `inicio` es tu primer registro, `actual` el último;
 // el tramo sombreado de la viga es entre tu mínimo y tu máximo.
 function BalanzaCursor({ inicio, actual, min, max, unidad, nota = null }) {
+  // La pesa llega balanceándose a tu peso de hoy, la primera vez del día (A4).
+  const llega = usePrimeraVezHoy("balanza");
   const bajo = Math.floor(Math.min(min, inicio, actual) - 1);
   const alto = Math.ceil(Math.max(max, inicio, actual) + 1);
   const rango = Math.max(1, alto - bajo);
@@ -13434,7 +13509,7 @@ function BalanzaCursor({ inicio, actual, min, max, unidad, nota = null }) {
         <span className="balanza-rango" style={{ left: pos(min), width: `calc(${pos(max)} - ${pos(min)})` }} />
         {marcas.map((v) => <i key={v} className={Number.isInteger(v) ? "mayor" : ""} style={{ left: pos(v) }} />)}
         <span className="balanza-pesa fantasma" style={{ left: pos(inicio) }} />
-        <span className="balanza-pesa" style={{ left: pos(actual) }} />
+        <span className={`balanza-pesa ${llega ? "llega" : ""}`} style={{ left: pos(actual) }} />
       </div>
       <div className="balanza-escala" aria-hidden="true"><span>{bajo}</span><span>{alto}</span></div>
       <div className="balanza-leyenda" aria-hidden="true">
@@ -13463,6 +13538,8 @@ function LecturaCabeza({ actual, inicio, unidad, nota }) {
 // Dice lo mismo que la balanza del peso, con el objeto con el que de verdad
 // se mide una cintura.
 function CintaMetrica({ inicio, actual, min, max, unidad, nota = null }) {
+  // La cinta sale del carrete hasta tu medida, la primera vez del día (A4).
+  const sale = usePrimeraVezHoy("cinta");
   const bajo = Math.floor(Math.min(min, inicio, actual) - 1);
   const alto = Math.ceil(Math.max(max, inicio, actual) + 1);
   const rango = Math.max(2, alto - bajo);
@@ -13479,7 +13556,7 @@ function CintaMetrica({ inicio, actual, min, max, unidad, nota = null }) {
   return (
     <div className="balanza" role="img" aria-label={`Hoy ${actual} ${unidad}; empezaste en ${inicio} ${unidad}`}>
       <LecturaCabeza actual={actual} inicio={inicio} unidad={unidad} nota={nota} />
-      <div className="cinta" aria-hidden="true">
+      <div className={`cinta ${sale ? "se-desenrolla" : ""}`} aria-hidden="true">
         <span className="cinta-rango" style={{ left: pos(min), width: `calc(${((max - min) / rango).toFixed(4)} * (100% - 24px))` }} />
         {rayas.map((r) => <i key={r.v} className={r.tipo} style={{ left: pos(r.v) }} />)}
         {rayas.filter((r) => r.tipo === "numero").map((r) => <b key={r.v} style={{ left: pos(r.v) }}>{r.v}</b>)}
@@ -13756,7 +13833,13 @@ function semanaDeSesiones(sesiones = [], colorDe = () => null) {
 // EL CARNET DE SOCIO: tu ficha, como la tarjeta del gimnasio. Arriba quién
 // sos; abajo del troquel, tu racha (la cadena) y tu semana (los agujeros).
 function CarnetSocio({ color = "#8B5CF6", foto = null, inicial = "?", nombre, linea = null, medalla = null, racha = 0, semana = [], children = null }) {
+  // EL CARNET EN EL LECTOR (A11): la primera vez del día que abrís Perfil,
+  // el carnet baja por la ranura del lector del molinete y se prende la luz
+  // verde, como al entrar al gimnasio.
+  const pasa = usePrimeraVezHoy("carnet");
   return (
+    <div className={`carnet-con-lector ${pasa ? "pasa" : ""}`}>
+    {pasa && <span className="carnet-lector" aria-hidden="true"><i /></span>}
     <section className="carnet elastic-in" style={{ "--rango": color }} aria-label="Tu carnet">
       <div className="carnet-arriba">
         <div className="carnet-avatar">{foto ? <img src={foto} alt="" /> : <span aria-hidden="true">{inicial}</span>}</div>
@@ -13779,6 +13862,7 @@ function CarnetSocio({ color = "#8B5CF6", foto = null, inicial = "?", nombre, li
       </div>
       {children}
     </section>
+    </div>
   );
 }
 
@@ -15180,6 +15264,20 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   // día se ve sin sesión (podés iniciar otra o solo registrar), pero la
   // sesión original sigue corriendo en su día — no se resetea.
   const sessionForThisDay = (activeSession && (!activeSession.dayKey || activeSession.dayKey === activeDay)) ? activeSession : null;
+  // LA BARRA SE DESENGANCHA (03/11, A1 de las propuestas): al iniciar la
+  // sesión, cuando se va el molinete, la barra del día sube de los ganchos.
+  // Sólo al tocar "Iniciar sesión", no al abrir la app con una ya empezada.
+  const [arranca, setArranca] = useState(false);
+  const inicioSesion = sessionForThisDay?.startedAt || null;
+  const inicioPrevio = useRef(inicioSesion);
+  useEffect(() => {
+    const antes = inicioPrevio.current;
+    inicioPrevio.current = inicioSesion;
+    if (!inicioSesion || antes) return;
+    const a = requestAnimationFrame(() => setArranca(true));
+    const t = setTimeout(() => setArranca(false), 3800);
+    return () => { cancelAnimationFrame(a); clearTimeout(t); };
+  }, [inicioSesion]);
 
   // Al iniciar la sesión, las tarjetas se "despiertan" con un pulso en cascada:
   // marca el momento en que arranca el entrenamiento. Va DESPUÉS de declarar
@@ -15421,7 +15519,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
               discos que sobran (los de afuera se deslizan por la manga) y los
               que quedan se cargan con las series de descarga. */}
           {avanceDia.total > 0 && (
-            <div className="dia-barra">
+            <div className={`dia-barra ${arranca ? "se-desengancha" : ""}`}>
               <BarraCargada
                 hechas={modoDescarga ? avanceDescarga.hechas : avanceDia.hechas}
                 total={avanceDia.total}
@@ -22851,6 +22949,9 @@ function Casillero({ semilla = "", nombre, usuario = null, foto = null, rango = 
         </div>
       )}
       <span className="casillero-manija" aria-hidden="true" />
+      {/* LA PUERTA SE ABRE (A5): al entrar al perfil, la puerta lisa del
+          casillero gira sobre la bisagra y deja ver lo de adentro. */}
+      <span className="casillero-puerta" aria-hidden="true"><span className="casillero-puerta-manija" /></span>
     </header>
   );
 }
@@ -23415,7 +23516,7 @@ function PlanillaAsistencia({ filas, enviados = {}, enviando = null, onAplaudir,
                         <span className="planilla-detalle">{f.dayLabel ? `${f.dayLabel}, ` : ""}{f.series} {f.series === 1 ? "serie" : "series"}{f.enCurso && <span className="planilla-ahora"> · entrenando</span>}</span>
                       </button>
                     )}
-                    <span className="planilla-firma a-mano" style={{ "--giro": `${giroDeFirma(f.nombre)}deg` }} aria-hidden="true">{primer}</span>
+                    <span className={`planilla-firma a-mano ${f.enCurso ? "se-escribe" : ""}`} style={{ "--giro": `${giroDeFirma(f.nombre)}deg` }} aria-hidden="true">{primer}</span>
                     {f.esYo ? (
                       <span className="planilla-vos">Vos</span>
                     ) : (
@@ -24459,7 +24560,7 @@ function PresetRoutineCard({ preset, isActive, onPreview }) {
   useEffect(() => {
     if (isActive && !antesActivaRef.current) {
       setRecienActivada(true);
-      const t = setTimeout(() => setRecienActivada(false), 900);
+      const t = setTimeout(() => setRecienActivada(false), 1300);
       antesActivaRef.current = isActive;
       return () => clearTimeout(t);
     }
@@ -24471,7 +24572,7 @@ function PresetRoutineCard({ preset, isActive, onPreview }) {
   // Si es la tuya, un sello de "Activa".
   const chinche = CHINCHES_CORCHO[[...preset.id].reduce((h, ch) => h + ch.charCodeAt(0), 0) % CHINCHES_CORCHO.length];
   return (
-    <button onClick={onPreview} className={`preset hoja-clavada ${isActive ? "activa" : ""} ${recienActivada ? "activate-pulse" : ""}`} style={{ "--pulse-color": tint(accent, "99"), "--c": accent, "--chinche": chinche }}>
+    <button onClick={onPreview} className={`preset hoja-clavada ${isActive ? "activa" : ""} ${recienActivada ? "activate-pulse se-clava" : ""}`} style={{ "--pulse-color": tint(accent, "99"), "--c": accent, "--chinche": chinche }}>
       <span className="chinche" aria-hidden="true" />
       <span className="preset-cabeza">
         <span className="preset-nombre">{preset.name}</span>
@@ -26904,6 +27005,21 @@ const COLORES_POSTIT = ["#ebe4bc", "#bfdac9", "#e8c6cc", "#c4d3e8"];
 const MAIL_SOPORTE = "deolmosagustin@gmail.com";
 function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMessages, conversations = [], activeConversationId = null, onNewConversation, onSwitchConversation, onDeleteConversation, onRenameConversation, settings, cycleStart, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onDeleteRoutine, onNavigate, onStartSession, onEndSession }) {
   const tizaHoy = usePrimeraVezHoy("pizarra");
+  // EL BORRADOR (A9): con una charla nueva, el borrador pasa por la pizarra
+  // y la tiza vuelve a escribir el saludo.
+  const [borrando, setBorrando] = useState(false);
+  const charlaPrevia = useRef(activeConversationId);
+  useEffect(() => {
+    const antes = charlaPrevia.current;
+    charlaPrevia.current = activeConversationId;
+    if (!antes || antes === activeConversationId) return;
+    const a = requestAnimationFrame(() => setBorrando(true));
+    const t = setTimeout(() => setBorrando(false), 1500);
+    return () => { cancelAnimationFrame(a); clearTimeout(t); };
+  }, [activeConversationId]);
+  // LA NOTA QUE SE DESPEGA (A10): se despega de una punta y vuela hacia la
+  // charla; el pedido sale cuando ya se fue.
+  const [despegando, setDespegando] = useState(null);
   // Contexto para reconstruir un plan EN VIVO a partir de la "action" cruda
   // (JSON plano, sí serializable) en vez de depender de la función confirm()
   // guardada en el mensaje — esa función no sobrevive un reload ni el
@@ -27640,7 +27756,8 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
           desaparecía con el primer mensaje y en su lugar quedaba una tira de
           pedidos que se deslizaba de costado. */}
       <section className={`ia-inicio ${esInicio ? "" : "con-charla"}`} aria-label={esInicio ? "Empezar una conversación" : "Pedidos para el entrenador"}>
-          <div className={`pizarra-ia ${tizaHoy ? "escribe" : ""}`}>
+          <div className={`pizarra-ia ${tizaHoy || borrando ? "escribe" : ""} ${borrando ? "borrando" : ""}`}>
+          {borrando && <span className="pizarra-ia-borrador-pasa" aria-hidden="true" />}
           <p className="pizarra-ia-saludo">{primerNombre ? `Hola, ${primerNombre}` : "Hola"}</p>
           <h2 className="pizarra-ia-pregunta">¿En qué te ayudo hoy?</h2>
           <p className="pizarra-ia-bajada">Conozco tu rutina, tus marcas y tu progreso: todo lo que anotás en la app.</p>
@@ -27651,7 +27768,14 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                 : c.label === "Plan de hoy" ? (yaEntreno ? { texto: "Hoy ya entrenaste" } : dia ? { texto: `Hoy toca ${dia.label}`, color: dia.color } : { texto: "Hoy es día de descanso" })
                 : null;
               return (
-                <button key={c.label} onClick={() => handleQuickPrompt(c)} disabled={isSending} className="ia-tarjeta postit" style={{ "--c": c.color, "--postit": COLORES_POSTIT[k % COLORES_POSTIT.length] }}>
+                <button key={c.label} onClick={() => {
+                  if (despegando) return;
+                  const quieto = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+                  if (quieto) { handleQuickPrompt(c); return; }
+                  setDespegando(c.label);
+                  haptic(8);
+                  setTimeout(() => { setDespegando(null); handleQuickPrompt(c); }, 460);
+                }} disabled={isSending} className={`ia-tarjeta postit ${despegando === c.label ? "se-despega" : ""}`} style={{ "--c": c.color, "--postit": COLORES_POSTIT[k % COLORES_POSTIT.length] }}>
                   <span className="ia-tarjeta-icono" aria-hidden="true">{c.icon}</span>
                   <span className="ia-tarjeta-titulo">{c.titulo}</span>
                   {dato
