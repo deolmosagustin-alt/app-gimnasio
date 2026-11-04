@@ -6597,6 +6597,41 @@ label.ajuste-rotulo { display: block; }
 .rack-kb-banda { fill: none; stroke: color-mix(in oklab, #c25a5c 75%, #2a2b2e); stroke-width: 4; stroke-linecap: round; }
 @media (prefers-reduced-motion: reduce) { .rack-kb-etiqueta { animation: none; } }
 
+
+/* ── VISTA PREVIA 12 (03/11): la barra es la protagonista ── */
+/* El fondo, oscuro y quieto, con el marco de la placa; arriba el día y la
+   cinta; abajo, la franja de goma donde apoya la barra, grande y con su
+   sombra. Nada compite con la barra. */
+.dia-seccion > .dia-hero.barra-protagonista { border-radius: 28px; margin: 0 -6px 6px; padding: 22px 20px 20px;
+  background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,255,255,.045), transparent 70%), linear-gradient(#1d1e21, #18191c);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.1), inset 0 0 0 6px rgba(0,0,0,.22), inset 0 0 0 7px rgba(255,255,255,.04), 0 14px 26px -18px rgba(0,0,0,.9); }
+.light-mode .dia-seccion > .dia-hero.barra-protagonista { background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,255,255,.7), transparent 70%), linear-gradient(#eceef1, #e2e4e8);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.07), inset 0 0 0 6px rgba(255,255,255,.5), inset 0 0 0 7px rgba(0,0,0,.05), 0 14px 26px -18px rgba(0,0,0,.3); }
+.dia-hero.barra-protagonista::after { display: none; }
+.dia-hero.barra-protagonista > .tarima-quemada, .dia-hero.barra-protagonista .tarima-arriba-madera { display: none; }
+.dia-hero.barra-protagonista .dia-chip { position: relative !important; top: auto; left: auto; }
+.barra-protagonista-titulo { margin-top: 4px; }
+.light-mode .barra-protagonista-titulo { color: var(--text-strong); }
+.dia-hero.barra-protagonista .tarima-cinta { margin: 10px 0 0; rotate: -1.5deg; font-size: 17px; }
+/* La goma: una franja baja y oscura, con motas apenas visibles. */
+.dia-hero.barra-protagonista .escena-barra { margin: 30px -8px 0; padding-bottom: 14px; }
+.dia-hero.barra-protagonista .escena-barra::before { content: ""; position: absolute; z-index: -1; left: -14px; right: -14px; bottom: 0; height: 30%;
+  background: radial-gradient(circle at 30% 40%, rgba(84,120,196,.22) 0 .6px, transparent 1px) 0 0 / 13px 11px, radial-gradient(circle at 70% 20%, rgba(196,86,88,.2) 0 .6px, transparent 1px) 4px 3px / 17px 13px, linear-gradient(#141517, #101113);
+  border-radius: 6px; box-shadow: inset 0 2px 4px rgba(0,0,0,.6), 0 -1px 0 rgba(255,255,255,.04); }
+.light-mode .dia-hero.barra-protagonista .escena-barra::before { background: radial-gradient(circle at 30% 40%, rgba(84,120,196,.3) 0 .6px, transparent 1px) 0 0 / 13px 11px, linear-gradient(#2c2e32, #25272a); }
+.dia-hero.barra-protagonista .escena-barra .barra-cargada { filter: drop-shadow(0 12px 8px rgba(0,0,0,.65)); }
+.dia-hero.barra-protagonista .dia-barra-texto, .dia-hero.barra-protagonista .dia-barra-texto b, .dia-hero.barra-protagonista .dia-descarga-regla { color: inherit; text-shadow: none; }
+.dia-hero.barra-protagonista .dia-barra-texto { color: var(--text-muted); }
+.dia-hero.barra-protagonista .dia-barra-texto b { color: var(--text-strong); }
+.dia-hero.barra-protagonista .dia-descarga-regla { color: var(--text-muted); }
+/* La banda elástica del rack. */
+.rack-kb-banda { stroke: none; }
+.rack-kb-gancho { fill: #2a2c30; }
+.rack-kb-banda-lazo { fill: color-mix(in oklab, #c25a5c 78%, #2a2b2e); }
+.rack-kb-banda-hueco { fill: #25262a; }
+.light-mode .rack-kb-banda-hueco { fill: #dcdcd9; }
+.rack-kb-banda-brillo { fill: none; stroke: rgba(255,255,255,.28); stroke-width: 1.6; stroke-linecap: round; }
+
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -14192,8 +14227,6 @@ function RackKettlebells({ dias = [], nombre = "", onElegir = null, etiqueta = "
           </linearGradient>
         </defs>
         {/* Las patas, con el pie y el regatón de goma. */}
-        {/* El magnesio de una mano en la pared, al costado del rack. */}
-        <g className="rack-kb-magnesio"><ellipse cx="318" cy="150" rx="9" ry="11" /><ellipse cx="309" cy="137" rx="2.6" ry="7" transform="rotate(-14 309 137)" /><ellipse cx="315" cy="134" rx="2.6" ry="8" transform="rotate(-4 315 134)" /><ellipse cx="321" cy="134" rx="2.5" ry="8" transform="rotate(5 321 134)" /><ellipse cx="327" cy="137" rx="2.3" ry="7" transform="rotate(14 327 137)" /><ellipse cx="331" cy="152" rx="2.4" ry="6" transform="rotate(40 331 152)" /></g>
         <rect x="14" y="16" width="11" height="262" rx="5" fill={`url(#${uid}-c)`} />
         <rect x="335" y="16" width="11" height="262" rx="5" fill={`url(#${uid}-c)`} />
         <rect x="2" y="274" width="35" height="9" rx="3" fill={`url(#${uid}-c)`} />
@@ -14239,7 +14272,14 @@ function RackKettlebells({ dias = [], nombre = "", onElegir = null, etiqueta = "
           </g>
         ))}
         {/* Una banda elástica colgada de la esquina del rack. */}
-        <path d="M339 26 C352 40 354 92 344 118 C340 128 333 126 334 116 C336 92 334 48 333 28" className="rack-kb-banda" />
+        {/* Una banda elástica de las planas, colgada del gancho de la esquina:
+            el lazo cae por su peso, con el canto más oscuro y un brillo. */}
+        <g className="rack-kb-banda">
+          <path d="M336 28 h10 v6 h-10 z" className="rack-kb-gancho" />
+          <path d="M338 33 C333 62 332 104 339 132 C343 146 353 146 356 132 C361 104 357 62 344 33 Z" className="rack-kb-banda-lazo" />
+          <path d="M341 38 C337 64 337 102 343 126 C346 135 351 135 352 126 C356 102 353 66 343 38 Z" className="rack-kb-banda-hueco" />
+          <path d="M339 46 C336 70 336 98 340 118" className="rack-kb-banda-brillo" />
+        </g>
         {/* La chapa con el nombre de la rutina, atornillada al travesaño. */}
         <rect x="95" y="10" width="170" height="27" rx="4" className="rack-kb-chapa" />
         <circle cx="104" cy="23.5" r="2.6" className="rack-kb-tornillo" /><circle cx="256" cy="23.5" r="2.6" className="rack-kb-tornillo" />
@@ -16000,7 +16040,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         style={{ "--c": day.color }}
         aria-label={modoDescarga ? `Día ${day.label}, semana de descarga` : `Día ${day.label}`}
       >
-        <div className="dia-hero con-plataforma escena-completa desde-arriba">
+        <div className="dia-hero con-plataforma escena-completa barra-protagonista">
           {/* "Resetear sesión de hoy": un ícono en la esquina. Sirve para
               arreglar un error, no es algo que necesites a mano cada día; el
               diálogo de confirmación es el mismo. */}
@@ -16025,14 +16065,12 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
               donde apoyan los discos y las tablas al medio con el nombre del
               día quemado. Los músculos van escritos en un pedazo de cinta y
               hay magnesio donde se agarra la barra. */}
-          <span className="tarima-arriba-madera" aria-hidden="true" />
-          {(() => { const { larga, total } = etiquetaDeDia(day.label); return <p className="tarima-arriba-nombre" aria-hidden="true" style={{ "--largo": larga, "--total": total }}>{day.label}</p>; })()}
+          {(() => { const { larga, total } = etiquetaDeDia(day.label); return <h2 className="dia-titulo barra-protagonista-titulo" style={{ "--largo": larga, "--total": total }}>{day.label}</h2>; })()}
           {modoDescarga ? (
             <span className="dia-chip descarga"><Zap size={12} /> {previa ? "Así va a ser tu descarga" : "Semana de descarga"}</span>
           ) : activeDay === suggestedDay && (
             <span className="dia-chip"><Calendar size={12} /> {scheduledDay === activeDay ? "Programado para hoy" : "Sugerido para hoy"}</span>
           )}
-          <h2 className="sr-only">{day.label}</h2>
           {day.description && <p className="tarima-cinta a-mano">{day.description}</p>}
           {avanceDia.total > 0 && (
             <div className={`dia-barra escena-barra ${arranca ? "se-desengancha" : ""}`}>
