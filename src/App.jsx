@@ -48,7 +48,7 @@ import {
 // Feature social (amigos + entrenador/alumno) — todo el acceso a Firestore
 // de esto vive en social.js, App.jsx solo llama y dibuja el resultado.
 import {
-  isValidUsername, normalizeUsername, checkUsernameAvailable, claimUsername, changeUsername, unpublishProfile, lookupUserByUsername,
+  isValidUsername, normalizeUsername, lookupUserByUsername, buscarPorNombre, crearUsuarioAutomatico,
   syncPublicProfile, getPublicBasic, getPublicFull,
   sendFriendRequest, respondToFriendRequest, removeFriend, listMyFriendships,
   sendTrainerLinkRequest, respondToTrainerLink, removeTrainerLink, listTrainerLinksAsTrainer, listTrainerLinksAsStudent,
@@ -1627,6 +1627,8 @@ async function generateWarmupWithAI(dayExercises, dayLabel) {
 // vacía, para "sin calentamiento en este día") se usa tal cual, en ESE
 // orden. Si es undefined (rutinas viejas, o un día al que nunca se le
 // tocó el calentamiento) se cae al auto-armado de siempre (pickWarmupDrills).
+const PORCENTAJES_1RM = [60, 70, 75, 80, 85, 90];
+
 function GeneralWarmupCard({ exercises, warmupKeys, accent }) {
   const [open, setOpen] = useState(false);
   const [done, setDone] = useState({});
@@ -6821,15 +6823,128 @@ label.ajuste-rotulo { display: block; }
 .rack-acciones .boton-tonal { min-height: 48px; border-radius: 14px; font-size: 15px; font-weight: 700; background: color-mix(in oklab, var(--c, var(--tono)) 12%, var(--surface-2)); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--c, var(--tono)) 22%, transparent); }
 .rack-acciones .boton-tonal[aria-expanded="true"] { background: color-mix(in oklab, var(--c, var(--tono)) 24%, var(--surface-2)); }
 
+
+/* ── QUÉ VES AL REGISTRAR, APLICADO (04/11) ── */
+.foco-extras .serie-boton-suave { white-space: nowrap; height: 44px; }
+.foco-1rm { margin-top: 10px; padding: 0 2px; }
+.foco-1rm-cabeza { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 12px; font-weight: 600; color: var(--text-faint); }
+.foco-1rm-cabeza b { color: var(--text-strong); font-weight: 750; }
+.foco-1rm-botones { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; margin-top: 6px; }
+.foco-1rm-botones > * { display: grid; justify-items: center; align-content: center; gap: 1px; min-height: 44px; padding: 4px 0; border-radius: 14px; background: var(--velo); color: var(--text-muted); transition: background var(--dur-chico, .24s) ease, transform var(--dur-toque, .1s) ease; }
+.foco-1rm-botones > *:active { transform: scale(.95); }
+.foco-1rm-botones b { font-size: 14px; font-weight: 750; font-stretch: 85%; color: var(--text-strong); }
+.foco-1rm-botones span { font-size: 11px; font-variant-numeric: tabular-nums; }
+.foco-1rm-botones .elegido { background: var(--accion-fondo); color: var(--accion-tinta); }
+.foco-1rm-botones .elegido b, .foco-1rm-botones .elegido span { color: var(--accion-tinta); }
+.chip-plan.estancado { color: #e0b25a; box-shadow: inset 0 0 0 1px color-mix(in oklab, #e0b25a 45%, transparent); background: transparent; }
+.light-mode .chip-plan.estancado { color: #946414; }
+.aviso-estancado { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 12px; padding: 10px 12px; border-radius: 16px; background: var(--panel-sunken); font-size: 13px; line-height: 1.4; color: var(--text-muted); text-wrap: pretty; }
+.aviso-estancado svg { flex: none; margin-top: 1px; color: #e0b25a; }
+.light-mode .aviso-estancado svg { color: #946414; }
+.ejercicio-consejo { margin-top: 3px; font-size: 12px; line-height: 1.4; color: var(--text-faint); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-wrap: pretty; }
+.aproximacion { flex-wrap: nowrap; }
+.aproximacion-pct { width: 44px; }
+.aproximacion-barra { flex: 0 0 56px; height: 6px; border-radius: 999px; background: var(--hairline-fuerte); position: relative; overflow: hidden; }
+.aproximacion-barra::after { content: ""; position: absolute; inset: 0 auto 0 0; width: calc(var(--p) * 100%); border-radius: inherit; background: color-mix(in oklab, var(--tono) 55%, #8a8c92); }
+.aproximacion-serie { margin-left: auto; }
+
+/* ── LA NOTA DEL PROFE EN LA DESCARGA (04/11) ── */
+.plataforma-pie:has(.nota-descarga) { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 12px; }
+.plataforma-pie:has(.nota-descarga) .dia-barra-texto { flex: 1 1 120px; min-width: 0; }
+.nota-descarga { position: relative; flex: none; width: fit-content; max-width: 100%; margin: 12px 4px 4px auto; padding: 12px 16px 10px 14px; rotate: 2deg;
+  background: linear-gradient(transparent 0 26px, rgba(80,120,170,.0) 26px), #e9e6dc; color: #2b2d33; border-radius: 2px 3px 4px 2px;
+  box-shadow: 0 1px 0 rgba(255,255,255,.4) inset, 0 8px 14px -8px rgba(0,0,0,.6), 0 2px 3px rgba(0,0,0,.25);
+  filter: brightness(.94); }
+.light-mode .nota-descarga { filter: none; background: #f7f5ee; box-shadow: 0 6px 14px -8px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.12); }
+/* El borde de abajo, cortado a mano. */
+.nota-descarga::after { content: ""; position: absolute; left: 0; right: 0; bottom: -4px; height: 5px; background: inherit;
+  clip-path: polygon(0 0, 100% 0, 100% 40%, 93% 100%, 86% 30%, 77% 90%, 68% 20%, 58% 80%, 49% 30%, 40% 100%, 31% 40%, 22% 90%, 13% 30%, 6% 80%, 0 40%); }
+.nota-descarga-cinta { position: absolute; left: 50%; top: -9px; width: 64px; height: 18px; translate: -50% 0; rotate: 3deg;
+  background: rgba(225,220,200,.55); box-shadow: 0 1px 2px rgba(0,0,0,.18); backdrop-filter: none;
+  clip-path: polygon(0 8%, 4% 0, 9% 10%, 14% 0, 100% 0, 96% 12%, 100% 24%, 96% 40%, 100% 56%, 96% 72%, 100% 88%, 96% 100%, 0 100%, 4% 86%, 0 70%, 4% 54%, 0 38%, 4% 22%); }
+.nota-descarga-titulo { font-size: 20px; line-height: 1; color: #b23c40; }
+.nota-descarga-lista { display: grid; gap: 0; margin-top: 2px; font-size: 19px; line-height: 1.08; }
+.nota-descarga-lista li { position: relative; padding-left: 20px; white-space: nowrap; }
+.nota-descarga-lista li::before { content: "✓"; position: absolute; left: 0; top: 0; font-size: 16px; color: #3d6e9e; rotate: -6deg; }
+.nota-descarga-lista b { font-weight: 700; }
+.nota-descarga-lista .subrayado { width: fit-content; background: linear-gradient(transparent 62%, color-mix(in oklab, #b23c40 34%, transparent) 62% 86%, transparent 86%); }
+@media (max-width: 340px) { .nota-descarga-lista li { white-space: normal; } }
+
+/* ── SOCIAL, LA VUELTA DE TUERCA (04/11) ── */
+/* Las secciones apoyan directo en la página: antes cada una era una tarjeta
+   con más tarjetas adentro. */
+.seccion-social { position: relative; }
+.lista-placa { border-radius: 22px; background: var(--surface-2); box-shadow: var(--placa-canto); overflow: hidden; }
+.lista-placa > * + * { border-top: 1px solid var(--hairline); }
+.lista-placa .amigo, .lista-placa .ranking-fila { border-radius: 0; background: transparent; padding-block: 10px; }
+.lista-placa .amigo-cuerpo:active, .lista-placa button.ranking-fila:active { background: var(--velo); }
+
+/* El césped de los trineos. */
+.carrera { border-radius: 22px; overflow: hidden; background: #1f2622; box-shadow: var(--placa-canto); }
+.carrera > li + li { border-top: 2px solid rgba(235,238,232,.55); }
+.carrera .carrera-carril { border-radius: 0; background: transparent; padding-block: 10px; }
+.carrera .carrera-carril.yo { background: color-mix(in oklab, var(--tono) 16%, transparent); }
+.carrera .carrera-nombre, .carrera .carrera-n { color: #eef0ec; }
+.carrera .carrera-puesto { color: rgba(238,240,236,.6); }
+.carrera .carrera-carril.primero .carrera-puesto { color: var(--record); }
+.carrera .carrera-carril.yo .carrera-puesto { color: #fff; }
+.cesped { position: relative; display: block; height: 26px; border-radius: 6px; overflow: hidden;
+  background:
+    radial-gradient(rgba(255,255,255,.05) .6px, transparent 1px) 0 0 / 4px 4px,
+    repeating-linear-gradient(90deg, #34433a 0 22px, #2e3c33 22px 44px); }
+.cesped-linea { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: rgba(240,242,236,.62); }
+.cesped-linea:last-of-type { background: repeating-linear-gradient(180deg, rgba(240,242,236,.85) 0 4px, transparent 4px 8px); }
+.cesped-rastro { position: absolute; left: 0; top: 7px; bottom: 7px; width: calc(var(--avance) * 100%); background: linear-gradient(90deg, transparent, rgba(220,232,214,.16)); border-radius: 0 4px 4px 0; }
+.cesped-trineo { position: absolute; bottom: 1px; left: calc(var(--avance) * (100% - 34px)); width: 34px; height: 21px; color: #b9bcc1; filter: drop-shadow(0 2px 1px rgba(0,0,0,.5)); }
+.carrera-carril.yo .cesped-trineo { color: color-mix(in oklab, var(--tono) 70%, white); }
+.carrera-carril.vacio .cesped-trineo { opacity: .35; }
+.carrera.llena .cesped-trineo { animation: trineoEmpuja .9s var(--sale, cubic-bezier(.2,.8,.2,1)) backwards; animation-delay: calc(var(--orden, 0) * 90ms + 150ms); }
+.carrera.llena .cesped-rastro { animation: rastroCrece .9s var(--sale, cubic-bezier(.2,.8,.2,1)) backwards; animation-delay: calc(var(--orden, 0) * 90ms + 150ms); }
+@keyframes trineoEmpuja { from { left: 0; } }
+@keyframes rastroCrece { from { width: 0; } }
+@media (prefers-reduced-motion: reduce) { .carrera.llena .cesped-trineo, .carrera.llena .cesped-rastro { animation: none; } }
+
+/* Entrenador: la tabla del profe vacía y el vínculo con el tono de Social. */
+.profe-vacio { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 22px; background: var(--surface-2); box-shadow: var(--placa-canto); }
+.profe-tabla { flex: none; width: 40px; height: 52px; rotate: -4deg; filter: drop-shadow(0 3px 3px rgba(0,0,0,.35)); }
+.profe-tabla-madera { fill: #8a6a48; }
+.profe-tabla-hoja { fill: #e9e6dc; }
+.profe-tabla-broche { fill: #b9bcc1; stroke: #7b7e84; stroke-width: 1; }
+.profe-tabla-renglon { stroke: #b8c4d4; stroke-width: 1.3; stroke-linecap: round; fill: none; }
+.profe-vacio-titulo { font-size: 15px; font-weight: 650; color: var(--text-strong); line-height: 1.2; }
+.profe-vacio-detalle { margin-top: 2px; font-size: 13px; line-height: 1.35; color: var(--text-faint); text-wrap: pretty; }
+.vincular-profe { border-radius: 22px; overflow: hidden; background: var(--surface-2); box-shadow: var(--placa-canto); }
+.campo-profe { width: 100%; min-height: 44px; padding: 0 12px 0 36px; border-radius: 999px; font-size: 15px; color: var(--text-strong); background: var(--panel-sunken); box-shadow: inset 0 0 0 1px var(--hairline); outline: none; }
+.campo-profe:focus { box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--tono) 70%, white); }
+
+/* El podio, de chapa con la plaqueta del puesto. */
+.podio-escalon { position: relative; border-radius: 10px 10px 4px 4px; padding-top: 0; align-items: center;
+  background: linear-gradient(180deg, color-mix(in oklab, var(--medalla) 26%, #3a3c42) 0 6px, color-mix(in oklab, var(--medalla) 14%, #26282c) 6px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.18), inset 0 -10px 14px -8px rgba(0,0,0,.45); color: transparent; }
+.podio-escalon::before { content: attr(data-n); display: grid; place-items: center; min-width: 30px; height: 24px; padding: 0 6px; border-radius: 6px; font-size: 15px; font-weight: 850; font-stretch: 80%; color: #23252a; background: color-mix(in oklab, var(--medalla) 70%, #d9dbe0); box-shadow: inset 0 0 0 1px rgba(0,0,0,.25), 0 1px 0 rgba(255,255,255,.2); }
+.light-mode .podio-escalon { color: transparent; background: linear-gradient(180deg, color-mix(in oklab, var(--medalla) 30%, #e6e7ea) 0 6px, color-mix(in oklab, var(--medalla) 18%, #d3d5d9) 6px); }
+
+/* Sumar amigos: el buscador por nombre y las otras dos formas. */
+.sumar-amigos { display: grid; gap: 10px; }
+.buscador-amigos { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 8px 0 16px; border-radius: 999px; background: var(--surface-2); box-shadow: var(--placa-canto); color: var(--text-faint); }
+.buscador-amigos:focus-within { box-shadow: var(--placa-canto), inset 0 0 0 1.5px color-mix(in oklab, var(--tono) 70%, white); }
+.buscador-amigos input { flex: 1; min-width: 0; height: 48px; background: transparent; border: 0; outline: none; font-size: 16px; color: var(--text-strong); }
+.buscador-amigos input::placeholder { color: var(--text-faint); }
+.buscador-amigos-borrar { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 999px; color: var(--text-muted); }
+.sumar-amigos-estado { padding: 4px 6px; font-size: 13px; line-height: 1.4; color: var(--text-faint); text-wrap: pretty; }
+.sumar-amigos-estado.alerta { color: #e0b25a; }
+.light-mode .sumar-amigos-estado.alerta { color: #946414; }
+.sumar-amigos-botones { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.sumar-amigos-boton { display: flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; min-height: 48px; padding: 0 14px; border-radius: 999px; font-size: 14px; font-weight: 650; color: var(--text-strong); background: color-mix(in oklab, var(--tono) 13%, var(--surface-2)); transition: transform var(--dur-toque, .1s) ease; }
+.sumar-amigos-boton svg { color: color-mix(in oklab, var(--tono) 72%, white); flex: none; }
+.light-mode .sumar-amigos-boton svg { color: color-mix(in oklab, var(--tono) 80%, black); }
+.sumar-amigos-boton:active { transform: scale(.95); }
+.sumar-amigos-boton:disabled { opacity: .5; }
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
 .dia-barra.se-desengancha .barra-cargada { animation: barraDesengancha 1.3s cubic-bezier(.3,.7,.4,1) 1.75s both; }
 @keyframes barraDesengancha { 0% { transform: none; } 30% { transform: translateY(-12px); } 45% { transform: translateY(-9px) scaleX(1.004); } 70% { transform: translateY(-11px); } 100% { transform: none; } }
-/* A3: los últimos tres segundos en LED. */
-.led-cuenta { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 210px); z-index: 120; translate: -50% 0; pointer-events: none; display: grid; place-items: center; width: 132px; height: 116px; border-radius: 16px; background: #0a0a0b; box-shadow: inset 0 0 0 3px #2f3136, 0 18px 40px -14px rgba(0,0,0,.9); }
-.led-cuenta-numero { font-size: calc(84px * 1); font-weight: 800; line-height: 1; color: #ff5a55; text-shadow: 0 0 18px rgba(255,80,75,.65), 0 0 2px #ffb3b0; animation: ledDestello .9s ease-out both; }
-@keyframes ledDestello { 0% { opacity: 0; transform: scale(1.25); } 18% { opacity: 1; transform: scale(1); } 80% { opacity: 1; } 100% { opacity: .55; } }
 /* A4: la cinta sale del carrete; la pesa de la balanza se balancea. */
 .cinta.se-desenrolla { animation: cintaSale 1s cubic-bezier(.25,.8,.3,1) .1s both; }
 @keyframes cintaSale { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
@@ -6925,7 +7040,7 @@ label.ajuste-rotulo { display: block; }
 .vitrina-lugar.se-cuelga .medalla-mes, .vitrina-lugar.se-cuelga > svg, .vitrina-lugar.se-cuelga .medalla { transform-origin: 50% -30px; animation: medallaCuelga 1.5s cubic-bezier(.3,.7,.4,1) .3s both; }
 @keyframes medallaCuelga { 0% { transform: translateY(-60px); opacity: 0; } 30% { transform: translateY(0) rotate(9deg); opacity: 1; } 50% { transform: rotate(-6deg); } 68% { transform: rotate(3deg); } 84% { transform: rotate(-1deg); } 100% { transform: none; } }
 @media (prefers-reduced-motion: reduce) {
-  .dia-barra.se-desengancha .barra-cargada, .led-cuenta-numero, .cinta.se-desenrolla, .cinta.se-desenrolla .cinta-marca, .balanza-pesa.llega, .planilla-firma.se-escribe, .hoja-clavada.se-clava, .hoja-clavada.se-clava .chinche, .pizarra-ia.borrando .pizarra-ia-saludo, .pizarra-ia.borrando .pizarra-ia-pregunta, .ia-tarjeta.postit.se-despega, .carnet-con-lector.pasa .carnet, .vitrina-lugar.se-cuelga * { animation: none; }
+  .dia-barra.se-desengancha .barra-cargada, .cinta.se-desenrolla, .cinta.se-desenrolla .cinta-marca, .balanza-pesa.llega, .planilla-firma.se-escribe, .hoja-clavada.se-clava, .hoja-clavada.se-clava .chinche, .pizarra-ia.borrando .pizarra-ia-saludo, .pizarra-ia.borrando .pizarra-ia-pregunta, .ia-tarjeta.postit.se-despega, .carnet-con-lector.pasa .carnet, .vitrina-lugar.se-cuelga * { animation: none; }
   .pizarra-ia-borrador-pasa, .carnet-lector { display: none; }
   .casillero-puerta, .casillero-puerta::after { animation: none; transform: rotateY(-82deg); }
   .casillero.abierto::before { animation: none; }
@@ -8785,7 +8900,7 @@ function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent = "#F59E0
 // de antemano. Pensada para mandarla por WhatsApp/Instagram: nombre,
 // @usuario grande (lo que la otra persona necesita escribir en "Buscar")
 // y tu mejor rango como gancho, si tenés uno.
-function drawSocialProfileShareCard(ctx, W, H, { name, username, topRank, avatarInitial }) {
+function drawSocialProfileShareCard(ctx, W, H, { name, topRank, avatarInitial }) {
   const accent = topRank?.color || "#A855F7";
   drawShareCardBase(ctx, W, H, accent, "#38BDF8");
   ctx.textAlign = "center";
@@ -8813,7 +8928,7 @@ function drawSocialProfileShareCard(ctx, W, H, { name, username, topRank, avatar
   // es literalmente el dato que la otra persona tiene que escribir.
   const chipY = Math.round(H * 0.545), chipH = Math.round(H * 0.075);
   ctx.font = `700 ${Math.round(W * 0.058)}px sans-serif`;
-  const chipText = `@${username || "usuario"}`;
+  const chipText = "Sumame en Social";
   const chipW = ctx.measureText(chipText).width + W * 0.09;
   ctx.fillStyle = tint(accent, "1c");
   canvasRoundRect(ctx, W / 2 - chipW / 2, chipY, chipW, chipH, chipH / 2); ctx.fill();
@@ -8830,7 +8945,7 @@ function drawSocialProfileShareCard(ctx, W, H, { name, username, topRank, avatar
   }
 
   ctx.fillStyle = "#6e7379"; ctx.font = `600 ${Math.round(W * 0.034)}px sans-serif`;
-  ctx.fillText("Buscame por mi @usuario en la pestaña Social", W / 2, Math.round(H * 0.885));
+  ctx.fillText("Buscame por mi nombre en la pestaña Social", W / 2, Math.round(H * 0.885));
 
   drawWordmark(ctx, W, H, accent);
 }
@@ -8913,7 +9028,7 @@ async function drawSocialProfileQrCard(ctx, W, H, { name, username, accent }) {
 
   const chipY = belowY + Math.round(H * 0.03), chipH = Math.round(H * 0.062);
   ctx.font = `700 ${Math.round(W * 0.046)}px sans-serif`;
-  const chipText = `@${username || "usuario"}`;
+  const chipText = "Escaneá para sumarme";
   const chipW = ctx.measureText(chipText).width + W * 0.08;
   ctx.fillStyle = tint(accent, "1c");
   canvasRoundRect(ctx, W / 2 - chipW / 2, chipY, chipW, chipH, chipH / 2); ctx.fill();
@@ -11120,15 +11235,7 @@ function FilaDescansoDock({ timerId, embebido = false }) {
   const base = datos?.color || "#14B8A6";
   const color = listo ? "#10B981" : urgente ? "#F59E0B" : base;
   const enPausa = estado === "paused";
-  // LOS ÚLTIMOS TRES SEGUNDOS EN LED (A3): el número grande, rojo, como el
-  // reloj de pared de los gimnasios, con un destello por segundo (la
-  // vibración ya la da VigilanteDescansos).
-  const ultimos = estado === "running" && restante > 0 && restante <= 3 ? Math.ceil(restante) : 0;
-  const led = ultimos > 0 && typeof document !== "undefined" && createPortal(
-    <div className="led-cuenta" aria-hidden="true"><span key={ultimos} className="led-cuenta-numero num-display">{ultimos}</span></div>,
-    document.body,
-  );
-  const relojGrande = <>{grande && <RelojDescansoGrande timerId={timerId} onClose={() => setGrande(false)} />}{led}</>;
+  const relojGrande = grande && <RelojDescansoGrande timerId={timerId} onClose={() => setGrande(false)} />;
   const envolver = (contenido) => (embebido
     ? <div className="dock-descanso dock-descanso-embebido relative" style={{ "--c": color }}>{contenido}{relojGrande}</div>
     : <div className="dock-tarjeta dock-descanso session-bar-in" style={{ "--c": color }}>{contenido}{relojGrande}</div>);
@@ -13681,7 +13788,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   const isRir = fieldSettings.rpeDisplayMode === "rir";
   const bloqueEsfuerzo = fieldSettings.showRpe !== false && (showRpe || (activa && !guardadaHoy)) && (
     !showRpe ? (
-      <button onClick={() => setShowRpeLocal(true)} className="serie-boton-suave"><Activity size={12} /> Registrar esfuerzo ({isRir ? "RIR" : "RPE"})</button>
+      <button onClick={() => setShowRpeLocal(true)} className="serie-boton-suave" aria-label={`Registrar el esfuerzo (${isRir ? "RIR" : "RPE"})`}><Activity size={14} /> Esfuerzo ({isRir ? "RIR" : "RPE"})</button>
     ) : (
       <div className="extra-abierto flex items-center gap-1.5 bounce-in rounded-2xl px-2 py-2 overflow-x-auto" style={{ backgroundColor: "var(--panel-sunken)" }}>
         <span className="text-[12px] text-slate-500 font-semibold w-8 shrink-0 pl-1">{isRir ? "RIR" : "RPE"}</span>
@@ -14089,21 +14196,22 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           ? Math.round((estimate1RM(displayToKg(parseFloat(kg), unit), parseFloat(reps) || 1) / pr1RM) * 100)
           : null;
         return (
-          <div className="flex items-center gap-2 pt-2.5 px-1">
-            <span className="text-[12px] text-slate-500">% de tu 1RM</span>
-            <input
-              type="number" inputMode="numeric" placeholder="—" aria-label="Porcentaje de tu 1RM"
-              className="w-14 h-8 rounded-full bg-slate-900/60 text-[13px] font-bold text-center text-slate-200 focus:outline-none"
-              onFocus={(e) => e.target.select()}
-              onChange={(e) => {
-                const pct = parseFloat(e.target.value);
-                if (!isNaN(pct) && pct > 0 && pr1RM > 0) {
-                  const targetKg = kgToDisplay(Math.round(pr1RM * pct / 100 * 2) / 2, unit);
-                  updateDraft({ kg: String(targetKg) });
-                }
-              }}
-            />
-            {currentPct && <span className="text-[12px] text-slate-500 tabular-nums">ahora ~{currentPct}%</span>}
+          // Cargar por porcentaje (04/11): antes era una cajita negra con un
+          // guion para escribir; ahora, los porcentajes de siempre a un toque,
+          // y el que corresponde a lo que tenés escrito, marcado.
+          <div className="foco-1rm" role="group" aria-label="Cargar el peso por porcentaje de tu 1RM">
+            <p className="foco-1rm-cabeza"><span>% de tu 1RM</span>{currentPct ? <span>ahora <b>{currentPct} %</b></span> : null}</p>
+            <div className="foco-1rm-botones">
+              {PORCENTAJES_1RM.map((pct) => {
+                const targetKg = kgToDisplay(Math.round(pr1RM * pct / 100 * 2) / 2, unit);
+                const elegido = currentPct != null && Math.abs(currentPct - pct) <= 1;
+                return (
+                  <button key={pct} onClick={() => { haptic(8); updateDraft({ kg: String(targetKg) }); }} className={elegido ? "elegido" : ""} aria-pressed={elegido} aria-label={`${pct} %: ${conComa(targetKg)} ${weightLabel(unit)}`}>
+                    <b>{pct}</b><span>{conComa(targetKg)}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         );
       })()}
@@ -14669,6 +14777,27 @@ function CarnetSocio({ color = "#8B5CF6", foto = null, inicial = "?", nombre, li
 // pista llega hasta lo que lleva el que va primero (y nunca menos de cuatro).
 // El primero, con el puesto en dorado; vos, resaltado. `vacios` dibuja
 // carriles de muestra (sin amigos todavía, para que se vea qué vas a tener).
+// EL CÉSPED DE LOS TRINEOS (04/11, pedido: "mejorá el diseño de 'Esta
+// semana' en Social"): la carrera es la franja de césped sintético del
+// gimnasio donde se empuja el trineo. Cada sesión de la semana es una línea
+// blanca; el trineo de cada uno llegó hasta las que lleva y detrás queda el
+// pasto aplastado. Antes eran barritas en una tabla.
+function CespedTrineo({ avance = 0, largo = 4, orden = 0 }) {
+  return (
+    <span className="cesped" style={{ "--avance": Math.max(0, Math.min(1, avance)), "--orden": orden }}>
+      {Array.from({ length: largo }, (_, k) => <i key={k} className="cesped-linea" style={{ left: `${((k + 1) / largo) * 100}%` }} />)}
+      <span className="cesped-rastro" />
+      <svg className="cesped-trineo" viewBox="0 0 40 24" aria-hidden="true">
+        {/* El trineo de empuje: los patines, la base con los discos y los dos caños. */}
+        <path d="M2 21 H34 Q38 21 38 17" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+        <rect x="6" y="14.5" width="22" height="4" rx="1" fill="currentColor" />
+        <rect x="11" y="7" width="12" height="8" rx="2" fill="#1d1e21" stroke="currentColor" strokeWidth="1.2" />
+        <path d="M27 15 L33 2 M23 15 L29 3" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      </svg>
+    </span>
+  );
+}
+
 function CarreraSemana({ filas = [], onVerPersona = null, vacios = 0 }) {
   const llenar = usePrimeraVezHoy("carrera");
   const corredores = filas
@@ -14688,7 +14817,7 @@ function CarreraSemana({ filas = [], onVerPersona = null, vacios = 0 }) {
               <span className={`carrera-avatar ${c.rango ? "con-rango" : ""}`} style={c.rango ? { "--rango-c": c.rango } : undefined} aria-hidden="true">{c.foto ? <img src={c.foto} alt="" /> : String(c.nombre || "?").charAt(0).toUpperCase()}</span>
               <span className="carrera-cuerpo" aria-hidden="true">
                 <span className="carrera-nombre">{c.yo ? "Vos" : String(c.nombre || "").split(" ")[0]}</span>
-                <span className="carrera-pista">{Array.from({ length: largo }, (_, k) => <i key={k} className={c.tramos[k] ? "hecho" : ""} style={c.tramos[k] ? { "--dia": c.tramos[k], "--orden": i * 2 + k } : undefined} />)}</span>
+                <CespedTrineo avance={n / largo} largo={largo} orden={i} />
               </span>
               <b className="carrera-n num-display" aria-hidden="true">{n}</b>
             </Tag>
@@ -14700,7 +14829,7 @@ function CarreraSemana({ filas = [], onVerPersona = null, vacios = 0 }) {
           <div className="carrera-carril vacio">
             <span className="carrera-puesto">{corredores.length + k + 1}</span>
             <span className="carrera-avatar">?</span>
-            <span className="carrera-cuerpo"><span className="carrera-nombre">Tu amigo</span><span className="carrera-pista">{Array.from({ length: largo }, (_, j) => <i key={j} />)}</span></span>
+            <span className="carrera-cuerpo"><span className="carrera-nombre">Tu amigo</span><CespedTrineo avance={0} largo={largo} orden={k} /></span>
             <b className="carrera-n num-display">0</b>
           </div>
         </li>
@@ -15017,7 +15146,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
               {/* El ×1/×2 de mancuernas se configura al editar la rutina
                   ("¿Con cuántas mancuernas?"), no acá: durante el
                   entrenamiento sumaba ruido y ya está definido. */}
-              {!descarga && stagnant && settings.showStagnation === true && !siguiendoPlan && <span className="text-[11px] bg-rose-500/15 text-rose-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><AlertTriangle size={9} /> ESTANCADO</span>}
+              {!descarga && stagnant && settings.showStagnation === true && !siguiendoPlan && <span className="chip-plan estancado" title={`Hace ${STAGNATION_DAYS} días o más que no superás tu récord`}><AlertTriangle size={12} /> Estancado</span>}
               {/* Con la tarjeta cerrada ya se ve cuáles ejercicios siguen el
                   plan y cuáles persiguen tu récord — antes había que abrir
                   cada uno para enterarte. Y el chip ES el interruptor: un
@@ -15051,7 +15180,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
               {/* Las notas ahora son POR SERIE (ver SetRow): cada serie tiene
                   su propio "Agregar nota". Acá ya no va nada. */}
             </div>
-            {exercise.nota && settings.showExerciseNote !== false && <p className="text-[11px] text-slate-500 mt-0.5" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{exercise.nota}</p>}
+            {exercise.nota && settings.showExerciseNote !== false && <p className="ejercicio-consejo">{exercise.nota}</p>}
           </div>
         </div>
         <div className="flex items-center gap-2.5 shrink-0">
@@ -15086,7 +15215,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
           </div>
         ) : (
         <div key="normal" className="cuerpo-cambia">
-        {stagnant && settings.showStagnation === true && !siguiendoPlan && <div className="mb-3 text-[11px] text-rose-400/90 bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" /><span>Hace {STAGNATION_DAYS}+ días sin superar el récord. Considerá cambiar reps, descanso o variante.</span></div>}
+        {stagnant && settings.showStagnation === true && !siguiendoPlan && <p className="aviso-estancado"><AlertTriangle size={15} aria-hidden="true" /><span>Hace {STAGNATION_DAYS} días o más que no superás tu récord. Probá otro rango de reps, otro descanso o una variante.</span></p>}
         {/* Pasar ESTE ejercicio de "sigue el plan" a "persigue mi récord" y
             al revés, sin salir de la pantalla ni perder lo planificado: el
             plan queda guardado, sólo se deja de perseguir (plannedPaused).
@@ -15139,7 +15268,8 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
                   const peso = Math.max(0, Math.round(kgToDisplay(bestWorkingKg * w.pct, planUnit) / paso) * paso);
                   return (
                     <div key={i} className="aproximacion">
-                      <span className="aproximacion-pct">{Math.round(w.pct * 100)}%</span>
+                      <span className="aproximacion-pct">{Math.round(w.pct * 100)} %</span>
+                      <span className="aproximacion-barra" style={{ "--p": w.pct }} aria-hidden="true" />
                       <span className="aproximacion-serie"><b className="num-display">{w.reps} × {conComa(peso)}</b> {weightLabel(planUnit)}</span>
                     </div>
                   );
@@ -16440,7 +16570,22 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
                   ? <><b><NumberFlow value={Math.min(avanceDescarga.hechas, avanceDescarga.total)} /></b> de {avanceDescarga.total} series de descarga{avanceDescarga.hechas >= avanceDescarga.total ? ": listo por hoy" : ""}</>
                   : <><b><NumberFlow value={Math.min(avanceDia.hechas, avanceDia.total)} /></b> de {avanceDia.total} series{avanceDia.hechas >= avanceDia.total ? ": barra completa" : ""}</>}
               </p>
-              {modoDescarga && <p className="dia-descarga-regla cuerpo-cambia">{reglaDescarga}</p>}
+              {/* LA NOTA DEL PROFE (04/11, pedido: "que la nota de la descarga
+                  aparezca distinto, no sólo texto así como así"): la regla de la
+                  semana escrita a mano en un papelito pegado con cinta, cada
+                  renglón con su tilde, y "sin buscar marcas" subrayado. */}
+              {modoDescarga && (
+                <div className="nota-descarga cuerpo-cambia" role="note" aria-label={reglaDescarga}>
+                  <span className="nota-descarga-cinta" aria-hidden="true" />
+                  <p className="nota-descarga-titulo a-mano" aria-hidden="true">Esta semana</p>
+                  <ul className="nota-descarga-lista a-mano" aria-hidden="true">
+                    <li><b>{{ 2: "½", 3: "⅓", 4: "¼" }[divisorDescarga] || "menos"}</b> de las series</li>
+                    <li><b>{Math.round(pctDescarga * 100)} %</b> del peso</li>
+                    <li>las mismas reps</li>
+                    <li className="subrayado">sin buscar marcas</li>
+                  </ul>
+                </div>
+              )}
             </div>
           )}
           {day.isNew && <div className="mt-3 inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 text-[12px] rounded-full px-3 py-1.5">🆕 Empezás a registrar tus marcas desde hoy.</div>}
@@ -16486,7 +16631,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           esta tarjeta es una guía aparte, no un campo de registro, y se
           probó que taparla dejaba a la mayoría de los perfiles (ficha
           mínima por default) sin verla nunca. */}
-      <GeneralWarmupCard exercises={day.exercises} warmupKeys={day.warmup} accent={day.color} />
+      {settings?.showGeneralWarmup !== false && <GeneralWarmupCard exercises={day.exercises} warmupKeys={day.warmup} accent={day.color} />}
 
       {/* La animación de deslizamiento se dispara reiniciando la clase por
           JS (ver el efecto de slideDir) en vez de con key={activeDay}: usar
@@ -17549,10 +17694,6 @@ const EVOLUTION_CHART_COLOR = "#F59E0B";
 // SOCIAL_INK es la variante para TEXTO e íconos: los violetas saturados no
 // llegan a 4.5:1 como tipografía, y esta sí.
 const SOCIAL_COLOR = "#8B5CF6";
-// Es una variable de CSS y no un hex fijo: el lila claro que se lee sobre
-// grafito desaparece sobre blanco (en modo claro, el "Amigos" activo de las
-// solapas no se veía). Ver --social-tinta en ANIMATION_CSS.
-const SOCIAL_INK = "var(--social-tinta)";
 
 /* ============================================================================
    EXERCISE CHIP ROW — selector de ejercicio con el mismo lenguaje visual que
@@ -20383,37 +20524,6 @@ function etiquetaPeriodo(prefijo) {
    modal de compartir una rutina puntual).
 ============================================================================ */
 
-/* ============================================================================
-   FILA DE SECCIÓN — el bloque básico dentro de las tarjetas de Social
-   (Amigos/Buscar/Ranking/Entrenador). Antes cada una de estas filas era su
-   propia tarjeta, con borde y fondo del color de la sección; ahora que viven
-   DENTRO de la tarjeta de la sección, eso quedaba como una caja adentro de
-   otra caja (el "medio raro" del reporte). Acá la superficie es tenue y
-   neutra, y el color queda sólo en la placa del ícono — el mismo patrón que
-   ya usan ToggleRow en Perfil y las filas de ejercicio en Rutina.
-============================================================================ */
-function SectionRow({ icon, title, desc, onClick = null, right = null, disabled = false }) {
-  const Tag = onClick ? "button" : "div";
-  return (
-    <Tag
-      onClick={onClick || undefined}
-      disabled={onClick ? disabled : undefined}
-      className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition disabled:opacity-60 ${onClick ? "active:scale-[0.99]" : ""}`}
-      style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}
-    >
-      {icon && (
-        <span className="placa-icono w-8 h-8 rounded-xl flex items-center justify-center shrink-0">
-          {icon}
-        </span>
-      )}
-      <span className="flex-1 min-w-0">
-        <span className="block text-sm font-bold text-white truncate">{title}</span>
-        {desc && <span className="block text-[11px] text-slate-500 leading-snug">{desc}</span>}
-      </span>
-      {right}
-    </Tag>
-  );
-}
 
 // Rótulo de sub-bloque dentro de una tarjeta de sección — un solo estilo
 // para "Solicitudes recibidas", "Mis alumnos", "Mi entrenador", etc., en vez
@@ -20537,85 +20647,6 @@ function CollapsibleSection({ title, subtitle, icon, defaultOpen = false, childr
 // desmonta/remonta entero cada vez que `currentUsername` cambia de forma
 // relevante (pasa a tener uno, o se cierra el panel de ajustes), así que
 // el useState(currentUsername || "") de abajo ya arranca fresco solo.
-function UsernameSection({ uid, currentUsername, onSaved, onRemoved = null }) {
-  const [value, setValue] = useState(currentUsername || "");
-  const [status, setStatus] = useState(null); // null|checking|available|taken|invalid|saving|error
-  const [editing, setEditing] = useState(!currentUsername);
-
-  const debouncedCheck = useMemo(() => debounce(async (raw) => {
-    const lower = normalizeUsername(raw);
-    if (!isValidUsername(lower)) { setStatus("invalid"); return; }
-    if (lower === currentUsername) { setStatus(null); return; }
-    setStatus("checking");
-    try {
-      const available = await checkUsernameAvailable(lower);
-      setStatus(available ? "available" : "taken");
-    } catch {
-      // Firestore puede rechazar esto (permission-denied) si todavía no se
-      // pegaron las reglas nuevas en la consola — sin este catch, "status"
-      // se quedaba trabado en "checking" para siempre, sin forma de saber
-      // qué pasó ni de reintentar.
-      setStatus("error");
-    }
-  }, 500), [currentUsername]);
-
-  const handleChange = (e) => {
-    const raw = e.target.value.replace(/[^a-zA-Z0-9_]/g, "").toLowerCase().slice(0, 20);
-    setValue(raw);
-    if (!raw) { setStatus(null); return; }
-    debouncedCheck(raw);
-  };
-
-  const handleSave = async () => {
-    const lower = normalizeUsername(value);
-    if (!isValidUsername(lower) || status === "taken") return;
-    setStatus("saving");
-    try {
-      const saved = currentUsername ? await changeUsername(uid, currentUsername, lower) : await claimUsername(uid, lower);
-      setStatus(null);
-      setEditing(false);
-      onSaved(saved);
-    } catch (err) {
-      setStatus(err?.code === "permission-denied" ? "taken" : "error");
-    }
-  };
-
-  if (!editing) {
-    return (
-      <button onClick={() => setEditing(true)} className="flex items-center gap-1 text-purple-400 hover:text-purple-300 transition text-xs font-bold">
-        <AtSign size={11} /> {currentUsername} <Edit3 size={10} className="opacity-60" />
-      </button>
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      <div className="relative">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-bold">@</span>
-        <input value={value} onChange={handleChange} placeholder="tu_usuario" maxLength={20}
-          className="w-full bg-slate-800 border border-slate-700/50 rounded-xl pl-7 pr-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500/50" />
-      </div>
-      <div className="flex items-center justify-between gap-2">
-        <p className={`text-[11px] ${status === "taken" || status === "invalid" || status === "error" ? "text-rose-400" : status === "available" ? "text-emerald-400" : "text-slate-600"}`}>
-          {status === "checking" && "Comprobando disponibilidad..."}
-          {status === "available" && "Disponible ✓"}
-          {status === "taken" && "Ese usuario ya existe"}
-          {status === "invalid" && "3 a 20 letras/números/guión bajo"}
-          {status === "error" && "No se pudo guardar, probá de nuevo"}
-          {status === "saving" && "Guardando..."}
-          {!status && "Así te van a poder encontrar tus amigos"}
-        </p>
-        <div className="flex gap-1.5 shrink-0">
-          {currentUsername && <button onClick={() => { setEditing(false); setValue(currentUsername); setStatus(null); }} className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-500 hover:text-slate-300">Cancelar</button>}
-          <button onClick={handleSave} disabled={status === "checking" || status === "saving" || status === "taken" || status === "invalid" || !value} className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-purple-500 !text-white disabled:opacity-40 disabled:cursor-not-allowed">Guardar</button>
-        </div>
-      </div>
-      {currentUsername && onRemoved && (
-        <button onClick={async () => { setStatus("saving"); await unpublishProfile(uid, currentUsername); setStatus(null); onRemoved(); }} className="text-[11px] text-slate-600 hover:text-rose-400 transition">Dejar de ser buscable (borra tu @usuario)</button>
-      )}
-    </div>
-  );
-}
 
 
 // Cuenta de amigos + solicitudes pendientes (amigo + entrenador, en
@@ -20673,38 +20704,24 @@ function SocialPreviewCard({ profile, uid, onGoToSocial, onUpdateProfile }) {
     );
   }
 
-  if (!profile?.username) {
-    return (
-      <div className="rounded-2xl border border-purple-500/20 bg-purple-500/5 px-4 py-3.5 space-y-2.5">
-        <div className="flex items-center gap-2">
-          <Users size={15} className="text-purple-400" />
-          <p className="text-xs font-bold text-purple-300">Activá lo social</p>
-        </div>
-        <p className="text-[11px] text-slate-500 -mt-1.5">Elegí un @usuario para que tus amigos y tu entrenador te puedan encontrar.</p>
-        <UsernameSection uid={uid} currentUsername={null} onSaved={(u) => onUpdateProfile({ username: u })} />
-      </div>
-    );
-  }
-
   return (
     <div className="rounded-2xl border border-slate-800/50 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 overflow-hidden">
       <div className="flex items-center gap-3 px-4 py-3.5">
         <button onClick={onGoToSocial} className="flex-1 flex items-center gap-3 min-w-0 text-left active:opacity-80 transition">
           <div className="icono-suelto"><Users size={17} /></div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-white flex items-center gap-1"><AtSign size={11} className="text-purple-400" />{profile.username}</p>
+            <p className="text-sm font-bold text-white">Amigos y entrenador</p>
             <p className="text-[11px] text-slate-500">{friendCount} {friendCount === 1 ? "amigo" : "amigos"} · Entrenador / alumnos</p>
           </div>
         </button>
         {pendingCount > 0 && (
           <span className="w-5 h-5 rounded-full bg-rose-500 text-white text-[11px] font-black flex items-center justify-center shrink-0">{pendingCount}</span>
         )}
-        <button onClick={() => setShowSettings((v) => !v)} aria-label="Configurar @usuario" className="p-1.5 rounded-lg text-slate-600 hover:text-slate-300 transition shrink-0"><Edit3 size={13} /></button>
+        <button onClick={() => setShowSettings((v) => !v)} aria-label="Qué ven tus amigos" className="p-1.5 rounded-lg text-slate-600 hover:text-slate-300 transition shrink-0"><Edit3 size={13} /></button>
         <button onClick={onGoToSocial} className="text-slate-600 shrink-0"><ChevronRight size={16} /></button>
       </div>
       {showSettings && (
         <div className="px-4 pb-4 pt-1 border-t border-slate-800/50 space-y-3">
-          <UsernameSection uid={uid} currentUsername={profile.username} onSaved={(u) => { onUpdateProfile({ username: u }); setShowSettings(false); }} onRemoved={() => { onUpdateProfile({ username: null }); setShowSettings(false); }} />
           {/* Pedido: "que en el perfil vos puedas decidir si mostrar tus
               marcas y/o rutina a amigos, pero que por default esté en que
               sí" — !== false en vez de === true: quien nunca tocó esto
@@ -21464,7 +21481,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-white">Qué ves al registrar</p>
           <p className="text-[12px] text-slate-500 mt-0.5 leading-snug">
-            {(() => { const flags = [settings.showRpe !== false, settings.showWarmup !== false, settings.show1RMPercent !== false, settings.showCoaching !== false, settings.showExerciseNote !== false, settings.showPersonalNote !== false, settings.showStagnation === true, settings.showProgressionSuggestion === true, settings.showLastSession === true]; const on = flags.filter(Boolean).length; return on === flags.length ? "Todo prendido" : `${on} de ${flags.length} prendidas`; })()}
+            {(() => { const flags = [settings.showGeneralWarmup !== false, settings.showRpe !== false, settings.showWarmup !== false, settings.show1RMPercent !== false, settings.showCoaching !== false, settings.showExerciseNote !== false, settings.showPersonalNote !== false, settings.showStagnation === true, settings.showProgressionSuggestion === true, settings.showLastSession === true]; const on = flags.filter(Boolean).length; return on === flags.length ? "Todo prendido" : `${on} de ${flags.length} prendidas`; })()}
           </p>
         </div>
         <ChevronRight size={16} className="text-slate-600 shrink-0" />
@@ -21579,7 +21596,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
             {[
               { t: "1. Datos que recopilamos", b: "Datos de entrenamiento (series, pesos, récords), datos de perfil (nombre, email, sexo, fecha de nacimiento, altura), medidas corporales, tu foto de perfil si elegís una, fotos de progreso (sólo en tu dispositivo) y datos de cuenta Google si iniciás sesión con Google. El micrófono y la cámara, sólo cuando los usás: el micrófono para dictarle al Entrenador IA (el reconocimiento de voz de tu teléfono pasa el audio a texto y no lo guardamos) y la cámara para leer el QR de un amigo o sacarle una foto a una rutina." },
               { t: "2. Cómo usamos los datos", b: "Para mostrarte tu historial, récords y progreso. Para sincronizar tu perfil entre dispositivos si iniciaste sesión con Google. Para generar recomendaciones del Chatbot (el texto se envía a la API de Google Gemini y no se almacena en nuestros servidores). No vendemos tus datos ni los usamos para publicidad." },
-              { t: "3. Almacenamiento y seguridad", b: "Tus datos se guardan localmente en tu dispositivo (IndexedDB/localStorage). Si usás la sincronización, se almacenan en Firebase Firestore con acceso restringido a tu cuenta. Si elegís un @usuario para activar lo social, tu nombre y foto de perfil quedan visibles para cualquier usuario de la app (necesario para que te puedan buscar), y tu rutina activa, historial de entrenamientos, récords y medidas corporales quedan visibles únicamente para las personas que aceptes como amigos o como entrenador/alumno vinculado — podés dejar de compartirlos en cualquier momento quitando el @usuario. Las fotos de progreso nunca se suben a ningún servidor ni se comparten con nadie, bajo ninguna circunstancia. Toda comunicación usa HTTPS." },
+              { t: "3. Almacenamiento y seguridad", b: "Tus datos se guardan localmente en tu dispositivo (IndexedDB/localStorage). Si usás la sincronización, se almacenan en Firebase Firestore con acceso restringido a tu cuenta. Si entrás con tu cuenta de Google, tu nombre, tu foto y tu rango general quedan visibles para quien te busque por tu nombre en Social (para que tus amigos te encuentren), y tu rutina activa, historial de entrenamientos, récords y medidas corporales quedan visibles únicamente para las personas que aceptes como amigos o como entrenador/alumno vinculado — podés dejar de compartirlos en cualquier momento desde Perfil, en Amigos y entrenador. Las fotos de progreso nunca se suben a ningún servidor ni se comparten con nadie, bajo ninguna circunstancia. Toda comunicación usa HTTPS." },
               { t: "4. Terceros", b: "Usamos Google Firebase (autenticación y base de datos) y la API de Google Gemini (IA): lo que le escribís al Entrenador IA, junto con tu sexo, tu edad y un resumen de tu entrenamiento y tus rutinas (no tu nombre ni tu mail), y las fotos o archivos de una rutina que importes se envían a Google para generar la respuesta o leer la rutina. Hoy usamos el plan gratuito de la API: según sus términos, Google puede usar esos datos para mejorar sus servicios y personas de Google pueden revisarlos, así que no le escribas al Entrenador IA nada que no quieras compartir. Cada uno tiene su propia política de privacidad." },
               { t: "5. Anuncios y pagos", b: "Hoy Modus Fit es gratis y no muestra anuncios. Si más adelante sumamos anuncios o una versión paga, vamos a actualizar esta política y avisarte en la app antes de que empiecen." },
               { t: "6. Retención y eliminación", b: "Los datos locales permanecen hasta que desinstalás la app o eliminás tu perfil. Al eliminar tu perfil (Perfil › Eliminar perfil) se borran tus datos en la nube, tu perfil público y tu cuenta. También podés pedirlo por mail, sin la app: app-gimnasio-two.vercel.app/eliminar-cuenta.html, o escribiendo a deolmosagustin@gmail.com." },
@@ -21981,7 +21998,7 @@ function AmigoDelLink({ username, myUid = null, onClose, onIrA }) {
         </div>
         <div className="modal-rutina-cuerpo" role="status">
           {estado === "buscando" && <p className="compartir-generando"><span className="plan-ia-girando" aria-hidden="true" /> Buscando a @{username}…</p>}
-          {persona && (estado === "encontrado" || estado === "enviada" || estado === "ya") && <PublicUserCard uid={persona.uid} basic={persona.basic} mostrarUsuario />}
+          {persona && (estado === "encontrado" || estado === "enviada" || estado === "ya") && <PublicUserCard uid={persona.uid} basic={persona.basic} />}
           {estado === "no-esta" && <p className="ficha-aviso"><AlertTriangle size={15} />No encontramos a @{username}. Puede que haya cambiado su usuario.</p>}
           {estado === "vos" && <p className="ficha-aviso"><Info size={15} />Es tu propio código: compartilo para que te agreguen.</p>}
           {estado === "enviada" && <p className="ficha-aviso"><Check size={15} />Le mandamos la solicitud a {nombre}. Cuando la acepte, aparece en Social.</p>}
@@ -22004,42 +22021,57 @@ function AmigoDelLink({ username, myUid = null, onClose, onIrA }) {
 // código QR de perfil (ver decodeQrFromImageFile/parseProfileQrPayload) —
 // ambos caminos terminan en la misma búsqueda y la misma tarjeta de
 // resultado, sólo cambia cómo se llega al @usuario.
-function SocialSearchSection({ myUid, friendStatus, onSendFriendRequest }) {
+// SUMAR AMIGOS (04/11, pedido: "olvidarnos del arroba: si te busco por el
+// nombre que tenés en el casillero ya te encuentro", "agregar un amigo por
+// WhatsApp" y "todo el esquema de buscar amigos más sencillo"). Un solo
+// campo que busca mientras escribís el nombre, y abajo las otras dos formas:
+// mandarle tu link por WhatsApp (lo abre y te agrega) o escanear su QR.
+function SocialSearchSection({ myUid, friendStatus, onSendFriendRequest, miUsuario = null }) {
   const [raw, setRaw] = useState("");
-  const [state, setState] = useState("idle"); // idle|searching|found|not_found|self|qr_error|qr_ajeno
-  const [found, setFound] = useState(null);
+  const [state, setState] = useState("idle"); // idle|searching|done|qr_error|qr_ajeno
+  const [resultados, setResultados] = useState([]);
   const [scanning, setScanning] = useState(false);
-  // Cámara en vivo (el camino principal) y foto (el de respaldo).
   const [camara, setCamara] = useState(false);
   const hayCamara = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
   const qrInputRef = useRef(null);
+  const pedido = useRef(0);
 
-  const runSearch = async (query) => {
-    const q = query.trim();
-    if (!q) return;
-    setState("searching"); setFound(null);
-    const hit = await lookupUserByUsername(q);
-    if (!hit) { setState("not_found"); return; }
-    if (hit.uid === myUid) { setState("self"); return; }
-    const basic = await getPublicBasic(hit.uid);
-    setFound({ uid: hit.uid, basic });
-    setState("found");
+  const runSearch = async (texto) => {
+    const q = String(texto || "").trim();
+    const yo = ++pedido.current;
+    if (q.replace(/^@+/, "").length < 2) { setState("idle"); setResultados([]); return; }
+    setState("searching");
+    const lista = await buscarPorNombre(q, myUid);
+    if (yo !== pedido.current) return;
+    setResultados(lista);
+    setState("done");
   };
-  const handleSearch = () => runSearch(raw);
+  // Busca solo, un rato después de que dejás de escribir.
+  useEffect(() => {
+    const t = setTimeout(() => { runSearch(raw); }, 350);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [raw]);
 
-  // Lo que se hace con un QR leído (de la cámara o de una foto): el @usuario
-  // de un amigo se busca; el link de una rutina compartida se abre (lo toma
-  // App por el #, igual que si lo hubieras tocado); otra cosa se avisa.
+  // Un QR leído: el link de un amigo lo busca; el de una rutina la abre.
   const usarQr = async (texto) => {
     const username = parseProfileQrPayload(texto);
-    if (username) { setRaw(username); await runSearch(username); return; }
+    if (username) {
+      const hit = await lookupUserByUsername(username);
+      if (hit && hit.uid !== myUid) {
+        const basic = await getPublicBasic(hit.uid);
+        setRaw(""); pedido.current++;
+        setResultados([{ uid: hit.uid, basic }]); setState("done");
+      } else setState(hit ? "idle" : "qr_ajeno");
+      return;
+    }
     const rutina = linkDeRutinaEnQr(texto);
     if (rutina) { setState("idle"); window.location.hash = `#r=${rutina}`; return; }
     setState("qr_ajeno");
   };
   const handleQrPhoto = async (file) => {
     if (!file) return;
-    setScanning(true); setState("idle"); setFound(null);
+    setScanning(true); setState("idle");
     try {
       const text = await decodeQrFromImageFile(file);
       if (!text) { setState("qr_error"); return; }
@@ -22051,71 +22083,62 @@ function SocialSearchSection({ myUid, friendStatus, onSendFriendRequest }) {
       setScanning(false);
     }
   };
+  // WhatsApp: tu link de amigo con dos palabras. Al tocarlo, a tu amigo se le
+  // abre la app (o la página, si no la tiene) con "Agregar".
+  const invitarPorWhatsApp = () => {
+    if (!miUsuario) return;
+    const texto = `Sumame en Modus Fit así vemos quién entrena más esta semana: ${buildProfileQrPayload(miUsuario)}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank", "noopener");
+  };
 
   return (
-    <div className="space-y-3">
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
-          <input value={raw} onChange={(e) => setRaw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSearch()} placeholder="@usuario de tu amigo"
-            className="w-full bg-slate-950/70 border border-slate-700/60 rounded-xl pl-9 pr-3 py-2.5 text-white text-sm focus:outline-none focus:border-cyan-500/60" />
+    <div className="sumar-amigos">
+      <label className="buscador-amigos">
+        <Search size={17} aria-hidden="true" />
+        <input value={raw} onChange={(e) => setRaw(e.target.value)} placeholder="Buscá a tu amigo por su nombre" aria-label="Buscar amigos por nombre" enterKeyHint="search" autoComplete="off" />
+        {raw && <button onClick={() => setRaw("")} aria-label="Borrar la búsqueda" className="buscador-amigos-borrar"><X size={16} /></button>}
+      </label>
+      {state === "searching" && <p className="sumar-amigos-estado">Buscando…</p>}
+      {state === "done" && resultados.length === 0 && <p className="sumar-amigos-estado">No encontramos a nadie con ese nombre. Mandale tu link por WhatsApp y te agrega él.</p>}
+      {state === "qr_error" && <p className="sumar-amigos-estado alerta" role="alert">No encontramos un código QR en esa foto. Probá con una más cerca, con el código entero.</p>}
+      {state === "qr_ajeno" && <p className="sumar-amigos-estado alerta" role="alert">Ese código no es de Modus Fit. Pedile el suyo a tu amigo: está en Social, arriba de todo.</p>}
+      {resultados.length > 0 && state !== "searching" && (
+        <div className="lista-placa" aria-live="polite">
+          {resultados.map((r) => (
+            <PublicUserCard key={r.uid} uid={r.uid} basic={r.basic}>
+              {(() => {
+                const st = friendStatus(r.uid);
+                if (st === "accepted") return <span className="chip-plan shrink-0"><UserCheck size={12} /> Amigos</span>;
+                if (st === "pending_sent") return <span className="chip-plan shrink-0">Enviada</span>;
+                if (st === "pending_received") return <span className="chip-plan sigue shrink-0">Te escribió</span>;
+                return (
+                  <button onClick={() => onSendFriendRequest(r.uid)} className="boton-tonal shrink-0" style={{ "--c": SOCIAL_COLOR, minHeight: 40, paddingInline: 14 }} aria-label={`Agregar a ${r.basic?.name || "esta persona"}`}>
+                    <UserPlus size={15} /> Agregar
+                  </button>
+                );
+              })()}
+            </PublicUserCard>
+          ))}
         </div>
-        <button onClick={handleSearch} disabled={!raw.trim() || state === "searching"} className="px-4 rounded-xl !text-white text-sm font-bold transition active:scale-[0.97] disabled:opacity-30" style={{ backgroundColor: "#06B6D4", boxShadow: "0 6px 16px -6px rgba(6,182,212,0.7)" }}>Buscar</button>
-      </div>
-      {/* Antes este botón era fucsia dentro de una sección cian: un tercer
-          color sin ningún motivo, que era buena parte de lo que hacía sentir
-          la sección desprolija. Ahora acompaña al color de Buscar. */}
-      {/* La cámara en vivo pasa a ser el camino principal (ver
-          ScanQrCamera): el escaneo por foto era a ciegas — sacabas la foto
-          y recién después te decía que no había podido. La foto queda de
-          respaldo, que además es el caso real de "me mandaron el QR por
-          WhatsApp y lo tengo en la galería". */}
-      <div className="flex gap-2">
-        {hayCamara && (
-          <button onClick={() => setCamara(true)} disabled={scanning} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl !text-white transition text-xs font-bold disabled:opacity-50 active:scale-[0.98]"
-            style={{ backgroundColor: "#06B6D4", boxShadow: "0 6px 16px -6px rgba(6,182,212,0.7)" }}>
-            <QrCode size={13} /> Escanear código QR
+      )}
+      <div className="sumar-amigos-botones">
+        {miUsuario && (
+          <button onClick={invitarPorWhatsApp} className="sumar-amigos-boton">
+            <MessageCircle size={18} aria-hidden="true" /><span>Por WhatsApp</span>
           </button>
         )}
-        <button onClick={() => qrInputRef.current?.click()} disabled={scanning} className={`${hayCamara ? "shrink-0 px-3" : "flex-1"} flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-cyan-500/25 text-cyan-300/90 hover:bg-cyan-500/10 transition text-xs font-bold disabled:opacity-50`}>
-          {scanning ? <RotateCcw size={13} className="animate-spin" /> : <Camera size={13} />} {scanning ? "Leyendo…" : hayCamara ? "Foto" : "Escanear desde una foto"}
+        <button onClick={() => (hayCamara ? setCamara(true) : qrInputRef.current?.click())} disabled={scanning} className="sumar-amigos-boton">
+          {scanning ? <RotateCcw size={18} className="animate-spin" aria-hidden="true" /> : <QrCode size={18} aria-hidden="true" />}<span>{scanning ? "Leyendo…" : "Escanear QR"}</span>
         </button>
       </div>
       {camara && (
         <ScanQrCamera
           onClose={() => setCamara(false)}
           onFoto={() => { setCamara(false); qrInputRef.current?.click(); }}
-          onResult={async (texto) => {
-            setCamara(false);
-            await usarQr(texto);
-          }}
+          onResult={async (texto) => { setCamara(false); await usarQr(texto); }}
         />
       )}
-      {/* Sin `capture="environment"`: eso obligaba a sacar una foto con la
-          cámara en el momento. Lo más común es que te manden el QR por
-          WhatsApp y lo tengas en la galería, y así ni siquiera se podía
-          elegir. Sin el atributo, Android ofrece cámara Y galería. */}
       <input ref={qrInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { handleQrPhoto(e.target.files?.[0]); e.target.value = ""; }} />
-      {state === "searching" && <p className="text-xs text-slate-500 text-center py-3">Buscando...</p>}
-      {state === "not_found" && <p className="text-xs text-slate-500 text-center py-3">No encontramos a nadie con ese @usuario.</p>}
-      {state === "self" && <p className="text-xs text-slate-500 text-center py-3">Ese es tu propio @usuario.</p>}
-      {state === "qr_error" && <p className="text-xs text-amber-400 text-center py-3" role="alert">No encontramos un código QR en esa foto. Probá con una más cerca, en la que el código se vea entero.</p>}
-      {state === "qr_ajeno" && <p className="text-xs text-amber-400 text-center py-3" role="alert">Ese código no es de Modus Fit. Pedile a tu amigo el suyo: está en Social, arriba de todo.</p>}
-      {state === "found" && found && (
-        <PublicUserCard uid={found.uid} basic={found.basic} mostrarUsuario>
-          {(() => {
-            const st = friendStatus(found.uid);
-            if (st === "accepted") return <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-400 shrink-0"><UserCheck size={12} /> Ya son amigos</span>;
-            if (st === "pending_sent") return <span className="text-[11px] font-bold text-slate-500 shrink-0">Solicitud enviada</span>;
-            if (st === "pending_received") return <span className="text-[11px] font-bold text-amber-400 shrink-0">Te escribió</span>;
-            return (
-              <button onClick={() => onSendFriendRequest(found.uid)} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 text-[11px] font-bold hover:bg-cyan-500/25 transition">
-                <UserPlus size={12} /> Agregar
-              </button>
-            );
-          })()}
-        </PublicUserCard>
-      )}
     </div>
   );
 }
@@ -22349,13 +22372,21 @@ function TrainerTemplatesCard({ templates, onCreate, onEdit, onSend }) {
 // Bloque vacío con forma, en vez de una línea de texto gris suelta: el
 // resto de la app contesta "acá no hay nada todavía" con un ícono y una
 // frase que dice qué hacer, y esta sección era la única que no.
-function TrainerEmpty({ icon, titulo, detalle }) {
+function TrainerEmpty({ titulo, detalle, alumnos = false }) {
+  // La tabla del profe con la hoja en blanco (04/11): el lugar vacío se dice
+  // con el objeto que después se va a llenar, no con una caja punteada.
   return (
-    <div className="flex items-center gap-3 rounded-2xl px-3.5 py-3" style={{ backgroundColor: "var(--row-surface)", border: "1px dashed var(--chip-border)" }}>
-      <span className="icono-suelto">{icon}</span>
+    <div className="profe-vacio">
+      <svg className="profe-tabla" viewBox="0 0 44 56" aria-hidden="true">
+        <rect x="2" y="5" width="40" height="49" rx="4" className="profe-tabla-madera" />
+        <rect x="7" y="11" width="30" height="39" rx="1.5" className="profe-tabla-hoja" />
+        <rect x="14" y="2" width="16" height="9" rx="2.5" className="profe-tabla-broche" />
+        {(alumnos ? [19, 26, 33, 40] : [20, 28, 36]).map((y) => <path key={y} d={`M11 ${y} H33`} className="profe-tabla-renglon" />)}
+        {alumnos ? <path d="M11 17 h3 M11 24 h3" className="profe-tabla-renglon" /> : null}
+      </svg>
       <div className="min-w-0">
-        <p className="text-[12px] font-bold text-slate-400 leading-tight">{titulo}</p>
-        <p className="text-[11px] text-slate-600 leading-snug mt-0.5">{detalle}</p>
+        <p className="profe-vacio-titulo">{titulo}</p>
+        <p className="profe-vacio-detalle">{detalle}</p>
       </div>
     </div>
   );
@@ -22364,13 +22395,11 @@ function TrainerEmpty({ icon, titulo, detalle }) {
 // Rótulo de sección con su cuenta al lado — "MIS ALUMNOS" no decía cuántos,
 // y con tres o más listas iguales una arriba de otra el número es lo primero
 // que se busca.
-function TrainerSectionLabel({ children, n = null, accent = null }) {
+function TrainerSectionLabel({ children, n = null }) {
   return (
     <div className="flex items-center gap-1.5 px-0.5">
-      <p className="text-[12px] font-bold" style={{ color: accent || "#6e7379" }}>{children}</p>
-      {n != null && n > 0 && (
-        <span className="text-[11px] font-black tabular-nums rounded-full px-1.5 py-px" style={{ backgroundColor: tint(accent || "#6e7379", "22"), color: accent || "#9da2a8" }}>{n}</span>
-      )}
+      <p className="ajuste-rotulo">{children}</p>
+      {n != null && n > 0 && <span className="chip-plan">{n}</span>}
     </div>
   );
 }
@@ -22380,6 +22409,7 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
   const [role, setRole] = useState("trainer"); // el rol que ELIJO para mí al mandar la solicitud
   const [searchState, setSearchState] = useState("idle");
   const [found, setFound] = useState(null);
+  const [opciones, setOpciones] = useState([]);
   // REDISEÑO: el formulario para vincular estaba ARRIBA DE TODO, encima de
   // tus alumnos y de tu entrenador. Es algo que usás una vez por persona,
   // mientras que la lista la mirás siempre — empujaba lo importante abajo
@@ -22390,13 +22420,12 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
   const handleSearch = async () => {
     const q = raw.trim();
     if (!q) return;
-    setSearchState("searching"); setFound(null);
-    const hit = await lookupUserByUsername(q);
-    if (!hit) { setSearchState("not_found"); return; }
-    if (hit.uid === myUid) { setSearchState("self"); return; }
-    const basic = await getPublicBasic(hit.uid);
-    setFound({ uid: hit.uid, basic });
-    setSearchState("found");
+    setSearchState("searching"); setFound(null); setOpciones([]);
+    // Por nombre, como en Amigos (04/11): con varios que coinciden, elegís.
+    const lista = await buscarPorNombre(q, myUid);
+    if (!lista.length) { setSearchState("not_found"); return; }
+    if (lista.length === 1) { setFound(lista[0]); setSearchState("found"); return; }
+    setOpciones(lista); setSearchState("elegir");
   };
 
   // Quién necesita atención primero: racha más baja arriba (0 o sin datos
@@ -22440,7 +22469,6 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
     return <span title={e.t} className="shrink-0 text-[11px] font-black rounded-md px-1.5 py-0.5" style={{ backgroundColor: e.bg, color: e.c }}>{e.l}</span>;
   };
 
-  const soyEntrenador = studentsAccepted.length > 0;
   const tengoEntrenador = trainersAccepted.length > 0;
 
   return (
@@ -22450,7 +22478,7 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
           el mismo peso visual que todo lo demás. */}
       {proposals.length > 0 && (
         <div className="space-y-2">
-          <TrainerSectionLabel n={proposals.length} accent="#2DD4BF">Te esperan</TrainerSectionLabel>
+          <TrainerSectionLabel n={proposals.length}>Te esperan</TrainerSectionLabel>
           {proposals.map((p) => (
             <RoutineProposalCard key={p.id} proposal={p} basic={basics[p.trainerUid]} onRespond={(accept) => onRespondProposal(p, accept)} />
           ))}
@@ -22461,26 +22489,26 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
         <>
           {trainerIncoming.length > 0 && (
             <div className="space-y-2">
-              <TrainerSectionLabel n={trainerIncoming.length} accent="#FBBF24">Solicitudes</TrainerSectionLabel>
+              <TrainerSectionLabel n={trainerIncoming.length}>Solicitudes</TrainerSectionLabel>
               {trainerIncoming.map((l) => (
-                <div key={l.id} className="rounded-2xl px-3.5 py-3" style={{ backgroundColor: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.22)" }}>
+                <div key={l.id} className="solicitud px-3.5 pt-3">
                   <div className="flex items-center gap-3">
                     {basics[l.requestedBy]?.avatarData
                       ? <img src={basics[l.requestedBy].avatarData} alt="" className="w-9 h-9 rounded-xl object-cover shrink-0" />
-                      : <span className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center shrink-0 text-sm font-black">{(basics[l.requestedBy]?.name || "?").charAt(0).toUpperCase()}</span>}
+                      : <span className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-sm font-black" style={{ background: "var(--surface-3)", color: "var(--text-strong)" }}>{(basics[l.requestedBy]?.name || "?").charAt(0).toUpperCase()}</span>}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-bold text-white truncate">{basics[l.requestedBy]?.name || "Alguien"}</p>
                       {/* El "qué te está pidiendo" era una línea de 9px
                           apretada contra los botones, a la derecha. Es lo
                           único que hace falta leer para decidir: va debajo
                           del nombre y a tamaño legible. */}
-                      <p className="text-[11px] text-amber-200/80 leading-snug">{l.trainerUid === myUid ? "Quiere que seas su entrenador" : "Se ofrece como tu entrenador"}</p>
+                      <p className="text-[13px] leading-snug" style={{ color: "var(--text-muted)" }}>{l.trainerUid === myUid ? "Quiere que seas su entrenador" : "Se ofrece como tu entrenador"}</p>
                     </div>
                   </div>
                   <div className="flex gap-2 mt-2.5">
-                    <button onClick={() => onRespondLink(l, false)} className="flex-1 py-2 rounded-xl bg-slate-800/80 text-slate-400 text-[11px] font-bold transition active:scale-[0.98]">Rechazar</button>
-                    <button onClick={() => onRespondLink(l, true)} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-black !text-white transition active:scale-[0.98]" style={{ backgroundColor: "#10B981" }}>
-                      <Check size={13} /> Aceptar
+                    <button onClick={() => onRespondLink(l, false)} className="boton-tonal flex-1" style={{ "--c": "#9a9ba0", minHeight: 44 }}>Rechazar</button>
+                    <button onClick={() => onRespondLink(l, true)} className="boton-pildora flex-1" style={{ "--c": SOCIAL_COLOR, minHeight: 44 }}>
+                      <Check size={16} /> Aceptar
                     </button>
                   </div>
                 </div>
@@ -22493,25 +22521,25 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
               hay UNA persona, la que te planifica, y merece una tarjeta con
               su rol escrito en vez de una fila más. */}
           <div className="space-y-2">
-            <TrainerSectionLabel accent={tengoEntrenador ? "#38BDF8" : null}>Mi entrenador</TrainerSectionLabel>
+            <TrainerSectionLabel>Mi entrenador</TrainerSectionLabel>
             {tengoEntrenador ? trainersAccepted.map((l) => (
               <PublicUserCard key={l.id} uid={l.trainerUid} basic={basics[l.trainerUid]} streak={streaks?.[l.trainerUid]?.streak} onClick={() => onViewTrainer(l.trainerUid)}>
-                <span className="shrink-0 text-[11px] font-black rounded-md px-1.5 py-0.5" style={{ backgroundColor: "rgba(56,189,248,0.15)", color: "#7dd3fc" }}>Te planifica</span>
+                <span className="chip-plan sigue shrink-0">Te planifica</span>
                 <button onClick={(e) => { e.stopPropagation(); onRemoveLink(l); }} className="shrink-0 p-1.5 rounded-lg text-slate-600 hover:text-rose-400 transition" title="Desvincular"><X size={13} /></button>
                 <ChevronRight size={15} className="text-slate-600 shrink-0" />
               </PublicUserCard>
             )) : (
-              <TrainerEmpty icon={<GraduationCap size={16} />} titulo="No tenés entrenador" detalle="Si alguien te arma la rutina, vinculalo abajo y va a poder mandarte metas." />
+              <TrainerEmpty titulo="No tenés entrenador" detalle="Si alguien te arma la rutina, vinculalo abajo y va a poder mandarte metas." />
             )}
           </div>
 
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <TrainerSectionLabel n={studentsAccepted.length} accent={soyEntrenador ? "#3B82F6" : null}>Mis alumnos</TrainerSectionLabel>
+              <TrainerSectionLabel n={studentsAccepted.length}>Mis alumnos</TrainerSectionLabel>
               {sortedStudents.length > 1 && <p className="text-[11px] text-slate-700 shrink-0">Quien menos entrenó, primero</p>}
             </div>
             {studentsAccepted.length === 0 ? (
-              <TrainerEmpty icon={<Users size={16} />} titulo="Todavía no tenés alumnos" detalle="Vinculá a quien entrenás para ver cómo viene y planificarle la semana." />
+              <TrainerEmpty alumnos titulo="Todavía no tenés alumnos" detalle="Vinculá a quien entrenás para ver cómo viene y planificarle la semana." />
             ) : sortedStudents.map((l) => (
               <PublicUserCard key={l.id} uid={l.studentUid} basic={basics[l.studentUid]} streak={streaks?.[l.studentUid]?.streak} onClick={() => onViewStudent(l.studentUid)}>
                 {chipPropuesta(l.studentUid)}
@@ -22524,30 +22552,39 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
       )}
 
       {/* VINCULAR, al final y plegado (ver `vinculando` arriba). */}
-      <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--panel-sunken)", border: "1px solid var(--chip-border)" }}>
-        <button onClick={() => setVinculando((v) => !v)} className="w-full flex items-center gap-2.5 px-3.5 py-3 text-left">
-          <span className="icono-suelto"><UserPlus size={15} /></span>
+      <div className="vincular-profe">
+        <button onClick={() => setVinculando((v) => !v)} className="w-full flex items-center gap-3 px-3.5 py-3 text-left" style={{ minHeight: 56 }}>
+          <span className="icono-suelto"><UserPlus size={17} /></span>
           <span className="flex-1 min-w-0">
-            <span className="block text-[12px] font-bold text-white">Vincular entrenador o alumno</span>
-            <span className="block text-[11px] text-slate-500">Con su @usuario</span>
+            <span className="block text-[15px] font-semibold text-[color:var(--text-strong)]">Vincular entrenador o alumno</span>
+            <span className="block text-[13px] text-[color:var(--text-faint)]">Buscalo por su nombre</span>
           </span>
           <ChevronDown size={15} className={`text-slate-600 shrink-0 transition-transform ${vinculando ? "rotate-180" : ""}`} />
         </button>
         {vinculando && (
           <div className="px-3.5 pb-3.5 space-y-2.5 tab-fade-in">
-            <div className="segmentado" style={{ "--c": "#3B82F6" }}>
+            <div className="segmentado" style={{ "--c": SOCIAL_COLOR }}>
               <button onClick={() => setRole("trainer")} aria-pressed={role === "trainer"} className={role === "trainer" ? "activo" : ""}>Soy el entrenador</button>
               <button onClick={() => setRole("student")} aria-pressed={role === "student"} className={role === "student" ? "activo" : ""}>Soy el alumno</button>
             </div>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
-                <input value={raw} onChange={(e) => setRaw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSearch()} placeholder={role === "trainer" ? "@usuario de tu alumno" : "@usuario de tu entrenador"}
-                  className="w-full bg-slate-950/70 border border-slate-700/60 rounded-xl pl-9 pr-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500/60" />
+                <input value={raw} onChange={(e) => setRaw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSearch()} placeholder={role === "trainer" ? "Nombre de tu alumno" : "Nombre de tu entrenador"}
+                  className="campo-profe" />
               </div>
-              <button onClick={handleSearch} disabled={!raw.trim() || searchState === "searching"} className="px-4 rounded-xl !text-white text-sm font-bold transition active:scale-[0.97] disabled:opacity-30" style={{ backgroundColor: "#3B82F6", boxShadow: "0 6px 16px -6px rgba(59,130,246,0.7)" }}>Buscar</button>
+              <button onClick={handleSearch} disabled={!raw.trim() || searchState === "searching"} className="boton-pildora shrink-0 disabled:opacity-40" style={{ "--c": SOCIAL_COLOR, minHeight: 44, width: "auto", paddingInline: 18 }}>Buscar</button>
             </div>
-            {searchState === "not_found" && <p className="text-xs text-slate-500">No encontramos a nadie con ese @usuario.</p>}
+            {searchState === "not_found" && <p className="sumar-amigos-estado">No encontramos a nadie con ese nombre.</p>}
+            {searchState === "elegir" && (
+              <div className="lista-placa">
+                {opciones.map((o) => (
+                  <PublicUserCard key={o.uid} uid={o.uid} basic={o.basic}>
+                    <button onClick={() => { setFound(o); setSearchState("found"); }} className="boton-tonal shrink-0" style={{ "--c": SOCIAL_COLOR, minHeight: 40, paddingInline: 14 }}>Elegir</button>
+                  </PublicUserCard>
+                ))}
+              </div>
+            )}
             {searchState === "self" && <p className="text-xs text-slate-500">Ese sos vos 🙂</p>}
             {/* BUG FIX (ver trainerLinkStatusWith en SocialView): antes acá
                 SIEMPRE se ofrecía "Invitar", sin mirar si ya había un vínculo
@@ -22561,11 +22598,11 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
             {searchState === "found" && found && (() => {
               const link = linkStatusWith?.(found.uid);
               if (link?.status === "accepted") {
-                return <PublicUserCard uid={found.uid} basic={found.basic} mostrarUsuario><span className="text-[11px] font-bold text-emerald-400 shrink-0">Ya vinculados</span></PublicUserCard>;
+                return <PublicUserCard uid={found.uid} basic={found.basic}><span className="chip-plan shrink-0">Ya vinculados</span></PublicUserCard>;
               }
               if (link?.status === "pending" && link.requestedBy === found.uid) {
                 return (
-                  <PublicUserCard uid={found.uid} basic={found.basic} mostrarUsuario>
+                  <PublicUserCard uid={found.uid} basic={found.basic}>
                     <button onClick={() => { onRespondLink(link, true); setFound(null); setRaw(""); setSearchState("idle"); }} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold hover:bg-emerald-500/25 transition">
                       <Check size={12} /> Aceptar — {link.myRole === "trainer" ? "te pidió ser su entrenador" : "se ofreció como tu entrenador"}
                     </button>
@@ -22573,10 +22610,10 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
                 );
               }
               if (link?.status === "pending" && link.requestedBy === myUid) {
-                return <PublicUserCard uid={found.uid} basic={found.basic} mostrarUsuario><span className="text-[11px] font-bold text-slate-500 shrink-0">Invitación enviada</span></PublicUserCard>;
+                return <PublicUserCard uid={found.uid} basic={found.basic}><span className="text-[11px] font-bold text-slate-500 shrink-0">Invitación enviada</span></PublicUserCard>;
               }
               return (
-                <PublicUserCard uid={found.uid} basic={found.basic} mostrarUsuario>
+                <PublicUserCard uid={found.uid} basic={found.basic}>
                   <button onClick={() => { onSendLink(found.uid, role); setFound(null); setRaw(""); setSearchState("idle"); }} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-300 text-[11px] font-bold hover:bg-blue-500/25 transition">
                     <UserPlus size={12} /> Invitar
                   </button>
@@ -22931,13 +22968,13 @@ function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, a
                 {e.streakDays != null
                   ? <span className="podio-dato"><MarcasTiza dias={e.streakDays} max={5} alto={12} decorativa />{e.streakDays}</span>
                   : e.topRank && <span className="podio-dato tinta-rango" style={{ "--rango-c": e.topRank.color }}>{e.topRank.tier} {e.topRank.sub}</span>}
-                <span className="podio-escalon" aria-hidden="true">{pos}</span>
+                <span className="podio-escalon" data-n={pos} aria-hidden="true">{pos}</span>
               </Tag>
             );
           })}
         </div>
       )}
-      <div className="space-y-2">
+      <div className={list.length === 3 ? "hidden" : "lista-placa"}>
         {/* Fallback de key: un perfil local ("sin Google") no tiene
             googleUid todavía, así que "vos" en la lista puede llegar con
             uid undefined — sin el fallback, React tira "missing key"
@@ -24133,7 +24170,7 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, viewerName = null, i
         <div className="tarjeta-tonal text-center px-5 py-8">
           <Users size={26} className="mx-auto mb-3 text-slate-500" />
           <p className="text-[14px] font-semibold text-slate-300">Esta persona no comparte su perfil con vos ahora.</p>
-          <p className="text-[13px] mt-1 text-slate-500">Puede que haya quitado su @usuario o que el vínculo haya cambiado.</p>
+          <p className="text-[13px] mt-1 text-slate-500">Puede que haya dejado de compartir su perfil o que el vínculo haya cambiado.</p>
         </div>
       )}
 
@@ -24704,7 +24741,6 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
   }, [kudosCandidates, basics, profile, profileName, uid]);
   // "Buscar" dejó de ser una solapa y pasó a ser una acción que se abre desde
   // Amigos (ver SECTIONS).
-  const [showBuscar, setShowBuscar] = useState(false);
   // BUG FIX: cuando Buscar dejó de ser una de las cuatro solapas y pasó a ser
   // un desplegable dentro de Amigos, quedaron botones llamando a
   // setSection("buscar") — una sección que ya no existe. sectionIdx daba -1,
@@ -24712,7 +24748,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
   // no renderizaba NADA: indistinguible de que la app se colgó. Y uno de esos
   // botones era el CTA principal de alguien recién llegado y sin amigos.
   // Un solo camino para todos: ir a Amigos y abrir el desplegable.
-  const irABuscar = () => { setSection("amigos"); setShowBuscar(true); };
+  const irABuscar = () => { setSection("amigos"); setTimeout(() => buscarVisible(".buscador-amigos input")?.focus(), 350); };
   // El amigo con la racha más alta que todavía no te alcanzó, pero está
   // cerca (1-2 días) — "being chased", estilo Strava.
   const chaserFriend = useMemo(() => {
@@ -24968,7 +25004,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
     // días: quién de tu grupo entrenó, qué hizo, y a quién podés aplaudirle.
     // Por eso va primera y es la que se abre al entrar.
     { k: "ranking", l: "Ranking", icon: <Award size={14} />, color: "#F59E0B" },
-    { k: "entrenador", l: "Entrenador", icon: <GraduationCap size={14} />, color: "#3B82F6" },
+    { k: "entrenador", l: "Entrenador", icon: <GraduationCap size={14} />, color: SOCIAL_COLOR },
   ];
 
   const sectionIdx = Math.max(0, SECTIONS.findIndex((s) => s.k === section));
@@ -24995,12 +25031,6 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
             />
             {/* Sin @usuario, se elige acá mismo; sin Google, el botón te
                 lleva a Perfil a vincularlo. */}
-            {!profile?.username && uid && (
-              <div className="tarjeta-tonal p-4" style={{ "--c": SOCIAL_COLOR }}>
-                <p className="text-[13px] text-slate-400 mb-2">Elegí tu @usuario para que te puedan buscar y agregar.</p>
-                <UsernameSection uid={uid} currentUsername={null} onSaved={(u) => onUpdateProfile({ username: u })} />
-              </div>
-            )}
             {!uid && (
               <button onClick={onGoToProfile || undefined} disabled={!onGoToProfile} className="atleta-accion !mt-0">
                 <Link2 size={16} />
@@ -25134,18 +25164,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
           en vez de flotar suelto debajo. */}
       <div
         key={section}
-        className="relative overflow-hidden rounded-2xl border backdrop-blur-sm shadow-md shadow-black/20 p-4 tab-fade-in"
-        style={{
-          borderColor: "var(--hairline)",
-          // Acá estaba el peor problema medido de la pestaña: rgba(5,7,11,0.62)
-          // sobre una página #0c0d10 compone a luminancia 6 contra la 10 de la
-          // página. O sea que la tarjeta era MÁS OSCURA que el fondo: no se
-          // leía como una tarjeta sino como un pozo sin bordes, y el lavado de
-          // color encima era el único modo de notar que existía. Ahora sube un
-          // escalón de luz y tiene un canto de 1px: se distingue por LUZ, y el
-          // violeta queda libre para significar algo en vez de dibujar cajas.
-          backgroundColor: "var(--surface-1)",
-        }}
+        className="seccion-social tab-fade-in"
       >
         {/* Sin título propio: "Amigos", "Ranking"… ya lo dice la solapa
             pintada justo arriba. */}
@@ -25170,39 +25189,12 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
             <>
               {/* La búsqueda vive acá, donde te hace falta: cuando estás
                   mirando tu lista y te falta alguien. */}
-              <SectionRow
-                icon={<UserPlus size={15} />}
-                accent={SOCIAL_COLOR}
-                title="Buscar y agregar"
-                desc="Por @usuario o escaneando su código QR"
-                onClick={() => setShowBuscar((v) => !v)}
-                right={<ChevronDown size={14} className={`text-slate-600 shrink-0 transition-transform ${showBuscar ? "rotate-180" : ""}`} />}
-              />
-              {/* El panel se abre PEGADO a la fila que lo abrió y hundido un
-                  escalón (--panel-sunken), que es el gesto que dice "esto
-                  salió de acá". Antes flotaba suelto ARRIBA del botón, como
-                  contenido sin dueño: ese era todo el "se ve raro". */}
-              {showBuscar && (
-                <div className="-mt-1 rounded-xl p-3 space-y-2.5 tab-fade-in" style={{ backgroundColor: "var(--panel-sunken)", border: "1px solid var(--hairline)" }}>
-                  <SocialSearchSection myUid={uid} friendStatus={friendStatus} onSendFriendRequest={doSendFriendRequest} />
-                  {friendSendError && <p className="text-[11px] text-rose-400/90 px-1">{friendSendError}</p>}
-                  {profile?.username ? (
-                    // Compartir tu perfil es la otra mitad de "conseguir un
-                    // amigo": o lo buscás vos, o hacés que te encuentren.
-                    <button onClick={() => setShowShareProfile(true)} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-bold transition active:scale-[0.98]"
-                      style={{ backgroundColor: tint(SOCIAL_COLOR, "16"), border: `1px solid ${tint(SOCIAL_COLOR, "33")}`, color: SOCIAL_INK }}>
-                      <QrCode size={12} /> Compartir mi perfil
-                    </button>
-                  ) : uid ? (
-                    <div className="rounded-lg px-3 py-2.5" style={{ backgroundColor: "var(--surface-2)", border: "1px solid var(--hairline)" }}>
-                      <p className="text-[11px] text-slate-400 mb-2">Elegí tu @usuario para que te puedan buscar y agregar.</p>
-                      <UsernameSection uid={uid} currentUsername={null} onSaved={(u) => onUpdateProfile({ username: u })} />
-                    </div>
-                  ) : (
-                    <p className="text-[11px] text-slate-600 px-1">Vinculá tu cuenta de Google en Perfil para poder elegir un @usuario y usar lo social.</p>
-                  )}
-                </div>
-              )}
+              <section aria-label="Sumar amigos" className="space-y-2">
+                <p className="ajuste-rotulo px-1">Sumar amigos</p>
+                <SocialSearchSection myUid={uid} friendStatus={friendStatus} onSendFriendRequest={doSendFriendRequest} miUsuario={profile?.username || null} />
+                {friendSendError && <p className="text-[13px] text-rose-400/90 px-1">{friendSendError}</p>}
+                {!uid && <p className="text-[13px] text-[color:var(--text-faint)] px-1">Vinculá tu cuenta de Google en Perfil para sumar amigos.</p>}
+              </section>
               {friendIncoming.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-[13px] font-semibold text-slate-300 px-1">Te quieren agregar</p>
@@ -25259,16 +25251,16 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
                         setSection("buscar"), una sección que dejó de existir
                         cuando Buscar pasó a ser un desplegable — te dejaba la
                         pantalla sin contenido. */}
-                    <p className="text-xs mt-1 text-slate-700">Usá <b className="text-slate-500">Buscar y agregar</b>, acá arriba: por su @usuario o escaneando su QR.</p>
+                    <p className="text-xs mt-1 text-slate-700">Buscalo por su nombre acá arriba, o mandale tu link por WhatsApp.</p>
                   </div>
-                ) : sortedFriendAccepted.map((f, i) => { const other = otherUidOf(f); return (
+                ) : <div className="lista-placa">{sortedFriendAccepted.map((f, i) => { const other = otherUidOf(f); return (
                   <div key={f.id} className="stagger-item" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
                     {/* Quitar a alguien vive ahora en su perfil, abajo de todo:
                         un ícono en cada fila era una acción destructiva a un
                         toque de distancia de abrir el perfil. */}
                     <PublicUserCard uid={other} basic={basics[other]} streak={streaks[other]?.streak} ultima={streaks[other]?.latestSession} onClick={() => setViewingUid(other)} />
                   </div>
-                ); })}
+                ); })}</div>}
               </div>
             </>
           )
@@ -27059,7 +27051,7 @@ function buildActionPlan(action, ctx) {
   // ("Personalizá tu ficha"), expuestos acá para poder prenderlos/apagarlos
   // por chat en vez de tener que ir a buscarlos.
   if (action.type === "config_ficha") {
-    const FICHA_FIELDS = { showRpe: "Esfuerzo (RPE/RIR)", showWarmup: "Aproximaciones", show1RMPercent: "Porcentaje de 1RM", showCoaching: "Consejos al guardar", showExerciseNote: "Consejos del ejercicio", showPersonalNote: "Notas por serie", showStagnation: "Aviso de estancamiento", showProgressionSuggestion: "Progresión sugerida", showLastSession: "La vez pasada, ya escrita", compactSetRow: "Filas compactas" };
+    const FICHA_FIELDS = { showGeneralWarmup: "Calentamiento general", showRpe: "Esfuerzo (RPE/RIR)", showWarmup: "Aproximaciones", show1RMPercent: "Porcentaje de 1RM", showCoaching: "Consejos al guardar", showExerciseNote: "Consejos del ejercicio", showPersonalNote: "Notas por serie", showStagnation: "Aviso de estancamiento", showProgressionSuggestion: "Progresión sugerida", showLastSession: "La vez pasada, ya escrita", compactSetRow: "Filas compactas" };
     const patch = {}; const items = [];
     Object.keys(FICHA_FIELDS).forEach((key) => {
       if (typeof action[key] === "boolean") { patch[key] = action[key]; items.push(`${FICHA_FIELDS[key]}: ${action[key] ? "activado" : "desactivado"}`); }
@@ -31539,7 +31531,7 @@ const RECORRIDOS = {
   social: [
     { sel: ".casillero-chico", titulo: "Tu casillero", texto: "Así te ven tus amigos: tu rango, tu racha y tus aplausos.", accion: "Tocalo para abrir tu perfil como lo ven ellos." },
     { sel: ".carrera", titulo: "La semana", texto: "Quién fue más veces al gimnasio esta semana.", accion: "Tocá a un amigo para ver su perfil." },
-    { sel: ".pestanas-internas", titulo: "Actividad, ranking y amigos", texto: "Aplaudí a tus amigos, mirá los récords del grupo y sumá amigos con su @usuario o su código QR." },
+    { sel: ".pestanas-internas", titulo: "Actividad, ranking y amigos", texto: "Aplaudí a tus amigos, mirá los récords del grupo y sumá amigos por su nombre, por WhatsApp o con su código QR." },
   ],
   entrenador_ia: [
     { sel: ".pizarra-ia .ia-tarjetas", titulo: "Tu entrenador con IA", texto: "Conoce tu rutina, tus marcas y tu progreso. Tocá un pedido para empezar.", accion: "Tocá una nota de la pizarra." },
@@ -31770,6 +31762,11 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
   const s = settings || DEFAULT_SETTINGS;
   const on = (key) => s[key] !== false;
   const GRUPOS = [
+    // El calentamiento general (04/11, pedido: "que sea activable en qué ves
+    // al registrar"): la tarjeta de movilidad de arriba de los ejercicios.
+    { titulo: "En el día", opciones: [
+      { key: "showGeneralWarmup", icon: <Activity size={17} />, label: "Calentamiento general", desc: "La movilidad de 10 minutos antes de los ejercicios del día." },
+    ] },
     { titulo: "En cada serie", opciones: [
       { key: "showLastSession", icon: <History size={17} />, label: "La vez pasada, ya escrita", desc: "La serie viene con lo que hiciste ahí la última vez: si no cambió nada, es un toque." },
       { key: "showRpe", icon: <Activity size={17} />, label: "Esfuerzo (RPE o RIR)", desc: "Del 1 al 10, qué tan dura fue la serie." },
@@ -31817,7 +31814,7 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
                 </div>
               </div>
               {s.showStagnation === true && (
-                <p className="ficha-aviso bounce-in"><AlertTriangle size={14} /> Hace {STAGNATION_DAYS} días que no superás tu récord: probá otras repeticiones, otro descanso o una variante.</p>
+                <p className="aviso-estancado bounce-in"><AlertTriangle size={15} aria-hidden="true" /><span>Hace {STAGNATION_DAYS} días o más que no superás tu récord. Probá otro rango de reps, otro descanso o una variante.</span></p>
               )}
               {on("showWarmup") && <p className="ficha-aproximaciones bounce-in"><Flame size={13} /> Ver las aproximaciones</p>}
               <div className="serie serie-foco">
@@ -31845,10 +31842,10 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
                 {on("showProgressionSuggestion") && !escrita && (
                   <div className="serie-sugerencia bounce-in"><Target size={14} /><span className="flex-1 text-left">Probá hoy: <b>9 × {k(77.5)} {u}</b></span><span className="text-[12px] text-slate-400">Usar</span></div>
                 )}
-                {on("show1RMPercent") && <p className="ficha-nota bounce-in"><Percent size={13} /> % de tu 1RM: ahora ~96 %</p>}
+                {on("show1RMPercent") && <div className="foco-1rm bounce-in"><p className="foco-1rm-cabeza"><span>% de tu 1RM</span><span>ahora <b>96 %</b></span></p><div className="foco-1rm-botones">{PORCENTAJES_1RM.map((p) => <span key={p} className={p === 75 ? "elegido" : ""}><b>{p}</b><span>{k(Math.round(101 * p / 100 / 2.5) * 2.5)}</span></span>)}</div></div>}
                 {(on("showRpe") || on("showPersonalNote")) && (
                   <div className="foco-extras">
-                    {on("showRpe") && <span className="serie-boton-suave bounce-in"><Activity size={13} /> Registrar esfuerzo ({s.rpeDisplayMode === "rir" ? "RIR" : "RPE"})</span>}
+                    {on("showRpe") && <span className="serie-boton-suave bounce-in"><Activity size={14} /> Esfuerzo ({s.rpeDisplayMode === "rir" ? "RIR" : "RPE"})</span>}
                     {on("showPersonalNote") && <span className="serie-boton-suave bounce-in"><StickyNote size={13} /> Agregar nota</span>}
                   </div>
                 )}
@@ -32970,6 +32967,17 @@ export default function App() {
       return np;
     });
   };
+
+  // Tu @usuario de adentro se crea solo (04/11, pedido: "olvidarnos del
+  // arroba"): es el del QR y el link para sumarte; te encuentran por nombre.
+  const usuarioPendiente = activeProfile && profiles[activeProfile]?.googleUid && !profiles[activeProfile]?.username ? profiles[activeProfile].googleUid : null;
+  useEffect(() => {
+    if (!usuarioPendiente) return;
+    let vivo = true;
+    crearUsuarioAutomatico(usuarioPendiente, activeProfile).then((u) => { if (vivo && u) handleUpdateProfile({ username: u }); }).catch(() => {});
+    return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuarioPendiente]);
   // Modo "rutina planificada" automático (ver DEFAULT_SETTINGS.trainingMode):
   // la PRIMERA vez que este perfil tiene un vínculo de entrenador aceptado,
   // se cambia solo a "planned" — asumimos que quien tiene un entrenador

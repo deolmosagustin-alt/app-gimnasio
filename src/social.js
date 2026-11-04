@@ -91,6 +91,69 @@ export async function lookupUserByUsername(rawUsername) {
   } catch { return null; }
 }
 
+// ============================== BUSCAR POR NOMBRE ==============================
+// Pedido del 04/11: "olvidarnos del arroba, que si te busco por el nombre que
+// tenés en el casillero ya te encuentre". El perfil público guarda el
+// principio de cada palabra del nombre ("ma", "mar", … "martina", "pa",
+// "paz") y la búsqueda pide la palabra más larga que escribiste; el resto se
+// filtra acá. El @usuario sigue existiendo por dentro (es el del QR y el
+// link para sumarte), pero se crea solo y no se ve.
+export function sinTildes(texto) {
+  return String(texto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+export function tokensDeNombre(nombre) {
+  const palabras = sinTildes(nombre).split(/[^a-z0-9ñ]+/).filter(Boolean).slice(0, 5);
+  const tokens = new Set();
+  palabras.forEach((w) => { for (let n = 2; n <= Math.min(w.length, 15); n++) tokens.add(w.slice(0, n)); });
+  return [...tokens].slice(0, 60);
+}
+
+export async function buscarPorNombre(texto, myUid) {
+  const limpio = sinTildes(texto).replace(/^@+/, "");
+  const palabras = limpio.split(/[^a-z0-9ñ_]+/).filter(Boolean);
+  if (!palabras.length || limpio.length < 2) return [];
+  const coincide = (nombre) => {
+    const suyas = sinTildes(nombre).split(/[^a-z0-9ñ]+/).filter(Boolean);
+    return palabras.every((w) => suyas.some((s) => s.startsWith(w)));
+  };
+  if (import.meta.env.DEV && demoSocialMarcado()) {
+    return (await import("./social-demo.js")).buscarPorNombre(palabras).filter((x) => coincide(x.basic.name));
+  }
+  const resultados = new Map();
+  // Quien escribe el @usuario de alguien (por costumbre o porque se lo
+  // pasaron) también lo encuentra.
+  const porUsuario = await lookupUserByUsername(limpio);
+  if (porUsuario && porUsuario.uid !== myUid) {
+    const basic = await getPublicBasic(porUsuario.uid);
+    if (basic) resultados.set(porUsuario.uid, { uid: porUsuario.uid, basic });
+  }
+  const clave = [...palabras].sort((a, b) => b.length - a.length)[0].slice(0, 15);
+  if (clave.length >= 2) {
+    try {
+      const snap = await getDocs(query(collectionGroup(db, "basic"), where("busqueda", "array-contains", clave), limit(25)));
+      snap.docs.forEach((d) => {
+        const uid = d.ref.parent.parent.id;
+        const basic = d.data();
+        if (uid !== myUid && coincide(basic.name)) resultados.set(uid, { uid, basic });
+      });
+    } catch (err) {
+      console.warn("[social] No se pudo buscar por nombre:", err?.message || err);
+    }
+  }
+  return [...resultados.values()].slice(0, 15);
+}
+
+// El @usuario de adentro, automático: el nombre sin tildes y cuatro números.
+export async function crearUsuarioAutomatico(uid, nombre) {
+  if (import.meta.env.DEV && demoSocialMarcado()) return null;
+  const base = (sinTildes(nombre).replace(/[^a-z0-9]+/g, "").slice(0, 12) || "socio").padEnd(3, "0");
+  for (let intento = 0; intento < 4; intento++) {
+    const usuario = `${base}_${Math.floor(1000 + Math.random() * 9000)}`;
+    try { return await claimUsername(uid, usuario); } catch { /* ocupado: otro número */ }
+  }
+  return null;
+}
+
 // ============================== PERFIL PÚBLICO ==============================
 
 // `topRank` ya viene calculado (getBest1RMForMuscleGroup/getMuscleRank
@@ -104,6 +167,9 @@ function profileToPublicBasic(profile, topRank) {
     name: profile.name || null,
     avatarData: profile.avatarData || null,
     topRank: topRank || null,
+    // Para que te encuentren por el nombre del casillero (04/11): el
+    // principio de cada palabra, sin tildes ni mayúsculas.
+    busqueda: tokensDeNombre(profile.name),
     updatedAt: new Date().toISOString(),
   };
 }

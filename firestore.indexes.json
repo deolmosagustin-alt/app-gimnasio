@@ -4,9 +4,31 @@
       "collectionGroup": "basic",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        { "fieldPath": "topRank.levelIdx", "order": "DESCENDING" }
+        {
+          "fieldPath": "topRank.levelIdx",
+          "order": "DESCENDING"
+        }
       ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    {
+      "collectionGroup": "basic",
+      "fieldPath": "busqueda",
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "arrayConfig": "CONTAINS",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "arrayConfig": "CONTAINS",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    }
+  ]
 }

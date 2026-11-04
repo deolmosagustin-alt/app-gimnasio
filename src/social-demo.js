@@ -117,3 +117,14 @@ export function borrarReto(id) {
   if (i >= 0) retosEnviados.splice(i, 1);
   return Promise.resolve();
 }
+
+// La búsqueda por nombre (04/11): tus amigos de muestra y dos personas más,
+// para ver cómo se ve alguien que todavía no es tu amigo.
+const OTROS = [
+  { uid: "demo-martin", name: "Martín Gómez", username: "martin_4821", topRank: { tier: "Bronce", sub: "II", color: "#B9763C", levelIdx: 1 } },
+  { uid: "demo-mariana", name: "Mariana López", username: "mariana_1290", topRank: null },
+];
+export function buscarPorNombre() {
+  const amigos = AMIGOS.map((a) => { const [tier, sub, color, levelIdx] = a.rango; return { uid: a.uid, basic: { name: a.name, username: a.username, avatarData: null, topRank: { tier, sub, color, levelIdx } } }; });
+  return [...amigos, ...OTROS.map((o) => ({ uid: o.uid, basic: o }))];
+}
