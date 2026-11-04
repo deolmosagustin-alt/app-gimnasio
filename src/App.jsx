@@ -23812,7 +23812,7 @@ function numeroDeCasillero(semilla = "") {
   for (let i = 0; i < semilla.length; i++) h = (h * 31 + semilla.charCodeAt(i)) >>> 0;
   return 1 + (h % 240);
 }
-function Casillero({ semilla = "", nombre, usuario = null, foto = null, rango = null, record = null, desde = null, accion = null }) {
+function Casillero({ semilla = "", nombre, usuario = null, foto = null, rango = null, desde = null, accion = null }) {
   const numero = numeroDeCasillero(semilla || nombre || "");
   return (
     // EL CASILLERO ABIERTO (04/11, pedido: "una vez que ingreses al perfil,
@@ -23837,10 +23837,9 @@ function Casillero({ semilla = "", nombre, usuario = null, foto = null, rango = 
           {usuario && <p className="casillero-usuario">@{usuario}</p>}
         </div>
       </div>
-      {(rango || record || desde) && (
+      {(rango || desde) && (
         <div className="casillero-calcos">
           {rango && <span className="calco calco-rango tinta-rango" style={{ "--rango-c": rango.color }}><RankBadgeIcon tier={rango.tier} sub={null} color={rango.color} size={20} />{rango.tier} {rango.sub}</span>}
-          {record && <span className="calco calco-record"><IconoCampana size={14} />{record}</span>}
           {desde && <span className="calco calco-papel">Desde {desde}</span>}
         </div>
       )}
@@ -24066,7 +24065,6 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, viewerName = null, i
         usuario={basic?.username || null}
         foto={basic?.avatarData || null}
         rango={theirTopRank}
-        record={recientes[0] ? `${recientes[0].nombre} ${recientes[0].reps}\u00a0×\u00a0${conComa(kgToDisplay(recientes[0].kg, unit))}\u00a0${weightLabel(unit)}` : null}
         desde={desde}
         accion={esYo && basic?.username ? <button onClick={() => setVerQr(true)} aria-label="Mostrar mi código QR" className="boton-redondo shrink-0"><QrCode size={17} /></button> : null}
       />
