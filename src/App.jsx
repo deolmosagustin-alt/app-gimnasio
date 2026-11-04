@@ -11473,53 +11473,6 @@ function sonarMolinete() {
 // detrás del gabinete: al girar, el que cerraba el paso baja y el de arriba
 // queda cruzado) y el carnet. Quieto (el de la guía), con la luz verde y sin
 // el carnet.
-// LA BARRA AL RACK (03/11, pedido: "proponer más animaciones como esa [el
-// molinete], están buenas"): al guardar la última serie del día, la barra
-// cargada sube y baja a los ganchos del rack con un clac, y abajo dice que el
-// día está completo. Es el cierre del entrenamiento antes del ticket, como el
-// molinete es la entrada. Dura lo mismo que el molinete y no se toca.
-function RackOverlay({ color = "#14B8A6", onDone }) {
-  const alTerminar = useRef(onDone);
-  useEffect(() => { alTerminar.current = onDone; });
-  useEffect(() => {
-    const t = setTimeout(() => alTerminar.current?.(), 2100);
-    const c = setTimeout(() => sonarDisco(), 980);
-    return () => { clearTimeout(t); clearTimeout(c); };
-  }, []);
-  const discos = [["#E5383B", 30], ["#2F6FED", 27], ["#F4C430", 23]];
-  return (
-    <div className="fixed inset-0 z-[135] flex items-center justify-center pointer-events-none rack-velo modal-overlay" role="status" aria-label="Día completo">
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
-      <div className="relative flex flex-col items-center" style={{ "--dia": color }}>
-        <svg viewBox="0 0 280 190" className="rack" aria-hidden="true">
-          <line x1="20" y1="184" x2="260" y2="184" className="rack-piso" />
-          {[82, 198].map((x) => (
-            <g key={x}>
-              <rect x={x - 7} y="18" width="14" height="166" rx="2" className="rack-parante" />
-              {Array.from({ length: 9 }, (_, k) => <circle key={k} cx={x} cy={34 + k * 16} r="2" className="rack-agujero" />)}
-              <path d={x < 140 ? `M${x + 7} 82 h14 v10 h-6` : `M${x - 7} 82 h-14 v10 h6`} className="rack-gancho" />
-            </g>
-          ))}
-          <g className="rack-barra">
-            <rect x="8" y="80" width="264" height="7" rx="3.5" className="rack-acero" />
-            {[1, -1].map((lado) => (
-              <g key={lado}>
-                {discos.map(([c, h], k) => {
-                  const x = lado === 1 ? 32 + k * 10 : 240 - k * 10;
-                  return <rect key={k} x={x} y={83.5 - h} width="8" height={h * 2} rx="2.5" fill={`color-mix(in oklab, ${c} 60%, #8a8c92)`} className="rack-disco" />;
-                })}
-                <rect x={lado === 1 ? 62 : 212} y="76" width="6" height="15" rx="1.5" className="rack-collarin" />
-              </g>
-            ))}
-          </g>
-        </svg>
-        <p className="rack-texto">Día completo</p>
-        <p className="rack-bajada">Finalizá cuando quieras</p>
-      </div>
-    </div>
-  );
-}
-
 function MolineteDibujo({ quieto = false }) {
   return (
     <svg viewBox="0 0 240 170" className={`molinete ${quieto ? "quieto" : ""}`} aria-hidden="true">
@@ -11547,7 +11500,7 @@ function MolineteDibujo({ quieto = false }) {
     </svg>
   );
 }
-function SessionStartOverlay({ onDone }) {
+function SessionStartOverlay({ onDone, salida = false }) {
   const [hora] = useState(() => new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false }));
   // onDone llega nuevo en cada render de App (el reloj de la sesión lo
   // redibuja): con él de dependencia, la cuenta volvía a empezar.
@@ -11558,12 +11511,12 @@ function SessionStartOverlay({ onDone }) {
     return () => clearTimeout(t);
   }, []);
   return (
-    <div className="fixed inset-0 z-[135] flex items-center justify-center pointer-events-none molinete-velo modal-overlay" role="status" aria-label={`Entrada ${hora}. A entrenar.`}>
+    <div className={`fixed inset-0 z-[135] flex items-center justify-center pointer-events-none molinete-velo modal-overlay ${salida ? "salida" : ""}`} role="status" aria-label={salida ? `Salida ${hora}. Buen entrenamiento.` : `Entrada ${hora}. A entrenar.`}>
       <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
       <div className="relative flex flex-col items-center">
         <MolineteDibujo />
-        <p className="molinete-entrada"><span>Entrada</span><b className="num-display">{hora}</b></p>
-        <p className="a-entrenar-texto molinete-texto">A entrenar</p>
+        <p className="molinete-entrada"><span>{salida ? "Salida" : "Entrada"}</span><b className="num-display">{hora}</b></p>
+        <p className="a-entrenar-texto molinete-texto">{salida ? "Buen entrenamiento" : "A entrenar"}</p>
       </div>
     </div>
   );
@@ -32221,7 +32174,7 @@ export default function App() {
   // noche. Ver el efecto checkPeriodRecaps más abajo.
   const [periodRecap, setPeriodRecap] = useState(null);
   const [sessionStarted, setSessionStarted] = useState(false); // overlay "¡A entrenar!"
-  const [diaCompleto, setDiaCompleto] = useState(false); // la barra al rack
+  const [salidaPendiente, setSalidaPendiente] = useState(null); // el molinete de salida, antes del ticket
   const [recoveredNotice, setRecoveredNotice] = useState(false);
 
   useEffect(() => {
@@ -32718,20 +32671,6 @@ export default function App() {
     return { done, total };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [logs, profile?.activeSession?.dayKey, profile?.activeSession?.deload, profile?.deloadProgress, activeRoutineDef]);
-  // La barra al rack: cuando la última serie del día queda hecha con la
-  // sesión abierta (una vez por día y día de la rutina).
-  const avancePrevio = useRef(null);
-  useEffect(() => {
-    const { done, total } = sessionProgress;
-    const antes = avancePrevio.current;
-    avancePrevio.current = { done, total, dk: profile?.activeSession?.dayKey || null };
-    if (!profile?.activeSession || !total || done !== total || !antes || antes.dk !== avancePrevio.current.dk || antes.done >= total) return;
-    if (!primeraVezHoy(`rack_${profile.activeSession.dayKey}`)) return;
-    // Un cuadro después: que el ✓ de la serie se vea antes de la barra.
-    const t = requestAnimationFrame(() => { setDiaCompleto(true); haptic([0, 30, 50, 60]); });
-    return () => cancelAnimationFrame(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionProgress]);
   const needsRoutinePick = !!profile && !profile.activeRoutineId;
   // Cronograma semanal de la rutina activa (lunes a domingo → día de rutina
   // o descanso) — ver getRoutineWeekSchedule más arriba en el archivo.
@@ -33304,7 +33243,7 @@ export default function App() {
       saveProfiles(np);
       return np;
     });
-    if (resumen.series > 0) setSessionSummary(resumen);
+    if (resumen.series > 0) salirPorElMolinete(resumen);
     if (updatedTrainingSessions) checkWeeklyRecap(updatedTrainingSessions);
   };
   const handleCancelSession = () => {
@@ -33323,6 +33262,15 @@ export default function App() {
   // hora actual como inicio y fin; si SÍ la iniciaste (ver SessionStartBar en
   // DeloadView), toma el startedAt real para que la duración no quede
   // siempre en 0 minutos, y limpia activeSession al terminar.
+  // LA SALIDA (04/11, pedido: "antes estaba la animación del molinete en vez
+  // de la barra que se apoya en el rack; volvé a eso y después que se imprima
+  // el ticket"): al finalizar pasás por el molinete con la hora de salida, y
+  // recién después sale el ticket. La barra al rack se sacó.
+  const salirPorElMolinete = (resumen) => {
+    if (getProfileSettings(profile).alertType !== "vibration") sonarMolinete();
+    haptic([0, 30, 50, 60]);
+    setSalidaPendiente(resumen);
+  };
   const handleFinishDeloadSession = (dayKey) => {
     detenerCronometrosDeSesion();
     const resumen = armarTicket({ logs, profile, cycleStart, fecha: todayStr(), dayKey, inicio: profile?.activeSession?.deload ? profile.activeSession.startedAt : null, descarga: true });
@@ -33351,7 +33299,7 @@ export default function App() {
       saveProfiles(np);
       return np;
     });
-    if (updatedTrainingSessions && resumen.series > 0) setSessionSummary(resumen);
+    if (updatedTrainingSessions && resumen.series > 0) salirPorElMolinete(resumen);
     if (updatedTrainingSessions) checkWeeklyRecap(updatedTrainingSessions);
   };
 
@@ -33510,7 +33458,7 @@ export default function App() {
         )}
       </DockInferior>
       {sessionStarted && <SessionStartOverlay onDone={() => setSessionStarted(false)} />}
-      {diaCompleto && !sessionStarted && <RackOverlay color={sessionTintColor || "#14B8A6"} onDone={() => setDiaCompleto(false)} />}
+      {salidaPendiente && <SessionStartOverlay salida onDone={() => { setSessionSummary(salidaPendiente); setSalidaPendiente(null); }} />}
       {/* Al cerrar el ticket de un entrenamiento (el momento en que ya viste
           lo que la app hace), el paywall una sola vez: ver paywallAutomatico. */}
       {sessionSummary && <SessionSummaryModal resumen={sessionSummary} onClose={() => { setSessionSummary(null); setTimeout(() => paywallAutomatico("primer_entrenamiento"), 500); }} />}

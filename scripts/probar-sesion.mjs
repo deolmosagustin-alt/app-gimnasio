@@ -79,59 +79,19 @@ async function probar({ fecha, nombre, boton }) {
   await page.waitForTimeout(400);
   const si = page.getByRole("button", { name: /Sí, finalizar/ });
   if (await si.count()) await si.first().click();
-  await page.waitForTimeout(1500);
+  // Primero la salida por el molinete (04/11), después el ticket.
+  await page.waitForTimeout(500);
+  ok("al finalizar sale el molinete de salida", (await page.locator(".molinete-velo.salida").count()) > 0);
+  ok("el ticket espera al molinete", (await page.locator(".ticket-fila").count()) === 0);
+  await page.screenshot({ path: join(SALIDA, `sesion-${fecha}-salida.png`) });
+  await page.waitForTimeout(2600);
+  ok("el molinete de salida se va solo", (await page.locator(".molinete-velo").count()) === 0);
   await page.screenshot({ path: join(SALIDA, `sesion-${fecha}-ticket.png`) });
   ok("al finalizar sale el ticket", (await page.locator(".ticket-fila").count()) > 0);
   await context.close();
 }
 
-// La barra al rack: con todas las series de PUSH anotadas menos la primera,
-// guardar esa tiene que subir la barra a los ganchos.
-async function probarRack() {
-  console.log("La barra al rack (la última serie del día)");
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, locale: "es-AR", timezoneId: "America/Argentina/Buenos_Aires" });
-  const page = await context.newPage();
-  await page.clock.install({ time: new Date("2026-10-22T18:30:00-03:00") });
-  page.on("pageerror", (e) => errores.push(e.message));
-  await page.goto(`${url}/?demo=rutina`);
-  await page.waitForTimeout(1500);
-  await page.evaluate(() => {
-    localStorage.setItem("gym_cycle_start_v2", "2026-09-14T15:00:00.000Z");
-    const todos = JSON.parse(localStorage.getItem("gym_profiles_v2"));
-    const p = todos[localStorage.getItem("gym_active_v2")] || Object.values(todos)[0];
-    const dia = p.routines[p.activeRoutineId].days.push;
-    p.activeSession = { dayKey: "push", startedAt: new Date().toISOString() };
-    dia.exercises.forEach((ex, j) => ex.sets.forEach((_, i) => {
-      if (j === 0 && i === 0) return;
-      const k = `${ex.libId || ex.id}_${i}`;
-      p.logs[k] = [...(p.logs[k] || []), { date: "2026-10-22", kg: 20, reps: 10 }];
-    }));
-    localStorage.setItem("gym_profiles_v2", JSON.stringify(todos));
-  });
-  await page.goto(`${url}/?pestana=rutina`);
-  await page.waitForTimeout(2500);
-  for (let i = 0; i < 4; i++) { await page.keyboard.press("Escape").catch(() => {}); await page.waitForTimeout(250); }
-  if (!(await page.getByRole("button", { name: "Guardar serie" }).count())) {
-    await page.locator(".ejercicio").first().click();
-    await page.waitForTimeout(800);
-  }
-  const guardar = page.getByRole("button", { name: "Guardar serie" }).first();
-  ok("está el ✓ de la última serie", await guardar.count());
-  if (await guardar.count()) {
-    await guardar.scrollIntoViewIfNeeded();
-    await guardar.click();
-    await page.waitForTimeout(500);
-    ok("sale la barra al rack", (await page.locator(".rack-velo").count()) > 0);
-    await page.waitForTimeout(800);
-    await page.screenshot({ path: join(SALIDA, "sesion-rack.png") });
-    await page.waitForTimeout(1800);
-    ok("la barra al rack se va sola", (await page.locator(".rack-velo").count()) === 0);
-  }
-  await context.close();
-}
-
 try {
-  await probarRack();
   await probar({ fecha: "2026-10-22", nombre: "Entrenamiento (semana 6)", boton: "Guardar serie" });
   await probar({ fecha: "2026-11-05", nombre: "Semana de descarga (semana 8)", boton: "Marcar como hecha" });
   ok("sin errores de consola", errores.length === 0, errores.slice(0, 3).join(" | "));
