@@ -6652,6 +6652,50 @@ label.ajuste-rotulo { display: block; }
 .collarin-suelto-mango { fill: none; stroke: #b9bcc2; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
 .collarin-suelto-puno { fill: color-mix(in oklab, var(--c, #14B8A6) 60%, #3a3c41); }
 
+
+/* ── VISTA PREVIA 14 (04/11): la escena en su placa y objetos bien dibujados ── */
+.dia-seccion > .dia-hero.barra-protagonista { background: transparent !important; box-shadow: none !important; padding: 14px 14px 16px; margin: 0; }
+.escena-placa { position: relative; overflow: hidden; margin: 0 -6px; padding: 22px 20px 0; border-radius: 26px;
+  background:
+    radial-gradient(ellipse 80% 55% at 50% 0%, rgba(255,255,255,.05), transparent 70%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.022) 0 2px, transparent 2px 5px),
+    linear-gradient(170deg, #2e3035, #27292e 60%, #232529);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 0 0 6px rgba(0,0,0,.18), inset 0 0 0 7px rgba(255,255,255,.04), 0 12px 30px -18px rgba(0,0,0,.8); }
+.light-mode .escena-placa { background:
+    radial-gradient(ellipse 80% 55% at 50% 0%, rgba(255,255,255,.55), transparent 70%),
+    repeating-linear-gradient(90deg, rgba(0,0,0,.02) 0 2px, transparent 2px 5px),
+    linear-gradient(170deg, #dfe1e5, #d9dbe0 60%, #d2d5da);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.08), inset 0 0 0 6px rgba(255,255,255,.35), 0 12px 30px -18px rgba(0,0,0,.35); }
+.dia-hero.barra-protagonista > .dia-reset { top: 25px; right: 25px; }
+.dia-hero.barra-protagonista .escena-barra { margin: 30px -20px 0; padding: 0 12px 30px; }
+.dia-hero.barra-protagonista .escena-barra::before { display: none; }
+.dia-hero.barra-protagonista .escena-barra > .barra-cargada { position: relative; z-index: 2; }
+.piso-barra { position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; width: 100%; height: 46px; }
+.piso-barra-junta { fill: none; stroke: #0b0b0c; stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+.dia-hero.barra-protagonista .plataforma-pie { margin-top: 16px; padding: 0 6px; }
+.dia-hero.barra-protagonista .boton-pildora { margin-top: 12px; }
+.collarin-suelto { position: absolute; z-index: 3; left: 6%; right: auto; bottom: 8px; width: 17%; max-width: 78px; height: auto; rotate: -6deg; filter: none; }
+.collarin-resorte ellipse { fill: none; stroke: #8b8e94; stroke-width: 2.4; }
+.collarin-resorte-luz path { fill: none; stroke: #d3d6db; stroke-width: 1.1; stroke-linecap: round; }
+.collarin-mango { fill: none; stroke: #b4b7bd; stroke-width: 3; stroke-linecap: round; }
+.collarin-puno { fill: color-mix(in oklab, var(--c, #14B8A6) 58%, #3a3c41); stroke: rgba(0,0,0,.35); stroke-width: .8; }
+.shaker { position: absolute; z-index: 3; right: 7%; bottom: 10px; width: 8.5%; max-width: 36px; height: auto; }
+.shaker-vaso { fill: rgba(220,228,236,.22); stroke: rgba(235,240,245,.55); stroke-width: 1; }
+.shaker-liquido { fill: color-mix(in oklab, #d1b25a 55%, #8a6a3a); opacity: .7; }
+.shaker-luz { stroke: rgba(255,255,255,.5); stroke-width: 1.6; stroke-linecap: round; }
+.shaker-medida { stroke: rgba(255,255,255,.55); stroke-width: .9; }
+.shaker-tapa { fill: #26282c; stroke: #0c0d0e; stroke-width: .8; }
+.shaker-rosca { stroke: #45484d; stroke-width: 1; }
+.shaker-pico { fill: color-mix(in oklab, var(--c, #14B8A6) 58%, #3a3c41); }
+.rack-kb-toalla .toalla-arriba { fill: #6f8296; }
+.rack-kb-toalla .toalla-cara { fill: #7d90a4; }
+.rack-kb-toalla .toalla-raya { stroke: #e8ecef; stroke-width: 2.2; opacity: .85; }
+.rack-kb-toalla .toalla-raya.fina { stroke-width: 1; opacity: .6; }
+.rack-kb-toalla .toalla-pliegue { stroke: rgba(0,0,0,.35); stroke-width: 1.4; }
+.rack-kb-toalla .toalla-flecos { stroke: #7d90a4; stroke-width: 1.2; stroke-linecap: round; }
+.light-mode .rack-kb-toalla .toalla-arriba { fill: #8ea1b4; }
+.light-mode .rack-kb-toalla .toalla-cara { fill: #9cafc2; }
+
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -14300,6 +14344,15 @@ function RackKettlebells({ dias = [], nombre = "", onElegir = null, etiqueta = "
           <path d="M341 38 C337 64 337 102 343 126 C346 135 351 135 352 126 C356 102 353 66 343 38 Z" className="rack-kb-banda-hueco" />
           <path d="M339 46 C336 70 336 98 340 118" className="rack-kb-banda-brillo" />
         </g>
+        {/* Una toalla doblada sobre el travesaño, con su raya y el borde. */}
+        <g className="rack-kb-toalla">
+          <path d="M30 16 Q30 13 33 13 H77 Q80 13 80 16 V29 H30 Z" className="toalla-arriba" />
+          <path d="M31 29 H79 L78 52 Q77 55 74 54 L36 51 Q33 51 32.5 48 Z" className="toalla-cara" />
+          <path d="M32 44 L78 47" className="toalla-raya" />
+          <path d="M32.3 48.5 L77.6 51.6" className="toalla-raya fina" />
+          <path d="M31 29 H79" className="toalla-pliegue" />
+          <path d="M36 51 L35 55 M44 51.6 L43.5 55.6 M52 52.2 L51.6 56 M60 52.7 L59.7 56.5 M68 53.3 L67.8 57 M74 53.8 L74 57.4" className="toalla-flecos" />
+        </g>
         {/* La chapa con el nombre de la rutina, atornillada al travesaño. */}
         <rect x="95" y="10" width="170" height="27" rx="4" className="rack-kb-chapa" />
         <circle cx="104" cy="23.5" r="2.6" className="rack-kb-tornillo" /><circle cx="256" cy="23.5" r="2.6" className="rack-kb-tornillo" />
@@ -16085,6 +16138,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
               donde apoyan los discos y las tablas al medio con el nombre del
               día quemado. Los músculos van escritos en un pedazo de cinta y
               hay magnesio donde se agarra la barra. */}
+          <div className="escena-placa">
           {(() => { const { larga, total } = etiquetaDeDia(day.label); return <h2 className="dia-titulo barra-protagonista-titulo" style={{ "--largo": larga, "--total": total }}>{day.label}</h2>; })()}
           {modoDescarga ? (
             <span className="dia-chip descarga"><Zap size={12} /> {previa ? "Así va a ser tu descarga" : "Semana de descarga"}</span>
@@ -16102,17 +16156,51 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
                 alto="clamp(84px, 25cqi, 140px)"
                 detalle
               />
-              {/* El detalle: un collarín de resorte suelto en la goma, como
-                  los que quedan tirados al lado de la barra. */}
-              <svg className="collarin-suelto" viewBox="0 0 64 30" aria-hidden="true">
-                <ellipse cx="22" cy="17" rx="13" ry="7.5" className="collarin-suelto-aro" />
-                <ellipse cx="22" cy="17" rx="7" ry="3.8" className="collarin-suelto-hueco" />
-                <path d="M33 13 L58 6 Q62 5 61 9 L36 18" className="collarin-suelto-mango" />
-                <path d="M33 21 L57 25 Q61 26 59 22 L36 17" className="collarin-suelto-mango" />
-                <circle cx="58.5" cy="7.5" r="2.4" className="collarin-suelto-puno" /><circle cx="57.5" cy="24" r="2.4" className="collarin-suelto-puno" />
+              {/* EL PISO DE GOMA: baldosas encastradas con sus motas, la junta
+                  de rompecabezas y el canto biselado adelante. */}
+              <svg className="piso-barra" viewBox="0 0 400 40" preserveAspectRatio="none" aria-hidden="true">
+                <defs>
+                  <linearGradient id="pb-cara" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#1a1b1e" /><stop offset="1" stopColor="#222326" /></linearGradient>
+                  <linearGradient id="pb-canto" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#2c2d31" /><stop offset=".25" stopColor="#141517" /><stop offset="1" stopColor="#0c0d0e" /></linearGradient>
+                </defs>
+                <rect x="0" y="0" width="400" height="30" fill="url(#pb-cara)" />
+                {[[275,17.9,0.79,"#5b7fd1"],[316,22.2,0.81,"#5b7fd1"],[95,2.1,0.72,"#d9d9d3"],[29,21.8,0.64,"#d9d9d3"],[19,26.9,0.94,"#c25a5c"],[246,2.9,0.70,"#5f9e78"],[48,25.8,0.72,"#d9d9d3"],[326,5.1,1.06,"#5b7fd1"],[221,10.6,0.79,"#c25a5c"],[17,23.6,0.64,"#5b7fd1"],[85,26.2,1.04,"#5f9e78"],[304,16.5,0.94,"#d9d9d3"],[191,22.7,0.62,"#5b7fd1"],[353,12.2,0.72,"#d1b25a"],[155,26.9,0.73,"#c25a5c"],[39,20.0,1.10,"#5b7fd1"],[197,15.8,0.95,"#d9d9d3"],[243,15.9,0.87,"#5b7fd1"],[69,10.7,1.06,"#5b7fd1"],[239,9.7,0.56,"#c25a5c"],[324,21.4,0.72,"#5b7fd1"],[270,24.5,1.07,"#d9d9d3"],[394,26.0,0.85,"#c25a5c"],[196,11.4,0.65,"#5f9e78"],[66,3.7,0.98,"#5f9e78"],[193,22.9,0.53,"#5f9e78"],[117,12.5,0.60,"#c25a5c"],[136,24.5,1.09,"#5b7fd1"],[192,8.3,1.08,"#d9d9d3"],[291,2.7,0.63,"#d9d9d3"],[317,24.0,0.86,"#5f9e78"],[232,23.2,0.68,"#c25a5c"],[111,21.2,0.51,"#d9d9d3"],[380,2.6,0.86,"#d9d9d3"],[339,16.6,0.65,"#d9d9d3"],[382,24.6,0.58,"#c25a5c"],[39,2.6,0.77,"#5b7fd1"],[345,18.4,0.58,"#5b7fd1"],[130,14.3,0.63,"#d9d9d3"],[75,11.4,0.93,"#5b7fd1"],[20,19.8,1.02,"#d9d9d3"],[315,2.2,0.78,"#5f9e78"],[305,6.4,0.93,"#5b7fd1"],[278,9.8,0.53,"#c25a5c"],[125,24.5,0.68,"#c25a5c"],[220,25.7,0.56,"#d9d9d3"],[203,20.4,1.08,"#d9d9d3"],[279,15.1,0.84,"#c25a5c"],[325,26.4,0.71,"#5b7fd1"],[395,4.7,0.55,"#c25a5c"],[324,21.0,0.77,"#5b7fd1"],[10,18.1,0.77,"#d9d9d3"],[156,12.0,0.64,"#d9d9d3"],[174,8.2,0.92,"#5b7fd1"],[289,13.4,0.64,"#5f9e78"],[195,17.8,1.08,"#c25a5c"],[192,14.3,0.93,"#5b7fd1"],[311,17.7,0.96,"#5f9e78"],[342,19.5,0.91,"#d9d9d3"],[365,11.6,0.87,"#c25a5c"],[384,26.7,0.50,"#5f9e78"],[125,11.8,0.59,"#c25a5c"],[33,9.6,1.07,"#d9d9d3"],[185,4.7,1.07,"#d9d9d3"],[84,10.4,0.88,"#d9d9d3"],[105,25.8,0.69,"#d9d9d3"],[337,5.8,0.91,"#c25a5c"],[239,8.9,0.73,"#5b7fd1"],[187,12.9,0.87,"#d1b25a"],[71,11.6,0.66,"#c25a5c"],[382,2.9,0.99,"#5b7fd1"],[281,2.5,0.80,"#d1b25a"],[243,19.5,0.64,"#5b7fd1"],[218,4.4,0.69,"#5b7fd1"],[356,11.3,0.58,"#c25a5c"],[328,15.2,0.53,"#5f9e78"],[162,15.8,0.64,"#5b7fd1"],[336,25.1,1.03,"#5f9e78"],[232,4.0,1.04,"#5b7fd1"],[303,6.7,0.54,"#d9d9d3"],[242,17.5,0.78,"#5f9e78"],[136,8.7,0.71,"#5f9e78"],[250,24.3,0.54,"#c25a5c"],[205,19.0,0.61,"#5b7fd1"],[25,2.9,0.80,"#c25a5c"],[261,6.0,0.56,"#d9d9d3"],[215,12.2,0.91,"#d1b25a"],[210,4.0,1.00,"#d9d9d3"],[18,10.8,0.82,"#5b7fd1"],[71,19.7,0.80,"#d9d9d3"]].map(([x, y, rr, c], k) => <circle key={k} cx={x} cy={y} r={rr} fill={c} opacity=".45" />)}
+                <path d="M133 0 V9 h3 v5 h-3 V30 M266 0 V12 h-3 v5 h3 V30" className="piso-barra-junta" />
+                <rect x="0" y="0" width="400" height="1.2" fill="#000" opacity=".55" />
+                <rect x="0" y="30" width="400" height="10" fill="url(#pb-canto)" />
+                <rect x="0" y="30" width="400" height=".8" fill="#fff" opacity=".09" />
+              </svg>
+              {/* EL COLLARÍN DE RESORTE, suelto en la goma: el resorte enrollado
+                  con su luz en cada vuelta y los dos mangos con el puño de goma
+                  del color del día. */}
+              <svg className="collarin-suelto" viewBox="0 0 96 44" aria-hidden="true">
+                <ellipse cx="30" cy="34" rx="26" ry="6" fill="#000" opacity=".45" />
+                <g className="collarin-resorte">
+                  {[0, 1, 2, 3, 4, 5, 6].map((k) => <ellipse key={k} cx={18 + k * 3.6} cy="24" rx="7" ry="13" />)}
+                </g>
+                <g className="collarin-resorte-luz">
+                  {[0, 1, 2, 3, 4, 5, 6].map((k) => <path key={k} d={`M${14 + k * 3.6} 15 Q${18 + k * 3.6} 10 ${22 + k * 3.6} 15`} />)}
+                </g>
+                <path d="M41 14 C55 12 70 9 82 6" className="collarin-mango" />
+                <path d="M41 34 C55 34 70 33 82 31" className="collarin-mango" />
+                <rect x="76" y="1" width="16" height="9" rx="4.5" transform="rotate(-12 84 5.5)" className="collarin-puno" />
+                <rect x="76" y="27" width="16" height="9" rx="4.5" transform="rotate(-3 84 31.5)" className="collarin-puno" />
+              </svg>
+              {/* EL SHAKER, parado en la goma: el vaso translúcido con la medida,
+                  la tapa a rosca y el pico. */}
+              <svg className="shaker" viewBox="0 0 40 74" aria-hidden="true">
+                <ellipse cx="20" cy="71" rx="15" ry="3" fill="#000" opacity=".45" />
+                <path d="M7 22 L9 68 Q9 71 12 71 H28 Q31 71 31 68 L33 22 Z" className="shaker-vaso" />
+                <path d="M9 44 L9.9 68 Q10 70 12 70 H28 Q30 70 30.1 68 L31 44 Z" className="shaker-liquido" />
+                <path d="M11 28 V64" className="shaker-luz" />
+                {[34, 42, 50, 58].map((y) => <path key={y} d={`M26 ${y} H30`} className="shaker-medida" />)}
+                <rect x="5" y="12" width="30" height="11" rx="3" className="shaker-tapa" />
+                <path d="M5 17.5 H35" className="shaker-rosca" />
+                <path d="M14 12 V6 Q14 3 17 3 H23 Q26 3 26 6 V12 Z" className="shaker-pico" />
               </svg>
             </div>
           )}
+          </div>
           {avanceDia.total > 0 && (
             <div className="plataforma-pie">
               <p className="dia-barra-texto">
