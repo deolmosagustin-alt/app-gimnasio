@@ -6387,6 +6387,60 @@ label.ajuste-rotulo { display: block; }
 .light-mode .cemento::after { background: linear-gradient(rgba(0,0,0,.18), transparent 45%, rgba(255,255,255,.15)); }
 .rutina-activa.es-rack > .piso-goma { display: none; }
 
+
+/* ── VISTA PREVIA 8 (03/11) ── */
+/* A: la barra con aire ("está muy achicharrada"): la plaqueta más chica y la
+   barra más grande, con más lugar arriba y abajo. */
+.plataforma.variante-a .plataforma-plaqueta { padding: 8px 16px 8px; }
+.plataforma.variante-a .plataforma-plaqueta .dia-titulo { font-size: min(2.9rem, calc(100cqi / var(--largo, 6) * 1.5), calc(100cqi / var(--total, 6) * 2.2)); }
+.plataforma.variante-a .plataforma-plaqueta .dia-bajada { font-size: .8125rem; }
+.plataforma.variante-a .plataforma-rack { margin-top: 30px; padding-bottom: 26px; }
+.plataforma.variante-a .plataforma-rack::before, .plataforma.variante-a .plataforma-rack::after { top: -26px; left: 29%; }
+.plataforma.variante-a .plataforma-rack::after { left: auto; right: 29%; }
+/* B: el día pintado con esténcil en la pared de bloques y la barra apoyada en
+   la tarima, con los discos en el piso (sin rack). */
+.plataforma.variante-b .plataforma-plaqueta { display: block; max-width: none; margin-top: 6px; padding: 0; background: none; box-shadow: none; }
+.plataforma.variante-b .plataforma-plaqueta::before, .plataforma.variante-b .plataforma-plaqueta::after { display: none; }
+.plataforma.variante-b .plataforma-plaqueta .dia-titulo { margin-right: 46px; color: rgba(238,236,228,.86); text-shadow: none; letter-spacing: .02em;
+  -webkit-mask: repeating-linear-gradient(90deg, #000 0 11px, transparent 11px 13px), radial-gradient(circle at 30% 40%, #000 60%, rgba(0,0,0,.75)); mask: repeating-linear-gradient(90deg, #000 0 11px, rgba(0,0,0,.55) 11px 13px); }
+.plataforma.variante-b .plataforma-plaqueta .dia-bajada { color: rgba(238,236,228,.7); }
+.light-mode .plataforma.variante-b .plataforma-plaqueta .dia-titulo { color: rgba(40,42,48,.82); }
+.light-mode .plataforma.variante-b .plataforma-plaqueta .dia-bajada { color: rgba(40,42,48,.65); }
+.plataforma.variante-b .plataforma-rack { margin-top: 26px; margin-bottom: -10px; padding-bottom: 0; z-index: 2; }
+.plataforma.variante-b .plataforma-rack::before, .plataforma.variante-b .plataforma-rack::after { display: none; }
+/* Rutinas B: las pesas en el piso frente al espejo. */
+.rutina-activa.frente-espejo .espejo-pesas { display: grid; gap: 14px; }
+.espejo-vinilo { justify-self: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 22px; font-weight: 800; font-stretch: 78%; letter-spacing: .08em; color: rgba(245,247,250,.88); text-shadow: 0 0 1px rgba(255,255,255,.4); }
+.light-mode .espejo-vinilo { color: rgba(30,38,48,.8); }
+.espejo-fila { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; margin: 0 0 -6px; padding: 0; list-style: none; }
+.espejo-fila > li { display: flex; min-width: 0; }
+.espejo-lugar { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.espejo-lugar.con-pesa { --d: color-mix(in oklab, var(--dia) 62%, #8a8c92); }
+.light-mode .espejo-lugar.con-pesa { --d: color-mix(in oklab, var(--dia) 72%, #a7a9ae); }
+.espejo-pesa { position: relative; display: block; width: 100%; max-width: 44px; padding-top: 10px; }
+.espejo-pesa > .pesa-rusa { position: relative; z-index: 1; width: 100%; height: auto; display: block; }
+/* El reflejo, atrás y un poco más chico, como en el espejo de la pared. */
+.espejo-reflejo { position: absolute; left: 8%; right: 8%; top: 0; opacity: .32; filter: saturate(.7) blur(.3px); }
+.espejo-reflejo .pesa-rusa { width: 100%; height: auto; display: block; }
+.espejo-lugar.hoy .espejo-pesa > .pesa-rusa { transform: translateY(-8px); }
+.espejo-cinta { position: relative; z-index: 1; display: grid; justify-items: center; min-width: 0; width: 100%; padding: 3px 2px 4px; border-radius: 1px; background: linear-gradient(#e7dfc6, #d9cfb2); box-shadow: 0 1px 2px rgba(0,0,0,.35); rotate: -1.5deg; }
+.espejo-lugar:nth-child(even) .espejo-cinta, li:nth-child(even) .espejo-cinta { rotate: 1.2deg; }
+.espejo-cinta b { font-family: 'Caveat Variable', 'Caveat', 'Segoe Print', cursive; font-size: 15px; font-weight: 700; line-height: 1; color: #2b2a26; }
+.espejo-cinta i { font-style: normal; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9.5px; font-size: max(11px, 9.5px); font-weight: 800; line-height: 1.2; color: color-mix(in oklab, var(--dia) 60%, #2b2a26); }
+.espejo-lugar:not(.con-pesa) .espejo-cinta { opacity: .55; }
+.espejo-lugar.hoy .espejo-cinta b { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 2px; }
+.rutina-activa.frente-espejo::before, .rutina-activa.frente-espejo::after { display: none; }
+.rutina-activa.frente-espejo { padding-left: 16px; padding-right: 16px; }
+.rutina-activa.frente-espejo .rack-pesas-travesano { display: none; }
+.rutina-activa.frente-espejo > .cemento { display: none; }
+/* El piso de cemento empieza donde se apoyan las pesas: las cintas van pegadas ahí. */
+.espejo-fila { position: relative; padding-bottom: 12px; margin-bottom: 0; }
+.espejo-fila::before { content: ""; position: absolute; z-index: 0; left: -16px; right: -16px; top: 50px; bottom: -4px; pointer-events: none;
+  background: linear-gradient(rgba(0,0,0,.45), rgba(0,0,0,.05) 35%, rgba(255,255,255,.04)), repeating-linear-gradient(90deg, transparent 0 calc(33.3% - 1px), rgba(0,0,0,.4) calc(33.3% - 1px) 33.3%), #55575b;
+  box-shadow: 0 -1px 0 rgba(0,0,0,.5); }
+.light-mode .espejo-fila::before { background: linear-gradient(rgba(0,0,0,.14), transparent 35%, rgba(255,255,255,.2)), repeating-linear-gradient(90deg, transparent 0 calc(33.3% - 1px), rgba(0,0,0,.14) calc(33.3% - 1px) 33.3%), #adaeac; }
+.espejo-fila > li { position: relative; z-index: 1; }
+
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -13954,7 +14008,36 @@ function PesaRusa({ vacia = false }) {
   );
 }
 // `dias`: siete { clave, corto ("Lun"), nombre ("lunes"), dia: { label, color } | null, hoy }.
-function EstantePesas({ dias = [], onElegir = null, etiqueta = "Tu semana", rack = null }) {
+function EstantePesas({ dias = [], onElegir = null, etiqueta = "Tu semana", rack = null, espejo = null }) {
+  if (espejo) {
+    return (
+      <div className="espejo-pesas">
+        <p className="espejo-vinilo" aria-hidden="true">{espejo}</p>
+        <ol className="espejo-fila" aria-label={etiqueta}>
+          {dias.map((d, i) => {
+            const texto = `${d.nombre || d.corto}: ${d.dia ? d.dia.label : "descanso"}${d.hoy ? " (hoy)" : ""}`;
+            const clase = `espejo-lugar ${d.dia ? "con-pesa" : ""} ${d.hoy ? "hoy" : ""}`;
+            const contenido = (
+              <>
+                <span className="espejo-pesa" aria-hidden="true">
+                  {d.dia && <span className="espejo-reflejo"><PesaRusa /></span>}
+                  <PesaRusa vacia={!d.dia} />
+                </span>
+                <span className="espejo-cinta" aria-hidden="true"><b>{d.corto}</b>{d.dia && <i>{d.dia.label}</i>}</span>
+              </>
+            );
+            return (
+              <li key={d.clave || i} style={d.dia ? { "--dia": d.dia.color } : undefined}>
+                {onElegir && d.dia
+                  ? <button onClick={() => onElegir(d)} className={clase} aria-label={`${texto}. Tocá para entrenarlo`}>{contenido}</button>
+                  : <span className={clase} role="img" aria-label={texto}>{contenido}</span>}
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+    );
+  }
   const lista = (
     <ol className={`estante ${rack ? "en-rack" : ""}`} aria-label={etiqueta}>
       {dias.map((d, i) => {
@@ -15530,6 +15613,9 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   // sesión, cuando se va el molinete, la barra del día sube de los ganchos.
   // Sólo al tocar "Iniciar sesión", no al abrir la app con una ya empezada.
   const [arranca, setArranca] = useState(false);
+  // Vista previa del 03/11: A (la barra en el rack) o B (el día pintado en
+  // la pared y la barra apoyada en la tarima), con modusfit_prueba_rutina.
+  const [varianteDia] = useState(() => { try { return localStorage.getItem("modusfit_prueba_rutina") || "a"; } catch { return "a"; } });
   const inicioSesion = sessionForThisDay?.startedAt || null;
   const inicioPrevio = useRef(inicioSesion);
   useEffect(() => {
@@ -15742,7 +15828,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
               nombre del día en una plaqueta atornillada, la barra cargada
               apoyada en los ganchos del rack y el piso de goma. Iniciar
               sesión queda abajo, afuera del dibujo. */}
-          <div className="plataforma">
+          <div className={`plataforma variante-${varianteDia}`}>
           {modoDescarga ? (
             <span className="dia-chip descarga"><Zap size={12} /> {previa ? "Así va a ser tu descarga" : "Semana de descarga"}</span>
           ) : activeDay === suggestedDay && (
@@ -15770,7 +15856,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
                 total={avanceDia.total}
                 fuera={modoDescarga ? avanceDia.total - avanceDescarga.total : 0}
                 etiqueta={modoDescarga ? `${avanceDescarga.hechas} de ${avanceDescarga.total} series de descarga` : null}
-                alto="clamp(60px, 17cqi, 108px)"
+                alto={varianteDia === "b" ? "clamp(90px, 26cqi, 150px)" : "clamp(76px, 22cqi, 128px)"}
                 detalle
               />
             </div>
@@ -29826,6 +29912,9 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
 
 function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpdateProfile, openScheduleSignal = 0, openEditorSignal = 0, onSignalConsumed = null, onGoToDay = null }) {
   const [mode, setMode] = useState("catalog");
+  // Vista previa del 03/11: A (el rack) o B (las pesas en el piso, frente al
+  // espejo), con modusfit_prueba_rutinas.
+  const [variantePesas] = useState(() => { try { return localStorage.getItem("modusfit_prueba_rutinas") || "a"; } catch { return "a"; } });
   const [showWizard, setShowWizard] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [showPresetsForced, setShowPresetsForced] = useState(false);
@@ -30094,7 +30183,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
         // Antes era una tarjeta más entre otras. Ahora es lo primero y lo más
         // grande: ves sus días de un vistazo (con su color), y el detalle
         // (balance, cronograma) queda a un toque para no saturar.
-        <section className="tarjeta-tonal rutina-activa es-rack p-4 space-y-4" style={{ "--c": "#3B82F6" }} aria-label="Tu rutina activa">
+        <section className={`tarjeta-tonal rutina-activa es-rack ${variantePesas === "b" ? "frente-espejo" : ""} p-4 space-y-4`} style={{ "--c": "#3B82F6" }} aria-label="Tu rutina activa">
           {/* EL RACK DE LAS PESAS RUSAS (vista previa del 03/11, la T2 con una
               vuelta de tuerca): la rutina activa es el rack del gimnasio, de
               la chapa del casillero. Arriba, el estante con la pesa de cada
@@ -30110,7 +30199,8 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
               vacío los de descanso y la de hoy, levantada. Arriba, los días de
               la rutina como baldosas, con sus ejercicios y sus series. */}
           <EstantePesas
-            rack={activeDef.name}
+            rack={variantePesas === "b" ? null : activeDef.name}
+            espejo={variantePesas === "b" ? activeDef.name : null}
             dias={WEEKDAY_KEYS.map((wk, i) => {
               const dk = activeSchedule[wk] || null;
               const d = dk ? activeDef.days[dk] : null;
