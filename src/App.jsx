@@ -6344,6 +6344,49 @@ label.ajuste-rotulo { display: block; }
 .light-mode .plataforma-rack::before, .light-mode .plataforma-rack::after { background: radial-gradient(circle, rgba(40,42,48,.55) 0 1.8px, transparent 2.4px) 50% 6px / 12px 14px repeat-y, linear-gradient(90deg, #8f9298, #b9bcc2 45%, #c9ccd1 58%, #94979d); }
 .light-mode .plataforma-llave { background: rgba(255,255,255,.65) !important; }
 
+
+/* ── VISTA PREVIA 7 (03/11): cada pestaña con su pared y su piso ── */
+/* Rutina: la pared de bloques de hormigón pintados y la tarima. */
+.plataforma { background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='28'%3E%3Cg fill='none' stroke='%23000' stroke-opacity='.42' stroke-width='2'%3E%3Cpath d='M0 1H56M0 15H56M1 1V15M29 15V28'/%3E%3C/g%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.06' stroke-width='1'%3E%3Cpath d='M0 3H56M0 17H56'/%3E%3C/g%3E%3C/svg%3E") 0 0 / 56px 28px,
+    radial-gradient(ellipse at 20% 10%, rgba(255,255,255,.06), transparent 55%),
+    linear-gradient(170deg, #4a4c51, #3d3f44 60%, #36383c) !important; }
+.light-mode .plataforma { background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='28'%3E%3Cg fill='none' stroke='%23000' stroke-opacity='.16' stroke-width='2'%3E%3Cpath d='M0 1H56M0 15H56M1 1V15M29 15V28'/%3E%3C/g%3E%3C/svg%3E") 0 0 / 56px 28px,
+    linear-gradient(170deg, #e4e3df, #d8d7d2 60%, #d1d0cb) !important; }
+.tarima { position: relative; margin: 0 -20px; min-height: 34px; overflow: hidden; box-shadow: 0 -1px 0 rgba(0,0,0,.55); }
+.tarima-dibujo { position: absolute; inset: 0; width: 100%; height: 100%; }
+.tarima-goma { fill: #2c2d31; }
+.tarima-madera { stroke: #1a1b1e; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.tarima-madera { fill: #9c7a52; }
+.tarima-tabla { stroke: #5e4529; stroke-width: 1.3; vector-effect: non-scaling-stroke; }
+.tarima-veta { stroke: #b8956a; stroke-opacity: .55; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.tarima-luz { fill: url(#none); fill: transparent; }
+.tarima::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(rgba(0,0,0,.5), rgba(0,0,0,.05) 40%, rgba(255,255,255,.05)); }
+.plataforma > .piso-goma { display: none; }
+/* Rutinas: la pared de espejos detrás del rack y el piso de cemento. */
+.rutina-activa.es-rack { background:
+    linear-gradient(90deg, transparent calc(50% - 1px), rgba(255,255,255,.16) calc(50% - 1px) 50%, rgba(0,0,0,.35) 50% calc(50% + 1px), transparent calc(50% + 1px)),
+    linear-gradient(112deg, transparent 0 14%, rgba(255,255,255,.07) 14% 21%, transparent 21% 58%, rgba(255,255,255,.045) 58% 63%, transparent 63%),
+    linear-gradient(180deg, #2a3036, #20252a 70%, #1c2024); }
+.light-mode .rutina-activa.es-rack { background:
+    linear-gradient(90deg, transparent calc(50% - 1px), rgba(255,255,255,.9) calc(50% - 1px) 50%, rgba(0,0,0,.12) 50% calc(50% + 1px), transparent calc(50% + 1px)),
+    linear-gradient(112deg, transparent 0 14%, rgba(255,255,255,.55) 14% 21%, transparent 21% 58%, rgba(255,255,255,.4) 58% 63%, transparent 63%),
+    linear-gradient(180deg, #d7dee4, #ccd4db 70%, #c4ccd3); }
+.rutina-activa.es-rack .rutina-activa-linea { color: rgba(238,242,246,.75); }
+.light-mode .rutina-activa.es-rack .rutina-activa-linea { color: rgba(24,32,42,.7); }
+.cemento { position: relative; margin: 0 -26px; min-height: 34px; overflow: hidden; box-shadow: 0 -1px 0 rgba(0,0,0,.45); }
+.cemento-dibujo { position: absolute; inset: 0; width: 100%; height: 100%; }
+.cemento-base { fill: #5d5f63; }
+.cemento-mancha { fill: #000; }
+.cemento-junta { stroke: #2a2b2e; stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+.cemento-luz { fill: transparent; }
+.cemento::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(rgba(0,0,0,.45), rgba(0,0,0,.05) 45%, rgba(255,255,255,.05)); }
+.light-mode .cemento-base { fill: #a9aaa8; }
+.light-mode .cemento-junta { stroke: #7f807e; }
+.light-mode .cemento::after { background: linear-gradient(rgba(0,0,0,.18), transparent 45%, rgba(255,255,255,.15)); }
+.rutina-activa.es-rack > .piso-goma { display: none; }
+
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -14631,6 +14674,41 @@ function IconoCajones({ size = 16 }) {
 // rompecabezas. Va de punta a punta, abajo de los cajones.
 const MOTAS_GOMA = [[22.4, 37.0, 0.73, "#d9d9d3"], [23.5, 7.4, 0.76, "#d9d9d3"], [31.7, 3.8, 0.63, "#5f9e78"], [32.4, 27.7, 0.48, "#5b7fd1"], [38.6, 26.2, 0.82, "#9a9ca2"], [0.6, 21.1, 0.49, "#5b7fd1"], [9.7, 1.2, 0.73, "#c25a5c"], [33.7, 20.8, 0.83, "#d9d9d3"], [26.5, 18.3, 0.62, "#d9d9d3"], [39.8, 33.6, 0.87, "#9a9ca2"], [9.2, 11.6, 0.49, "#c25a5c"], [16.0, 33.9, 0.68, "#9a9ca2"], [33.9, 0.0, 0.58, "#9a9ca2"], [18.8, 39.2, 0.69, "#9a9ca2"], [25.2, 31.1, 0.61, "#5b7fd1"], [13.3, 38.6, 0.90, "#5b7fd1"], [9.9, 4.0, 0.49, "#5b7fd1"], [7.1, 22.4, 0.72, "#9a9ca2"], [29.3, 5.2, 0.84, "#c25a5c"], [16.8, 8.5, 0.61, "#5b7fd1"], [32.1, 12.2, 0.98, "#9a9ca2"], [15.8, 34.2, 0.84, "#c25a5c"], [39.6, 8.5, 0.60, "#5b7fd1"], [13.2, 11.9, 0.49, "#9a9ca2"], [23.3, 9.7, 0.81, "#5b7fd1"], [18.1, 38.4, 0.74, "#d9d9d3"], [34.7, 7.3, 0.54, "#d9d9d3"], [32.7, 10.0, 0.56, "#9a9ca2"], [37.6, 7.9, 1.02, "#d1b25a"], [24.1, 16.9, 0.51, "#9a9ca2"], [38.5, 9.5, 0.87, "#5b7fd1"], [32.9, 23.9, 0.63, "#c25a5c"], [28.8, 2.8, 0.59, "#5b7fd1"], [34.1, 24.6, 0.62, "#d9d9d3"]];
 const JUNTAS_GOMA = ["M-221.5 0 L-400.0 72", "M-137.2 0 L-280.0 72", "M-52.9 0 L-160.0 72", "M31.4 0 L-40.0 72", "M115.7 0 L80.0 72", "M200.0 0 L200.0 72", "M284.3 0 L320.0 72", "M368.6 0 L440.0 72", "M452.9 0 L560.0 72", "M537.2 0 L680.0 72", "M621.5 0 L800.0 72", "M0 9 L400 9", "M0 25 L400 25", "M0 47 L400 47"];
+// LA TARIMA DE HALTEROFILIA (Rutina, vista previa del 03/11): donde se
+// apoya la barra del día. Al medio, las tablas de madera; a los costados, la
+// goma donde caen los discos; todo en perspectiva, como el piso de goma del
+// ciclo pero con otro material (pedido: "que sean un mismo esquema, pero que
+// no se repita el diseño").
+function TarimaHalterofilia() {
+  return (
+    <div className="tarima">
+      <svg className="tarima-dibujo" viewBox="0 0 400 72" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <path d="M0 0 L124.1 0 L92 72 L0 72 Z" className="tarima-goma" />
+        <path d="M275.9 0 L400 0 L400 72 L308 72 Z" className="tarima-goma" />
+        <path d="M124.1 0 L275.9 0 L308 72 L92 72 Z" className="tarima-madera" />
+        {["M149.4 0 L128.0 72", "M174.7 0 L164.0 72", "M200.0 0 L200.0 72", "M225.3 0 L236.0 72", "M250.6 0 L272.0 72"].map((d, k) => <path key={k} d={d} className="tarima-tabla" />)}
+        {["M221.6 38.1 L223.6 57.7", "M277.6 38.0 L285.4 59.1", "M122.4 25.4 L113.9 46.7", "M227.1 45.4 L228.5 56.8", "M195.2 15.3 L194.7 31.9", "M210.9 4.6 L211.7 17.2", "M159.8 46.2 L156.3 65.3", "M139.5 40.7 L136.2 52.3", "M217.8 9.8 L218.8 19.8", "M257.5 13.6 L261.4 26.2", "M287.1 44.1 L292.6 57.6", "M277.3 28.8 L284.4 46.9", "M145.9 47.3 L141.4 65.6", "M284.6 45.1 L289.9 58.7", "M178.7 11.6 L177.4 23.4", "M131.1 17.9 L124.8 35.1"].map((d, k) => <path key={k} d={d} className="tarima-veta" />)}
+        <path d="M0 0 L400 0 L400 72 L0 72 Z" className="tarima-luz" />
+      </svg>
+    </div>
+  );
+}
+// EL CEMENTO ALISADO (Rutinas): el piso del rack de las pesas rusas, gris,
+// con sus manchas y las juntas de corte en perspectiva.
+const MANCHAS_CEMENTO = [[185, 27, 18, 0.082], [3, 36, 43, 0.035], [222, 44, 15, 0.053], [281, 33, 37, 0.039], [95, 8, 30, 0.085], [236, 56, 26, 0.075], [41, 21, 36, 0.074], [169, 6, 23, 0.043], [112, 58, 20, 0.083], [352, 4, 26, 0.060], [9, 31, 43, 0.037], [239, 9, 33, 0.084], [81, 1, 17, 0.062], [7, 6, 30, 0.085]];
+function PisoCemento() {
+  return (
+    <div className="cemento">
+      <svg className="cemento-dibujo" viewBox="0 0 400 72" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <rect width="400" height="72" className="cemento-base" />
+        {MANCHAS_CEMENTO.map(([x, y, rr, o], k) => <ellipse key={k} cx={x} cy={y} rx={rr} ry={rr * 0.4} className="cemento-mancha" opacity={o} />)}
+        {["M-362.0 0 L-600.0 72", "M-221.5 0 L-400.0 72", "M-81.0 0 L-200.0 72", "M59.5 0 L0.0 72", "M200.0 0 L200.0 72", "M340.5 0 L400.0 72", "M481.0 0 L600.0 72", "M621.5 0 L800.0 72", "M762.0 0 L1000.0 72", "M0 30 L400 30"].map((d, k) => <path key={k} d={d} className="cemento-junta" />)}
+        <path d="M0 0 L400 0 L400 72 L0 72 Z" className="cemento-luz" />
+      </svg>
+    </div>
+  );
+}
+
 function PisoGoma({ children = null }) {
   const uid = `pg${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   return (
@@ -15697,7 +15775,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
               />
             </div>
           )}
-          <PisoGoma />
+          <TarimaHalterofilia />
           </div>
           {avanceDia.total > 0 && (
             <div className="plataforma-pie">
@@ -30078,7 +30156,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
             </div>
           )}
           {/* El rack se para en el piso de goma, de punta a punta. */}
-          <PisoGoma />
+          <PisoCemento />
         </section>
       )}
 
