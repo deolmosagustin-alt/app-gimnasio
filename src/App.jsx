@@ -6667,10 +6667,10 @@ label.ajuste-rotulo { display: block; }
     linear-gradient(170deg, #dfe1e5, #d9dbe0 60%, #d2d5da);
   box-shadow: inset 0 0 0 1px rgba(0,0,0,.08), inset 0 0 0 6px rgba(255,255,255,.35), 0 12px 30px -18px rgba(0,0,0,.35); }
 .dia-hero.barra-protagonista > .dia-reset { top: 25px; right: 25px; }
-.dia-hero.barra-protagonista .escena-barra { margin: 30px -20px 0; padding: 0 12px 30px; }
+.dia-hero.barra-protagonista .escena-barra { margin: 30px -20px 0; padding: 0 12px 34px; }
 .dia-hero.barra-protagonista .escena-barra::before { display: none; }
 .dia-hero.barra-protagonista .escena-barra > .barra-cargada { position: relative; z-index: 2; }
-.piso-barra { position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; width: 100%; height: 46px; }
+.piso-barra { position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; width: 100%; height: 58px; }
 .piso-barra-junta { fill: none; stroke: #0b0b0c; stroke-width: 1.4; vector-effect: non-scaling-stroke; }
 .dia-hero.barra-protagonista .plataforma-pie { margin-top: 16px; padding: 0 6px; }
 .dia-hero.barra-protagonista .boton-pildora { margin-top: 12px; }
@@ -6695,6 +6695,32 @@ label.ajuste-rotulo { display: block; }
 .rack-kb-toalla .toalla-flecos { stroke: #7d90a4; stroke-width: 1.2; stroke-linecap: round; }
 .light-mode .rack-kb-toalla .toalla-arriba { fill: #8ea1b4; }
 .light-mode .rack-kb-toalla .toalla-cara { fill: #9cafc2; }
+
+
+/* ── VISTA PREVIA 15 (04/11): collarín, piso, cinturón y soga, investigados ── */
+.collarin-suelto { width: 20%; max-width: 86px; left: 5%; bottom: 12px; rotate: -4deg; }
+.collarin-vuelta { fill: none; stroke: #8e9197; stroke-width: 2.2; }
+.collarin-vuelta:last-of-type { stroke: #b8bbc1; }
+.collarin-agujero { fill: rgba(0,0,0,.35); }
+.collarin-luz { fill: none; stroke: #e6e8eb; stroke-width: 1.2; stroke-linecap: round; opacity: .8; }
+.collarin-mango { fill: none; stroke: #b4b7bd; stroke-width: 3.2; stroke-linecap: round; }
+.collarin-puno { fill: color-mix(in oklab, var(--c, #14B8A6) 58%, #33353a); stroke: rgba(0,0,0,.4); stroke-width: .8; }
+.collarin-puno-luz { stroke: rgba(255,255,255,.28); stroke-width: 1.4; stroke-linecap: round; }
+.cinturon-pared { position: absolute; z-index: 1; right: 8%; top: 76px; width: 15%; max-width: 64px; height: auto; filter: drop-shadow(2px 4px 3px rgba(0,0,0,.55)); }
+.cp-placa { fill: #6f7279; stroke: #3d4045; stroke-width: .8; }
+.cp-tornillo { fill: #3d4045; }
+.cp-pua { fill: #8d9097; }
+.cp-agujero { fill: #1f130b; }
+.cp-costura { stroke: #c9a77d; stroke-width: .8; stroke-dasharray: 1.6 1.4; opacity: .7; }
+.cp-hebilla { fill: #b8bbc1; stroke: #5d6066; stroke-width: .8; }
+.cp-hebilla-hueco { fill: #4a2e1c; }
+.cp-hebilla-pua { stroke: #d6d8dc; stroke-width: 1.4; stroke-linecap: round; }
+.cp-pliegue { fill: none; stroke: rgba(255,255,255,.18); stroke-width: 1; }
+.soga-cuerda { fill: none; stroke: #3a2a1d; stroke-width: 2.2; stroke-linecap: round; }
+.soga-mango { fill: #a5774a; stroke: #6b4a2b; stroke-width: .7; }
+.soga-tapa { fill: #2a2b2e; }
+.soga-mango-luz { stroke: rgba(255,240,220,.35); stroke-width: 1; stroke-linecap: round; }
+.light-mode .soga-cuerda { stroke: #4a3626; }
 
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
@@ -14344,14 +14370,17 @@ function RackKettlebells({ dias = [], nombre = "", onElegir = null, etiqueta = "
           <path d="M341 38 C337 64 337 102 343 126 C346 135 351 135 352 126 C356 102 353 66 343 38 Z" className="rack-kb-banda-hueco" />
           <path d="M339 46 C336 70 336 98 340 118" className="rack-kb-banda-brillo" />
         </g>
-        {/* Una toalla doblada sobre el travesaño, con su raya y el borde. */}
-        <g className="rack-kb-toalla">
-          <path d="M30 16 Q30 13 33 13 H77 Q80 13 80 16 V29 H30 Z" className="toalla-arriba" />
-          <path d="M31 29 H79 L78 52 Q77 55 74 54 L36 51 Q33 51 32.5 48 Z" className="toalla-cara" />
-          <path d="M32 44 L78 47" className="toalla-raya" />
-          <path d="M32.3 48.5 L77.6 51.6" className="toalla-raya fina" />
-          <path d="M31 29 H79" className="toalla-pliegue" />
-          <path d="M36 51 L35 55 M44 51.6 L43.5 55.6 M52 52.2 L51.6 56 M60 52.7 L59.7 56.5 M68 53.3 L67.8 57 M74 53.8 L74 57.4" className="toalla-flecos" />
+        {/* La soga de saltar colgada del travesaño: la cuerda de cuero pasa
+            por arriba y cae a cada lado hasta los mangos de madera. */}
+        <g className="rack-kb-soga">
+          <path d="M37 33 C36 22 40 15 46 15 C52 15 56 22 55 33" className="soga-cuerda" />
+          <path d="M37 33 C34 40 33 44 33.5 47" className="soga-cuerda" />
+          <path d="M55 33 C57 39 58 43 57.5 46" className="soga-cuerda" />
+          <rect x="30" y="46" width="7" height="16" rx="3.5" className="soga-mango" />
+          <rect x="54" y="45" width="7" height="16" rx="3.5" className="soga-mango" />
+          <rect x="30" y="45" width="7" height="3" rx="1.2" className="soga-tapa" />
+          <rect x="54" y="44" width="7" height="3" rx="1.2" className="soga-tapa" />
+          <path d="M32 50 V59 M56 49 V58" className="soga-mango-luz" />
         </g>
         {/* La chapa con el nombre de la rutina, atornillada al travesaño. */}
         <rect x="95" y="10" width="170" height="27" rx="4" className="rack-kb-chapa" />
@@ -16146,6 +16175,29 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             <span className="dia-chip"><Calendar size={12} /> {scheduledDay === activeDay ? "Programado para hoy" : "Sugerido para hoy"}</span>
           )}
           {day.description && <p className="tarima-cinta a-mano">{day.description}</p>}
+          {/* EL CINTURÓN, colgado en la pared de la derecha: el colgador de
+              chapa atornillado (como el H-51 de Rogue), el cinturón de cuero
+              doblado sobre la púa, con la hebilla de un lado y los agujeros
+              del otro. */}
+          <svg className="cinturon-pared" viewBox="0 0 70 124" aria-hidden="true">
+            <defs>
+              <linearGradient id="cp-cuero" x1="0" x2="1"><stop offset="0" stopColor="#4a2e1c" /><stop offset=".45" stopColor="#734830" /><stop offset="1" stopColor="#4d301d" /></linearGradient>
+              <linearGradient id="cp-cuero2" x1="0" x2="1"><stop offset="0" stopColor="#3a2315" /><stop offset=".5" stopColor="#583720" /><stop offset="1" stopColor="#3b2416" /></linearGradient>
+            </defs>
+            <rect x="21" y="2" width="28" height="11" rx="2" className="cp-placa" />
+            <circle cx="26" cy="7.5" r="1.6" className="cp-tornillo" /><circle cx="44" cy="7.5" r="1.6" className="cp-tornillo" />
+            <path d="M32 11 h6 v9 h-6 z" className="cp-pua" />
+            {/* La punta de atrás, con los agujeros. */}
+            <path d="M24 22 Q35 16 52 23 L54 112 Q54 120 47 120 L30 120 Q24 120 24 113 Z" fill="url(#cp-cuero2)" />
+            {[60, 72, 84, 96, 108].map((y) => <g key={y}><ellipse cx="34" cy={y} rx="1.9" ry="2.5" className="cp-agujero" /><ellipse cx="45" cy={y} rx="1.9" ry="2.5" className="cp-agujero" /></g>)}
+            {/* La punta de adelante, con la costura y la hebilla doble. */}
+            <path d="M18 23 Q34 16 48 23 L49 86 Q49 92 43 92 L23 92 Q17 92 17 86 Z" fill="url(#cp-cuero)" />
+            <path d="M20.5 28 L20 87 M45.5 28 L46 87" className="cp-costura" />
+            <rect x="13" y="82" width="40" height="22" rx="3" className="cp-hebilla" />
+            <rect x="17" y="86" width="32" height="14" rx="1.5" className="cp-hebilla-hueco" />
+            <path d="M27 86 V97 M39 86 V97" className="cp-hebilla-pua" />
+            <path d="M19 24 Q33 18 47 24" className="cp-pliegue" />
+          </svg>
           {avanceDia.total > 0 && (
             <div className={`dia-barra escena-barra ${arranca ? "se-desengancha" : ""}`}>
               <BarraCargada
@@ -16156,48 +16208,38 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
                 alto="clamp(84px, 25cqi, 140px)"
                 detalle
               />
-              {/* EL PISO DE GOMA: baldosas encastradas con sus motas, la junta
-                  de rompecabezas y el canto biselado adelante. */}
-              <svg className="piso-barra" viewBox="0 0 400 40" preserveAspectRatio="none" aria-hidden="true">
+              {/* EL PISO DE GOMA, en perspectiva: las baldosas encastradas, con
+                  las juntas que se abren hacia adelante, las motas más chicas
+                  al fondo y el canto biselado. */}
+              <svg className="piso-barra" viewBox="0 0 400 50" preserveAspectRatio="none" aria-hidden="true">
                 <defs>
-                  <linearGradient id="pb-cara" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#1a1b1e" /><stop offset="1" stopColor="#222326" /></linearGradient>
-                  <linearGradient id="pb-canto" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#2c2d31" /><stop offset=".25" stopColor="#141517" /><stop offset="1" stopColor="#0c0d0e" /></linearGradient>
+                  <linearGradient id="pb-cara" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#141517" /><stop offset=".5" stopColor="#1b1c1f" /><stop offset="1" stopColor="#232427" /></linearGradient>
+                  <linearGradient id="pb-canto" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#2e2f33" /><stop offset=".3" stopColor="#151618" /><stop offset="1" stopColor="#0b0c0d" /></linearGradient>
                 </defs>
-                <rect x="0" y="0" width="400" height="30" fill="url(#pb-cara)" />
-                {[[275,17.9,0.79,"#5b7fd1"],[316,22.2,0.81,"#5b7fd1"],[95,2.1,0.72,"#d9d9d3"],[29,21.8,0.64,"#d9d9d3"],[19,26.9,0.94,"#c25a5c"],[246,2.9,0.70,"#5f9e78"],[48,25.8,0.72,"#d9d9d3"],[326,5.1,1.06,"#5b7fd1"],[221,10.6,0.79,"#c25a5c"],[17,23.6,0.64,"#5b7fd1"],[85,26.2,1.04,"#5f9e78"],[304,16.5,0.94,"#d9d9d3"],[191,22.7,0.62,"#5b7fd1"],[353,12.2,0.72,"#d1b25a"],[155,26.9,0.73,"#c25a5c"],[39,20.0,1.10,"#5b7fd1"],[197,15.8,0.95,"#d9d9d3"],[243,15.9,0.87,"#5b7fd1"],[69,10.7,1.06,"#5b7fd1"],[239,9.7,0.56,"#c25a5c"],[324,21.4,0.72,"#5b7fd1"],[270,24.5,1.07,"#d9d9d3"],[394,26.0,0.85,"#c25a5c"],[196,11.4,0.65,"#5f9e78"],[66,3.7,0.98,"#5f9e78"],[193,22.9,0.53,"#5f9e78"],[117,12.5,0.60,"#c25a5c"],[136,24.5,1.09,"#5b7fd1"],[192,8.3,1.08,"#d9d9d3"],[291,2.7,0.63,"#d9d9d3"],[317,24.0,0.86,"#5f9e78"],[232,23.2,0.68,"#c25a5c"],[111,21.2,0.51,"#d9d9d3"],[380,2.6,0.86,"#d9d9d3"],[339,16.6,0.65,"#d9d9d3"],[382,24.6,0.58,"#c25a5c"],[39,2.6,0.77,"#5b7fd1"],[345,18.4,0.58,"#5b7fd1"],[130,14.3,0.63,"#d9d9d3"],[75,11.4,0.93,"#5b7fd1"],[20,19.8,1.02,"#d9d9d3"],[315,2.2,0.78,"#5f9e78"],[305,6.4,0.93,"#5b7fd1"],[278,9.8,0.53,"#c25a5c"],[125,24.5,0.68,"#c25a5c"],[220,25.7,0.56,"#d9d9d3"],[203,20.4,1.08,"#d9d9d3"],[279,15.1,0.84,"#c25a5c"],[325,26.4,0.71,"#5b7fd1"],[395,4.7,0.55,"#c25a5c"],[324,21.0,0.77,"#5b7fd1"],[10,18.1,0.77,"#d9d9d3"],[156,12.0,0.64,"#d9d9d3"],[174,8.2,0.92,"#5b7fd1"],[289,13.4,0.64,"#5f9e78"],[195,17.8,1.08,"#c25a5c"],[192,14.3,0.93,"#5b7fd1"],[311,17.7,0.96,"#5f9e78"],[342,19.5,0.91,"#d9d9d3"],[365,11.6,0.87,"#c25a5c"],[384,26.7,0.50,"#5f9e78"],[125,11.8,0.59,"#c25a5c"],[33,9.6,1.07,"#d9d9d3"],[185,4.7,1.07,"#d9d9d3"],[84,10.4,0.88,"#d9d9d3"],[105,25.8,0.69,"#d9d9d3"],[337,5.8,0.91,"#c25a5c"],[239,8.9,0.73,"#5b7fd1"],[187,12.9,0.87,"#d1b25a"],[71,11.6,0.66,"#c25a5c"],[382,2.9,0.99,"#5b7fd1"],[281,2.5,0.80,"#d1b25a"],[243,19.5,0.64,"#5b7fd1"],[218,4.4,0.69,"#5b7fd1"],[356,11.3,0.58,"#c25a5c"],[328,15.2,0.53,"#5f9e78"],[162,15.8,0.64,"#5b7fd1"],[336,25.1,1.03,"#5f9e78"],[232,4.0,1.04,"#5b7fd1"],[303,6.7,0.54,"#d9d9d3"],[242,17.5,0.78,"#5f9e78"],[136,8.7,0.71,"#5f9e78"],[250,24.3,0.54,"#c25a5c"],[205,19.0,0.61,"#5b7fd1"],[25,2.9,0.80,"#c25a5c"],[261,6.0,0.56,"#d9d9d3"],[215,12.2,0.91,"#d1b25a"],[210,4.0,1.00,"#d9d9d3"],[18,10.8,0.82,"#5b7fd1"],[71,19.7,0.80,"#d9d9d3"]].map(([x, y, rr, c], k) => <circle key={k} cx={x} cy={y} r={rr} fill={c} opacity=".45" />)}
-                <path d="M133 0 V9 h3 v5 h-3 V30 M266 0 V12 h-3 v5 h3 V30" className="piso-barra-junta" />
-                <rect x="0" y="0" width="400" height="1.2" fill="#000" opacity=".55" />
-                <rect x="0" y="30" width="400" height="10" fill="url(#pb-canto)" />
-                <rect x="0" y="30" width="400" height=".8" fill="#fff" opacity=".09" />
+                <rect x="0" y="0" width="400" height="40" fill="url(#pb-cara)" />
+                {[[326,22.7,0.52,"#d9d9d3"],[363,25.8,0.51,"#5f9e78"],[201,25.8,0.87,"#d9d9d3"],[377,21.1,0.65,"#c25a5c"],[198,12.4,0.33,"#c25a5c"],[171,24.1,0.79,"#d9d9d3"],[272,36.3,0.57,"#d9d9d3"],[114,3.1,0.28,"#d1b25a"],[50,35.1,0.68,"#d9d9d3"],[4,10.2,0.46,"#c25a5c"],[75,12.6,0.35,"#c25a5c"],[298,2.3,0.36,"#5f9e78"],[49,5.7,0.34,"#5b7fd1"],[82,3.2,0.28,"#c25a5c"],[189,25.8,0.59,"#c25a5c"],[124,21.5,0.41,"#5f9e78"],[312,19.3,0.41,"#c25a5c"],[217,34.2,0.73,"#5b7fd1"],[280,13.0,0.37,"#5f9e78"],[14,19.8,0.41,"#d9d9d3"],[185,23.9,0.59,"#d9d9d3"],[350,20.3,0.77,"#c25a5c"],[159,19.3,0.69,"#5b7fd1"],[75,13.3,0.56,"#5b7fd1"],[249,24.6,0.76,"#c25a5c"],[174,37.7,0.99,"#5f9e78"],[300,36.2,0.84,"#5f9e78"],[250,20.4,0.68,"#5f9e78"],[109,9.7,0.47,"#5b7fd1"],[76,22.8,0.81,"#5b7fd1"],[308,3.7,0.38,"#d1b25a"],[4,38.8,1.08,"#d9d9d3"],[325,16.7,0.40,"#5f9e78"],[312,2.5,0.42,"#5b7fd1"],[147,9.7,0.54,"#5b7fd1"],[386,29.1,0.82,"#5f9e78"],[4,32.8,0.94,"#5b7fd1"],[52,24.5,0.56,"#c25a5c"],[180,13.9,0.39,"#d9d9d3"],[52,4.1,0.26,"#5b7fd1"],[319,16.8,0.55,"#5b7fd1"],[94,18.5,0.37,"#d9d9d3"],[145,4.0,0.30,"#c25a5c"],[4,12.6,0.46,"#5f9e78"],[289,15.6,0.42,"#c25a5c"],[390,2.6,0.31,"#5b7fd1"],[258,5.4,0.51,"#d1b25a"],[17,13.6,0.40,"#5f9e78"],[315,31.2,0.67,"#d9d9d3"],[249,34.3,0.59,"#5b7fd1"],[172,8.6,0.52,"#5f9e78"],[362,11.8,0.51,"#d9d9d3"],[379,9.9,0.54,"#d9d9d3"],[40,17.9,0.65,"#c25a5c"],[14,7.0,0.31,"#5b7fd1"],[71,15.6,0.49,"#d9d9d3"],[55,29.8,0.72,"#5b7fd1"],[228,35.3,0.55,"#5f9e78"],[359,34.2,0.78,"#d1b25a"],[316,15.5,0.70,"#d9d9d3"],[125,19.8,0.59,"#d9d9d3"],[183,21.7,0.78,"#c25a5c"],[122,10.0,0.56,"#c25a5c"],[371,12.5,0.61,"#5f9e78"],[180,31.6,0.90,"#5b7fd1"],[348,10.3,0.59,"#d9d9d3"],[13,14.3,0.44,"#5b7fd1"],[329,21.8,0.67,"#c25a5c"],[132,24.6,0.71,"#5f9e78"],[47,14.3,0.61,"#c25a5c"],[286,35.2,0.53,"#5b7fd1"],[360,16.9,0.51,"#c25a5c"],[102,20.4,0.48,"#c25a5c"],[220,3.4,0.42,"#5b7fd1"],[394,26.5,0.46,"#c25a5c"],[72,17.4,0.72,"#c25a5c"],[71,28.2,0.84,"#5b7fd1"],[119,15.2,0.45,"#c25a5c"],[237,23.4,0.43,"#c25a5c"],[128,21.3,0.75,"#d9d9d3"],[165,36.3,0.60,"#d9d9d3"],[67,24.8,0.65,"#c25a5c"],[303,8.6,0.28,"#d9d9d3"],[135,25.0,0.75,"#5b7fd1"],[301,37.7,0.72,"#c25a5c"],[266,36.7,0.56,"#5b7fd1"],[364,22.3,0.72,"#d9d9d3"],[252,21.9,0.67,"#c25a5c"],[298,24.2,0.83,"#d9d9d3"],[296,24.6,0.58,"#5f9e78"],[331,31.5,0.93,"#c25a5c"],[277,35.1,0.77,"#5f9e78"],[356,12.0,0.42,"#d9d9d3"],[363,9.0,0.34,"#d9d9d3"],[221,6.3,0.49,"#5b7fd1"],[19,10.4,0.36,"#5f9e78"],[198,21.8,0.68,"#d9d9d3"],[208,14.7,0.33,"#c25a5c"],[262,8.6,0.34,"#c25a5c"],[260,10.3,0.42,"#d1b25a"],[326,30.8,0.75,"#d9d9d3"],[172,24.4,0.59,"#5b7fd1"],[354,10.7,0.37,"#c25a5c"],[68,5.3,0.25,"#c25a5c"],[12,35.7,0.80,"#d9d9d3"],[377,7.6,0.56,"#d9d9d3"],[197,16.1,0.37,"#5f9e78"],[311,16.2,0.61,"#5f9e78"],[281,38.5,1.01,"#c25a5c"],[348,36.1,0.70,"#5f9e78"],[49,15.4,0.45,"#d9d9d3"],[75,15.1,0.57,"#5b7fd1"],[319,12.8,0.64,"#5b7fd1"],[34,9.5,0.35,"#d9d9d3"],[223,7.2,0.50,"#d9d9d3"],[349,26.1,0.70,"#d9d9d3"],[342,9.6,0.54,"#5b7fd1"],[323,25.5,0.61,"#d1b25a"],[366,8.1,0.54,"#c25a5c"],[179,1.2,0.43,"#5b7fd1"]].map(([x, y, rr, c], k) => <circle key={k} cx={x} cy={y} r={rr} fill={c} opacity=".45" />)}
+                {["M-34.7 0 L-120 40", "M104.7 0 L70 40", "M200.0 0 L200 40", "M295.3 0 L330 40", "M434.7 0 L520 40", "M0 13 L400 13"].map((d, k) => <path key={k} d={d} className="piso-barra-junta" />)}
+                <rect x="0" y="0" width="400" height="5" fill="#000" opacity=".35" />
+                <rect x="0" y="40" width="400" height="10" fill="url(#pb-canto)" />
+                <rect x="0" y="40" width="400" height=".8" fill="#fff" opacity=".1" />
               </svg>
-              {/* EL COLLARÍN DE RESORTE, suelto en la goma: el resorte enrollado
-                  con su luz en cada vuelta y los dos mangos con el puño de goma
-                  del color del día. */}
-              <svg className="collarin-suelto" viewBox="0 0 96 44" aria-hidden="true">
-                <ellipse cx="30" cy="34" rx="26" ry="6" fill="#000" opacity=".45" />
-                <g className="collarin-resorte">
-                  {[0, 1, 2, 3, 4, 5, 6].map((k) => <ellipse key={k} cx={18 + k * 3.6} cy="24" rx="7" ry="13" />)}
-                </g>
-                <g className="collarin-resorte-luz">
-                  {[0, 1, 2, 3, 4, 5, 6].map((k) => <path key={k} d={`M${14 + k * 3.6} 15 Q${18 + k * 3.6} 10 ${22 + k * 3.6} 15`} />)}
-                </g>
-                <path d="M41 14 C55 12 70 9 82 6" className="collarin-mango" />
-                <path d="M41 34 C55 34 70 33 82 31" className="collarin-mango" />
-                <rect x="76" y="1" width="16" height="9" rx="4.5" transform="rotate(-12 84 5.5)" className="collarin-puno" />
-                <rect x="76" y="27" width="16" height="9" rx="4.5" transform="rotate(-3 84 31.5)" className="collarin-puno" />
+              {/* EL COLLARÍN DE RESORTE, acostado en la goma (como los de York o
+                  Marcy): el aro de cuatro vueltas de alambre, los dos mangos de
+                  metal que salen de sus puntas y los puños de goma del color
+                  del día. */}
+              <svg className="collarin-suelto" viewBox="0 0 100 40" aria-hidden="true">
+                <ellipse cx="34" cy="30" rx="30" ry="7" fill="#000" opacity=".5" />
+                <ellipse cx="26" cy="25.0" rx="18" ry="7.5" className="collarin-vuelta" /><ellipse cx="26" cy="23.5" rx="18" ry="7.5" className="collarin-vuelta" /><ellipse cx="26" cy="22.0" rx="18" ry="7.5" className="collarin-vuelta" /><ellipse cx="26" cy="20.5" rx="18" ry="7.5" className="collarin-vuelta" />
+                <ellipse cx="26" cy="21" rx="15" ry="5.2" className="collarin-agujero" />
+                <path d="M10 22 Q12 16.5 22 15.6" className="collarin-luz" />
+                <path d="M43 18.5 L74 10" className="collarin-mango" />
+                <path d="M43.5 25.5 L75 24" className="collarin-mango" />
+                <rect x="70" y="5" width="24" height="9" rx="4.5" transform="rotate(-15 82 9.5)" className="collarin-puno" />
+                <rect x="71" y="19.5" width="24" height="9" rx="4.5" transform="rotate(-3 83 24)" className="collarin-puno" />
+                <path d="M74 7.4 L90 3.2" transform="rotate(-0 0 0)" className="collarin-puno-luz" />
+                <path d="M75 21.6 L91 20.8" className="collarin-puno-luz" />
               </svg>
-              {/* EL SHAKER, parado en la goma: el vaso translúcido con la medida,
-                  la tapa a rosca y el pico. */}
-              <svg className="shaker" viewBox="0 0 40 74" aria-hidden="true">
-                <ellipse cx="20" cy="71" rx="15" ry="3" fill="#000" opacity=".45" />
-                <path d="M7 22 L9 68 Q9 71 12 71 H28 Q31 71 31 68 L33 22 Z" className="shaker-vaso" />
-                <path d="M9 44 L9.9 68 Q10 70 12 70 H28 Q30 70 30.1 68 L31 44 Z" className="shaker-liquido" />
-                <path d="M11 28 V64" className="shaker-luz" />
-                {[34, 42, 50, 58].map((y) => <path key={y} d={`M26 ${y} H30`} className="shaker-medida" />)}
-                <rect x="5" y="12" width="30" height="11" rx="3" className="shaker-tapa" />
-                <path d="M5 17.5 H35" className="shaker-rosca" />
-                <path d="M14 12 V6 Q14 3 17 3 H23 Q26 3 26 6 V12 Z" className="shaker-pico" />
-              </svg>
+
             </div>
           )}
           </div>
