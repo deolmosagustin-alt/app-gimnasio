@@ -6632,6 +6632,26 @@ label.ajuste-rotulo { display: block; }
 .light-mode .rack-kb-banda-hueco { fill: #dcdcd9; }
 .rack-kb-banda-brillo { fill: none; stroke: rgba(255,255,255,.28); stroke-width: 1.6; stroke-linecap: round; }
 
+
+/* ── VISTA PREVIA 13 (04/11): la chapa cepillada detrás de la barra ── */
+.dia-seccion > .dia-hero.barra-protagonista {
+  background:
+    radial-gradient(ellipse 80% 55% at 50% 0%, rgba(255,255,255,.05), transparent 70%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.022) 0 2px, transparent 2px 5px),
+    linear-gradient(170deg, #2e3035, #27292e 60%, #232529);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), inset 0 0 0 6px rgba(0,0,0,.18), inset 0 0 0 7px rgba(255,255,255,.04), 0 12px 30px -18px rgba(0,0,0,.8); }
+.light-mode .dia-seccion > .dia-hero.barra-protagonista {
+  background:
+    radial-gradient(ellipse 80% 55% at 50% 0%, rgba(255,255,255,.55), transparent 70%),
+    repeating-linear-gradient(90deg, rgba(0,0,0,.02) 0 2px, transparent 2px 5px),
+    linear-gradient(170deg, #dfe1e5, #d9dbe0 60%, #d2d5da);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.08), inset 0 0 0 6px rgba(255,255,255,.35), 0 12px 30px -18px rgba(0,0,0,.35); }
+.collarin-suelto { position: absolute; z-index: 2; right: 5%; bottom: 2px; width: 13%; max-width: 58px; height: auto; rotate: -8deg; filter: drop-shadow(0 2px 2px rgba(0,0,0,.6)); }
+.collarin-suelto-aro { fill: #9a9da3; stroke: #5f6268; stroke-width: 1; }
+.collarin-suelto-hueco { fill: #141517; }
+.collarin-suelto-mango { fill: none; stroke: #b9bcc2; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.collarin-suelto-puno { fill: color-mix(in oklab, var(--c, #14B8A6) 60%, #3a3c41); }
+
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -16082,6 +16102,15 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
                 alto="clamp(84px, 25cqi, 140px)"
                 detalle
               />
+              {/* El detalle: un collarín de resorte suelto en la goma, como
+                  los que quedan tirados al lado de la barra. */}
+              <svg className="collarin-suelto" viewBox="0 0 64 30" aria-hidden="true">
+                <ellipse cx="22" cy="17" rx="13" ry="7.5" className="collarin-suelto-aro" />
+                <ellipse cx="22" cy="17" rx="7" ry="3.8" className="collarin-suelto-hueco" />
+                <path d="M33 13 L58 6 Q62 5 61 9 L36 18" className="collarin-suelto-mango" />
+                <path d="M33 21 L57 25 Q61 26 59 22 L36 17" className="collarin-suelto-mango" />
+                <circle cx="58.5" cy="7.5" r="2.4" className="collarin-suelto-puno" /><circle cx="57.5" cy="24" r="2.4" className="collarin-suelto-puno" />
+              </svg>
             </div>
           )}
           {avanceDia.total > 0 && (
