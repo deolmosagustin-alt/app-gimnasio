@@ -3761,17 +3761,25 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
    lo justo para que la palabra más larga (--largo, en letras) entre
    entera. Nunca se parte una palabra. */
 .selector-dias {
-  display: flex; gap: 3px; padding: 4px; border-radius: 999px;
+  display: flex; gap: 3px; padding: 4px; border-radius: 26px;
   background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--hairline);
 }
+/* Los días, con el mismo formato que el riel de Progreso y Social
+   (.pestanas-internas, pedido del 04/11): las del medio con las esquinas
+   suaves, las de las puntas redondeadas hacia afuera y la elegida, píldora
+   entera (el resorte cierra las puntas). */
 .dia-solapa {
   container-type: inline-size;
-  flex: 1 1 0; min-width: 0;
-  border-radius: 999px;
+  flex: 1 1 0; min-width: 0; min-height: 56px;
+  border-radius: 22px;
   background: transparent; color: var(--text-muted);
-  transition: background-color .25s ease, color .2s ease, transform .2s ease;
+  transition: border-radius .5s var(--resorte), background-color .25s ease, color .2s ease, transform .2s ease;
 }
+.dia-solapa:active { transform: scale(.96); }
+.selector-dias > .dia-solapa:first-child { border-top-left-radius: 999px; border-bottom-left-radius: 999px; }
+.selector-dias > .dia-solapa:last-child { border-top-right-radius: 999px; border-bottom-right-radius: 999px; }
 .dia-solapa[aria-selected="true"], .dia-solapa.elegida {
+  border-radius: 999px;
   color: color-mix(in oklab, var(--c, var(--tono)) 72%, white) !important;
   background: color-mix(in oklab, var(--c, var(--tono)) 20%, var(--surface-1)) !important;
 }
@@ -6753,6 +6761,27 @@ label.ajuste-rotulo { display: block; }
 .piso-rack { position: absolute; z-index: 0; left: -16px; right: -16px; bottom: -10px; width: calc(100% + 32px); height: 12%; }
 .piso-rack-junta { stroke: rgba(0,0,0,.5); stroke-width: 1.2; vector-effect: non-scaling-stroke; }
 
+
+/* ── PRUEBA (04/11): cómo se elige entre entrenamiento y descarga ── */
+.modo-palanca { position: absolute !important; z-index: 2 !important; right: 22px; top: 82px; padding: 0; background: none; }
+.modo-palanca-placa { display: grid; justify-items: center; gap: 4px; width: 72px; padding: 8px 6px; border-radius: 6px; background: linear-gradient(#b7bac0, #989ba1); box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 6px 10px -4px rgba(0,0,0,.7); }
+.modo-palanca-rotulo { font-size: 11px; font-weight: 800; letter-spacing: .03em; color: #4a4d53; }
+.modo-palanca:not(.descarga) .modo-palanca-rotulo.arriba, .modo-palanca.descarga .modo-palanca-rotulo.abajo { color: #1d1f24; }
+.modo-palanca-ranura { position: relative; width: 14px; height: 44px; border-radius: 7px; background: #26282c; box-shadow: inset 0 2px 3px rgba(0,0,0,.7); }
+.modo-palanca-ranura i { position: absolute; left: -5px; top: 3px; width: 24px; height: 16px; border-radius: 5px; background: linear-gradient(color-mix(in oklab, var(--c, #14B8A6) 70%, white), color-mix(in oklab, var(--c, #14B8A6) 70%, #3a3c41)); box-shadow: 0 3px 4px rgba(0,0,0,.6); transition: top .35s var(--resorte); }
+.modo-palanca.descarga .modo-palanca-ranura i { top: 25px; }
+.modo-palanca:active .modo-palanca-placa { transform: scale(.97); }
+.modo-etiqueta { position: absolute; z-index: 3; left: 50%; top: 30%; translate: -50% 0; display: grid; justify-items: center; padding: 0; background: none; transform-origin: 50% 0; animation: etiquetaVuelta .55s var(--resorte, ease-out) both; }
+.modo-etiqueta-hilo { width: 1.5px; height: 10px; background: #c9ccd1; }
+.modo-etiqueta-carton { position: relative; display: grid; justify-items: center; gap: 1px; padding: 8px 12px 5px; border-radius: 3px 3px 5px 5px; background: linear-gradient(#ddd0b1, #cdbf9f); box-shadow: 0 6px 10px -4px rgba(0,0,0,.65); rotate: -3deg; }
+.modo-etiqueta-carton i { position: absolute; top: 3px; width: 6px; height: 6px; border-radius: 999px; background: #2a2620; box-shadow: inset 0 0 0 1.5px #b9aa8b; }
+.modo-etiqueta-carton b { font-size: 14px; font-weight: 800; color: #2b2620; }
+.modo-etiqueta-carton small { font-size: 11px; font-weight: 600; color: #6b6150; }
+@keyframes etiquetaVuelta { 0% { transform: rotateY(90deg); } 100% { transform: none; } }
+.modo-cintas { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.modo-cinta { min-height: 40px; padding: 4px 14px 5px; font-size: 19px; font-weight: 700; color: rgba(35,35,42,.55); background: linear-gradient(#e6dfc7, #d8cfb2); opacity: .7; rotate: 2deg; clip-path: polygon(0 4%, 6% 0, 14% 5%, 24% 0, 34% 4%, 46% 0, 58% 5%, 70% 0, 82% 4%, 92% 0, 100% 5%, 100% 70%, 88% 100%, 72% 96%, 60% 100%, 48% 95%, 36% 100%, 24% 96%, 12% 100%, 0 95%); transition: opacity .25s ease, rotate .35s var(--resorte); }
+.modo-cinta.pegada { color: #23232a; opacity: 1; rotate: -1.5deg; clip-path: polygon(0 4%, 6% 0, 14% 5%, 24% 0, 34% 4%, 46% 0, 58% 5%, 70% 0, 82% 4%, 92% 0, 100% 5%, 100% 95%, 92% 100%, 82% 96%, 70% 100%, 58% 95%, 46% 100%, 34% 96%, 24% 100%, 12% 95%, 0 100%); box-shadow: 0 2px 3px rgba(0,0,0,.35); }
+
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -6769,11 +6798,62 @@ label.ajuste-rotulo { display: block; }
 .balanza-pesa.llega { animation: pesaLlega 1.2s cubic-bezier(.3,.7,.4,1) .15s both; }
 @keyframes pesaLlega { 0% { transform: translateX(-46px); } 45% { transform: translateX(8px); } 65% { transform: translateX(-4px); } 82% { transform: translateX(2px); } 100% { transform: none; } }
 @keyframes aparece { from { opacity: 0; } to { opacity: 1; } }
-/* A5: la puerta del casillero gira sobre la bisagra. */
-.casillero-puerta { position: absolute; inset: 0; z-index: 3; border-radius: inherit; pointer-events: none; transform-origin: left center; background: repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 2px, transparent 2px 5px), #2e3036; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 0 0 6px rgba(0,0,0,.2); animation: puertaAbre .95s cubic-bezier(.45,.05,.3,1) .2s both; }
-.casillero-puerta-manija { position: absolute; right: 16px; top: 50%; width: 8px; height: 34px; translate: 0 -50%; border-radius: 4px; background: #8d9097; }
-.light-mode .casillero-puerta { background: repeating-linear-gradient(90deg, rgba(0,0,0,.02) 0 2px, transparent 2px 5px), #cfd2d8; }
-@keyframes puertaAbre { 0% { transform: perspective(1800px) rotateY(0); opacity: 1; } 75% { opacity: 1; } 100% { transform: perspective(1800px) rotateY(-96deg); opacity: 0; visibility: hidden; } }
+/* A5: EL CASILLERO SE ABRE. La puerta, con la perspectiva en el casillero
+   (no en cada cuadro, así no salta), primero se destraba (un tirón chico) y
+   después gira sobre la bisagra con una curva que arranca suave y frena al
+   final; mientras gira se oscurece de costado y adentro entra la luz. Al
+   terminar se desvanece justo cuando aparece la puerta abierta de costado. */
+.casillero.abierto { perspective: 1700px; perspective-origin: 0 50%; overflow: clip; }
+.casillero-puerta { position: absolute; inset: 0; z-index: 3; border-radius: inherit; pointer-events: none; transform-origin: 0 50%; backface-visibility: hidden; will-change: transform, opacity;
+  background: repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 2px, transparent 2px 5px), #2e3036;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 0 0 6px rgba(0,0,0,.2);
+  animation: puertaAbre 1.15s cubic-bezier(.6,.02,.22,1) .18s both; }
+.casillero-puerta::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(90deg, rgba(0,0,0,.05), rgba(0,0,0,.55)); opacity: 0; animation: puertaSombra 1.15s cubic-bezier(.6,.02,.22,1) .18s both; }
+.casillero-puerta-rejilla { position: absolute; left: 16px; top: 16px; width: min(132px, 40%); display: grid; gap: 4px; }
+.casillero-puerta-rejilla i { display: block; height: 4px; border-radius: 2px; background: #121316; box-shadow: 0 1px 0 rgba(255,255,255,.08); }
+.casillero-puerta-numero { position: absolute; right: 46px; top: 18px; padding: 3px 8px; border-radius: 6px; font-size: 13px; font-weight: 800; font-stretch: 78%; letter-spacing: .04em; color: #2a2b30; background: #c6c9cf; box-shadow: inset 0 0 0 1px rgba(0,0,0,.2); }
+.casillero-puerta-manija { position: absolute; right: 14px; top: 50%; width: 10px; height: 64px; translate: 0 -50%; border-radius: 6px; background: #9ca0a7; box-shadow: inset -2px 0 0 rgba(0,0,0,.25), 0 2px 4px rgba(0,0,0,.4); }
+.light-mode .casillero-puerta { background: repeating-linear-gradient(90deg, rgba(0,0,0,.02) 0 2px, transparent 2px 5px), #d9dbe0; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08), inset 0 0 0 6px rgba(255,255,255,.35); }
+.light-mode .casillero-puerta-rejilla i { background: #8e9198; box-shadow: 0 1px 0 rgba(255,255,255,.6); }
+@keyframes puertaAbre {
+  0% { transform: rotateY(0); opacity: 1; }
+  9% { transform: rotateY(-4deg) translateX(1px); }
+  16% { transform: rotateY(-2.5deg); }
+  78% { opacity: 1; }
+  100% { transform: rotateY(-86deg); opacity: 0; visibility: hidden; } }
+@keyframes puertaSombra { 0%, 15% { opacity: 0; } 100% { opacity: 1; } }
+
+/* El interior: el fondo hundido (más oscuro, con la sombra del techo y la
+   de la puerta), el marco de chapa, el estante con el número y el gancho.
+   La luz entra mientras se abre la puerta. */
+.casillero.abierto { padding-left: 46px; padding-right: 16px;
+  background: repeating-linear-gradient(90deg, rgba(255,255,255,.012) 0 2px, transparent 2px 5px), linear-gradient(#17181b, #1d1f23 40%, #212327);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), inset 0 0 0 6px #34363c, inset 0 0 0 7px rgba(0,0,0,.55), inset 0 18px 22px -12px rgba(0,0,0,.75), inset 22px 0 20px -14px rgba(0,0,0,.6), 0 12px 30px -18px rgba(0,0,0,.8); }
+.light-mode .casillero.abierto { background: repeating-linear-gradient(90deg, rgba(0,0,0,.015) 0 2px, transparent 2px 5px), linear-gradient(#b4b7bd, #c0c3c9 40%, #c7cad0);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.1), inset 0 0 0 6px #e3e5e9, inset 0 0 0 7px rgba(0,0,0,.12), inset 0 18px 22px -12px rgba(0,0,0,.3), inset 22px 0 20px -14px rgba(0,0,0,.25), 0 12px 30px -18px rgba(0,0,0,.35); }
+.casillero.abierto::before { content: ""; position: absolute; inset: 0; z-index: 2; border-radius: inherit; pointer-events: none; background: rgba(0,0,0,.6); animation: luzEntra 1s ease-out .35s both; }
+@keyframes luzEntra { from { opacity: 1; } to { opacity: 0; } }
+.casillero.abierto > .casillero-manija { display: none; }
+.casillero.abierto .casillero-arriba { position: relative; padding-bottom: 12px; margin-bottom: 16px; }
+/* El estante de chapa, de lado a lado del interior. */
+.casillero.abierto .casillero-arriba::after { content: ""; position: absolute; left: -40px; right: -10px; bottom: 0; height: 6px; border-radius: 1px; background: linear-gradient(#5d6066, #3a3c42 60%, #26282c); box-shadow: 0 5px 7px -3px rgba(0,0,0,.65); }
+.light-mode .casillero.abierto .casillero-arriba::after { background: linear-gradient(#f1f2f4, #cfd2d7 60%, #b6b9bf); box-shadow: 0 5px 7px -3px rgba(0,0,0,.25); }
+/* El gancho de la percha, atornillado al fondo. */
+.casillero-gancho { position: relative; width: 22px; height: 26px; flex: none; }
+.casillero-gancho::before { content: ""; position: absolute; left: 7px; top: 0; width: 8px; height: 8px; border-radius: 2px; background: #6f7279; box-shadow: inset 0 1px 0 rgba(255,255,255,.25); }
+.casillero-gancho::after { content: ""; position: absolute; left: 3px; top: 6px; width: 12px; height: 16px; border: 3px solid #8d9097; border-top: 0; border-radius: 0 0 9px 9px; border-left-color: transparent; }
+/* La puerta abierta, vista de costado contra el marco izquierdo: la chapa
+   en perspectiva (el borde de afuera, más cerca, es más alto), su rejilla y
+   la manija. Aparece cuando termina el giro. */
+.casillero-puerta-abierta { position: absolute; left: 6px; top: 6px; bottom: 6px; width: 30px; z-index: 1; pointer-events: none;
+  clip-path: polygon(0 0, 100% 5%, 100% 95%, 0 100%);
+  background: repeating-linear-gradient(180deg, transparent 0 12%, transparent 12%), linear-gradient(90deg, #44474d, #36383d 70%, #2b2d31);
+  box-shadow: inset -2px 0 0 rgba(0,0,0,.45); animation: tiraAparece .3s ease-out 1.2s both; }
+.casillero-puerta-abierta::before { content: ""; position: absolute; left: 7px; right: 6px; top: 16%; height: 22px; background: repeating-linear-gradient(180deg, #121316 0 3px, transparent 3px 6px); opacity: .85; }
+.casillero-puerta-abierta i { position: absolute; left: 6px; top: 50%; width: 5px; height: 40px; translate: 0 -50%; border-radius: 3px; background: #9ca0a7; box-shadow: 1px 0 0 rgba(0,0,0,.35); }
+.light-mode .casillero-puerta-abierta { background: linear-gradient(90deg, #e1e3e7, #cfd2d7 70%, #bfc2c8); box-shadow: inset -2px 0 0 rgba(0,0,0,.15); }
+.light-mode .casillero-puerta-abierta::before { background: repeating-linear-gradient(180deg, #8e9198 0 3px, transparent 3px 6px); }
+@keyframes tiraAparece { from { opacity: 0; transform: translateX(6px) scaleX(.7); } to { opacity: 1; transform: none; } }
 /* A6: la firma se escribe sola cuando alguien llega. */
 .planilla-firma.se-escribe { animation: firmaEscribe 1.1s steps(9) .2s both; }
 @keyframes firmaEscribe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
@@ -6805,6 +6885,8 @@ label.ajuste-rotulo { display: block; }
 @media (prefers-reduced-motion: reduce) {
   .dia-barra.se-desengancha .barra-cargada, .led-cuenta-numero, .cinta.se-desenrolla, .cinta.se-desenrolla .cinta-marca, .balanza-pesa.llega, .planilla-firma.se-escribe, .hoja-clavada.se-clava, .hoja-clavada.se-clava .chinche, .pizarra-ia.borrando .pizarra-ia-saludo, .pizarra-ia.borrando .pizarra-ia-pregunta, .ia-tarjeta.postit.se-despega, .carnet-con-lector.pasa .carnet, .vitrina-lugar.se-cuelga * { animation: none; }
   .casillero-puerta, .pizarra-ia-borrador-pasa, .carnet-lector { display: none; }
+  .casillero.abierto::before, .casillero-puerta-abierta { animation: none; }
+  .casillero.abierto::before { display: none; }
 }
 
 /* LA BARRA AL RACK */
@@ -15970,6 +16052,10 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   // sesión, cuando se va el molinete, la barra del día sube de los ganchos.
   // Sólo al tocar "Iniciar sesión", no al abrir la app con una ya empezada.
   const [arranca, setArranca] = useState(false);
+  // PRUEBA (04/11): cómo se elige entre entrenamiento y descarga. "a", la
+  // palanca en la pared; "b", la etiqueta colgada de la barra; "c", las dos
+  // cintas; sin elegir, el selector de arriba de los días.
+  const [modoPrueba] = useState(() => { try { return localStorage.getItem("modusfit_prueba_modo") || ""; } catch { return ""; } });
 
   const inicioSesion = sessionForThisDay?.startedAt || null;
   const inicioPrevio = useRef(inicioSesion);
@@ -16133,7 +16219,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           El elegido se vuelve una píldora llena de su color (el resorte
           cierra las puntas) y le da el tono a la pantalla (ver ponerTono).
           Los demás van sin color. */}
-      {esSemanaDescarga && onModoDescarga && (
+      {esSemanaDescarga && onModoDescarga && !modoPrueba && (
         <div className="segmentado chico dia-modo modo-semana" role="group" aria-label="Qué hacés esta semana">
           <button onClick={() => onModoDescarga(false)} aria-pressed={!pideDescarga} className={!pideDescarga ? "activo" : ""}>Entrenamiento</button>
           <button onClick={() => onModoDescarga(true)} aria-pressed={pideDescarga} className={pideDescarga ? "activo" : ""}><Zap size={13} /> Descarga</button>
@@ -16151,7 +16237,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           return DAY_ORDER.map((k) => (
           <button key={k} onClick={() => setActiveDay(k)} title={ROUTINE[k].label} role="tab" aria-selected={activeDay === k}
             className="dia-solapa relative flex items-center justify-center py-2.5 px-2 text-center min-w-0 active:scale-95"
-            style={{ "--dia": ROUTINE[k].color, minHeight: `${Math.max(minHeight + 22, 52)}px` }}>
+            style={{ "--dia": ROUTINE[k].color, minHeight: `${Math.max(minHeight + 22, 56)}px` }}>
             {/* El día que toca hoy lleva un punto: se ve sin tener que
                 abrirlo, aunque estés mirando otro. */}
             {k === suggestedDay && <span className="dia-solapa-hoy" aria-label="Toca hoy" />}
@@ -16206,6 +16292,25 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             <span className="dia-chip"><Calendar size={12} /> {scheduledDay === activeDay ? "Programado para hoy" : "Sugerido para hoy"}</span>
           )}
           {day.description && <p className="tarima-cinta a-mano">{day.description}</p>}
+          {esSemanaDescarga && onModoDescarga && modoPrueba === "a" && (
+            // A: LA PALANCA de la pared, como la de la luz del gimnasio: dos
+            // posiciones grabadas en la placa y la palanca hacia la elegida.
+            <button onClick={() => onModoDescarga(!pideDescarga)} className={`modo-palanca ${pideDescarga ? "descarga" : ""}`} aria-pressed={pideDescarga} aria-label={pideDescarga ? "Semana de descarga. Tocá para entrenar normal" : "Entrenamiento normal. Tocá para hacer la descarga"}>
+              <span className="modo-palanca-placa">
+                <span className="modo-palanca-rotulo arriba">Entrenar</span>
+                <span className="modo-palanca-ranura"><i /></span>
+                <span className="modo-palanca-rotulo abajo">Descarga</span>
+              </span>
+            </button>
+          )}
+          {esSemanaDescarga && onModoDescarga && modoPrueba === "c" && (
+            // C: LAS DOS CINTAS: la elegida, pegada derecha; la otra, con una
+            // punta despegada. Tocás la otra y se pegan al revés.
+            <div className="modo-cintas" role="group" aria-label="Qué hacés esta semana">
+              <button onClick={() => onModoDescarga(false)} aria-pressed={!pideDescarga} className={`modo-cinta a-mano ${!pideDescarga ? "pegada" : ""}`}>Entrenamiento</button>
+              <button onClick={() => onModoDescarga(true)} aria-pressed={pideDescarga} className={`modo-cinta a-mano ${pideDescarga ? "pegada" : ""}`}>Descarga</button>
+            </div>
+          )}
           {/* EL CINTURÓN, colgado en la pared de la derecha: el colgador de
               chapa atornillado (como el H-51 de Rogue), el cinturón de cuero
               doblado sobre la púa, con la hebilla de un lado y los agujeros
@@ -16257,6 +16362,15 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
                 alto="clamp(84px, 25cqi, 140px)"
                 detalle
               />
+              {esSemanaDescarga && onModoDescarga && modoPrueba === "b" && (
+                // B: LA ETIQUETA colgada del agarre de la barra, como la de
+                // un equipo reservado: dice qué hacés esta semana; tocarla lo
+                // cambia y se da vuelta.
+                <button key={pideDescarga ? "d" : "e"} onClick={() => onModoDescarga(!pideDescarga)} className="modo-etiqueta" aria-pressed={pideDescarga} aria-label={pideDescarga ? "Semana de descarga. Tocá para entrenar normal" : "Entrenamiento normal. Tocá para hacer la descarga"}>
+                  <span className="modo-etiqueta-hilo" aria-hidden="true" />
+                  <span className="modo-etiqueta-carton"><i aria-hidden="true" /><b>{pideDescarga ? "Descarga" : "Entrenamiento"}</b><small>tocá para cambiar</small></span>
+                </button>
+              )}
               {/* EL COLLARÍN DE RESORTE, acostado en la goma (como los de York o
                   Marcy): el aro de cuatro vueltas de alambre, los dos mangos de
                   metal que salen de sus puntas y los puños de goma del color
@@ -23720,9 +23834,15 @@ function numeroDeCasillero(semilla = "") {
 function Casillero({ semilla = "", nombre, usuario = null, foto = null, rango = null, record = null, desde = null, accion = null }) {
   const numero = numeroDeCasillero(semilla || nombre || "");
   return (
-    <header className="casillero" aria-label={`El casillero de ${nombre}`}>
+    // EL CASILLERO ABIERTO (04/11, pedido: "una vez que ingreses al perfil,
+    // que en vez de la imagen del locker cerrado aparezca uno abierto"): al
+    // entrar, la puerta (con su rejilla y su manija) se destraba y gira
+    // sobre la bisagra; queda abierta de costado, a la izquierda, y adentro
+    // se ve el fondo hundido, el estante con el número y lo que hay pegado.
+    <header className="casillero abierto" aria-label={`El casillero de ${nombre}`}>
+      <span className="casillero-puerta-abierta" aria-hidden="true"><i /></span>
       <div className="casillero-arriba">
-        <div className="casillero-rejilla" aria-hidden="true">{Array.from({ length: 5 }, (_, i) => <i key={i} />)}</div>
+        <span className="casillero-gancho" aria-hidden="true" />
         <span className="casillero-numero" aria-hidden="true">{String(numero).padStart(3, "0")}</span>
         {accion}
       </div>
@@ -23746,7 +23866,11 @@ function Casillero({ semilla = "", nombre, usuario = null, foto = null, rango = 
       <span className="casillero-manija" aria-hidden="true" />
       {/* LA PUERTA SE ABRE (A5): al entrar al perfil, la puerta lisa del
           casillero gira sobre la bisagra y deja ver lo de adentro. */}
-      <span className="casillero-puerta" aria-hidden="true"><span className="casillero-puerta-manija" /></span>
+      <span className="casillero-puerta" aria-hidden="true">
+        <span className="casillero-puerta-rejilla">{Array.from({ length: 5 }, (_, i) => <i key={i} />)}</span>
+        <span className="casillero-puerta-numero">{String(numero).padStart(3, "0")}</span>
+        <span className="casillero-puerta-manija" />
+      </span>
     </header>
   );
 }
@@ -23776,7 +23900,6 @@ function CasilleroChico({ semilla = "", nombre, foto = null, rango = null, racha
         </span>
         <span className="casillero-datos">
           <span className="casillero-etiqueta"><span className="casillero-nombre">{nombre}</span></span>
-          <span className="casillero-abrir">Así te ven tus amigos{onAbrir && <ChevronRight size={15} aria-hidden="true" />}</span>
         </span>
       </Puerta>
       <div className="casillero-calcos">
@@ -23965,7 +24088,6 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, viewerName = null, i
         desde={desde}
         accion={esYo && basic?.username ? <button onClick={() => setVerQr(true)} aria-label="Mostrar mi código QR" className="boton-redondo shrink-0"><QrCode size={17} /></button> : null}
       />
-      {esYo && <p className="atleta-nota">Así te ven tus amigos cuando entran a tu perfil.</p>}
 
       {state === "ok" && !esYo && (
         <div className="segmentado" role="tablist" aria-label="Qué ver" style={{ "--c": SOCIAL_COLOR }}>
