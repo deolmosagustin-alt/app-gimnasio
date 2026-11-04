@@ -6234,46 +6234,25 @@ label.ajuste-rotulo { display: block; }
 }
 
 
-/* ── VISTA PREVIA DEL 03/11: P2, T1 y T2 ── */
-.cartelera { padding: 14px 14px 16px; border-radius: 14px; background: linear-gradient(135deg, #5f4c3a, #4a3a2b 60%, #55432f); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 0 0 6px rgba(0,0,0,.16), 0 14px 26px -18px rgba(0,0,0,.9); }
-.cartelera-titulo { text-align: center; font-size: 13px; font-weight: 800; letter-spacing: .16em; color: #d6bc74; margin-bottom: 10px; }
-.cartelera-lista { display: grid; gap: 7px; }
-.cartelera-placa { --metal: #a9acb2; --tinta-placa: #1d1f24; display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 8px; min-height: 36px; padding: 0 9px; border-radius: 4px; color: var(--tinta-placa); background: linear-gradient(180deg, color-mix(in oklab, var(--metal) 82%, white), var(--metal) 55%, color-mix(in oklab, var(--metal) 80%, black)); box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 2px 3px rgba(0,0,0,.35); }
-.cartelera-placa.oro { --metal: #c8ad62; --tinta-placa: #2b2416; }
-.cartelera-placa.plata { --metal: #b9bcc2; }
-.cartelera-placa.bronce { --metal: #b88160; --tinta-placa: #2b1a12; }
-.cartelera-placa.chapa { --metal: #8f9298; --tinta-placa: #17181b; }
-.cartelera-nombre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 700; }
-.cartelera-marca { font-size: 14px; font-weight: 800; font-stretch: 85%; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.cartelera-tornillo { width: 7px; height: 7px; border-radius: 999px; background: radial-gradient(circle at 35% 35%, rgba(255,255,255,.5), transparent 45%), color-mix(in oklab, var(--metal) 45%, black); box-shadow: inset 0 0 0 1px rgba(0,0,0,.35); position: relative; }
-.cartelera-tornillo::after { content: ""; position: absolute; inset: 3px 1px; background: rgba(0,0,0,.55); border-radius: 1px; }
-.cartelera-placa { animation: placaAparece .45s var(--sale, ease-out) both; animation-delay: calc(var(--i) * 70ms); }
-.cartelera-placa.nueva { animation: placaNueva .7s cubic-bezier(.3,.7,.4,1) both; animation-delay: calc(var(--i) * 70ms + 200ms); }
-.cartelera-placa.nueva .cartelera-tornillo::after { animation: tornilloGira .6s ease-out .6s both; }
-@keyframes placaAparece { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
-@keyframes placaNueva { 0% { opacity: 0; transform: translateY(14px) scale(.96); } 60% { opacity: 1; transform: translateY(-2px); } 100% { transform: none; } }
-@keyframes tornilloGira { from { transform: rotate(0); } to { transform: rotate(540deg); } }
-.hoja-rutina.compacta .planilla-hoja { padding: 20px 14px 12px; }
-.hoja-rutina-cabeza { display: flex; align-items: flex-start; gap: 10px; padding-bottom: 6px; border-bottom: 1.5px dashed var(--papel-linea); }
-.hoja-rutina.compacta .hoja-rutina-titulo { font-size: 22px; }
-.hoja-rutina-a-mano { font-size: 19px; line-height: 1; color: var(--papel-suave); margin-top: 2px; }
-.hoja-rutina-compartir { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 999px; color: var(--papel-tinta); background: rgba(0,0,0,.06); transition: transform var(--dur-toque) var(--sale); }
-.hoja-rutina-compartir:active { transform: scale(.92); }
-.hoja-rutina-renglones { display: grid; }
-.hoja-rutina-renglon { width: 100%; min-height: 46px; display: flex; align-items: center; gap: 8px; text-align: left; color: var(--papel-tinta); border-bottom: 1px solid var(--papel-linea); transition: background-color var(--dur-toque) var(--sale); }
-.hoja-rutina-renglon:active { background: rgba(0,0,0,.04); }
-.hoja-rutina-renglon > i { flex: 1; min-width: 10px; border-bottom: 1.5px dotted var(--papel-linea); transform: translateY(-3px); }
-.hoja-rutina-renglon > b { font-size: 13px; font-weight: 700; white-space: nowrap; }
-.hoja-rutina.compacta .hoja-rutina-dia-nombre span { background-size: 0% 100%; animation: resaltadorPasa .5s var(--sale, ease-out) both; animation-delay: calc(var(--i) * 140ms + 150ms); }
-@keyframes resaltadorPasa { to { background-size: 100% 100%; } }
-.estante-con-chapa { display: grid; gap: 0; }
-.estante-chapa { justify-self: center; margin-top: 8px; padding: 3px; border-radius: 5px; background: #8d9097; box-shadow: 0 3px 6px -2px rgba(0,0,0,.6); }
-.estante-chapa span { display: block; padding: 4px 14px; border-radius: 3px; font-size: 14px; font-weight: 800; font-stretch: 82%; letter-spacing: .04em; color: #1d1f24; background: linear-gradient(#b3b6bc, #9a9da3); box-shadow: inset 0 1px 0 rgba(255,255,255,.45); }
-.estante.grande { margin-bottom: 30px; }
-.estante.grande .estante-lugar .pesa-rusa { max-width: 50px; }
-.estante-etiqueta { position: absolute; top: calc(100% + 5px); left: 50%; translate: -50% 0; transform-origin: top center; padding: 2px 5px; border-radius: 2px; font-size: 11px; font-weight: 800; white-space: nowrap; color: var(--papel-tinta, #232326); background: var(--papel, #e6e5df); box-shadow: 0 2px 3px rgba(0,0,0,.35); animation: etiquetaHamaca 3.2s ease-in-out infinite; }
-@keyframes etiquetaHamaca { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
-@media (prefers-reduced-motion: reduce) { .cartelera-placa, .cartelera-tornillo::after, .estante-etiqueta, .hoja-rutina.compacta .hoja-rutina-dia-nombre span { animation: none; } .hoja-rutina.compacta .hoja-rutina-dia-nombre span { background-size: 100% 100%; } }
+/* ── EL RACK DE LAS PESAS RUSAS (vista previa del 03/11) ── */
+.rack-pesas { position: relative; display: grid; padding: 0 6px 10px; }
+.rack-pesas::before, .rack-pesas::after { content: ""; position: absolute; top: 34px; bottom: 0; width: 9px; border-radius: 3px; background: repeating-linear-gradient(90deg, rgba(255,255,255,.04) 0 1px, transparent 1px 3px), linear-gradient(90deg, #2c2e33, #3d4046 50%, #2a2c31); box-shadow: inset 0 0 0 1px rgba(0,0,0,.3); }
+.rack-pesas::before { left: 0; }
+.rack-pesas::after { right: 0; }
+.estante.en-rack { z-index: 1; margin-bottom: 48px; }
+.estante.en-rack .estante-lugar .pesa-rusa { max-width: 46px; }
+.estante-etiqueta { position: absolute; top: calc(100% + 9px); left: 50%; translate: -50% 0; transform-origin: 50% -9px; display: block; min-width: 2.6em; padding: 4px 5px 3px; border-radius: 2px 2px 3px 3px; font-size: 11px; font-weight: 800; letter-spacing: .02em; text-align: center; white-space: nowrap; color: #2b2620; background: linear-gradient(#d9cdb4, #cbbd9f); box-shadow: 0 3px 4px -1px rgba(0,0,0,.45); animation: etiquetaHamaca 3.4s ease-in-out infinite; animation-delay: calc(var(--i) * -0.45s); }
+.estante-etiqueta::before { content: ""; position: absolute; left: 50%; bottom: 100%; width: 1px; height: 10px; background: #a3a8b0; }
+.estante-etiqueta i { display: block; width: 5px; height: 5px; margin: 0 auto 2px; border-radius: 999px; background: #3a342b; box-shadow: inset 0 0 0 1.5px #b9aa8b; }
+@keyframes etiquetaHamaca { 0%, 100% { transform: rotate(-3.5deg); } 50% { transform: rotate(3.5deg); } }
+.rack-pesas-travesano { position: relative; z-index: 1; margin: 0 -2px; display: grid; place-items: center; height: 14px; border-radius: 3px; background: repeating-linear-gradient(90deg, rgba(255,255,255,.03) 0 2px, transparent 2px 5px), linear-gradient(#45484e, #33363b); box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 6px 10px -6px rgba(0,0,0,.8); }
+.rack-pesas-chapa { position: relative; display: flex; align-items: center; gap: 8px; max-width: 86%; padding: 6px 10px; border-radius: 4px; background: linear-gradient(#b7bac0, #989ba1); box-shadow: inset 0 1px 0 rgba(255,255,255,.5), inset 0 -1px 0 rgba(0,0,0,.2), 0 4px 8px -3px rgba(0,0,0,.7); }
+.rack-pesas-chapa span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 800; font-stretch: 80%; letter-spacing: .05em; color: #26282d; text-shadow: 0 1px 0 rgba(255,255,255,.45); }
+.rack-pesas-chapa i { flex: none; width: 7px; height: 7px; border-radius: 999px; background: radial-gradient(circle at 35% 35%, rgba(255,255,255,.6), transparent 45%), #6b6e75; position: relative; }
+.rack-pesas-chapa i::after { content: ""; position: absolute; inset: 3px 1px; border-radius: 1px; background: rgba(0,0,0,.45); }
+.light-mode .rack-pesas::before, .light-mode .rack-pesas::after { background: linear-gradient(90deg, #b4b7bd, #cfd2d7 50%, #b0b3b9); }
+.light-mode .rack-pesas-travesano { background: linear-gradient(#d3d6db, #bfc2c8); box-shadow: inset 0 1px 0 #fff, 0 6px 10px -6px rgba(0,0,0,.3); }
+@media (prefers-reduced-motion: reduce) { .estante-etiqueta { animation: none; } }
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -6881,17 +6860,36 @@ button.estante-lugar:active .pesa-rusa { scale: .92; }
   background: radial-gradient(ellipse at 22% 12%, rgba(255,255,255,.055), transparent 60%), radial-gradient(ellipse at 85% 80%, rgba(255,255,255,.03), transparent 55%), #1f2622;
   box-shadow: inset 0 0 0 5px var(--madera), inset 0 0 0 6px rgba(0,0,0,.35), inset 0 3px 12px rgba(0,0,0,.5), 0 12px 24px -18px rgba(0,0,0,.9);
 }
-/* P1 (vista previa del 03/11): el piso de goma encastrable del gimnasio en
-   vez de la repisa: negro mate con motas de color, las juntas en zigzag y la
-   tiza de las semanas sobre la pared de atrás. */
-.cajones-pizarra.en-piso { padding: 10px 12px 0; background: linear-gradient(#202125, #18191c 70%); box-shadow: inset 0 0 0 1px rgba(255,255,255,.05), 0 12px 24px -18px rgba(0,0,0,.9); }
-.cajones-pizarra.en-piso::after { height: 26px; margin: 0 -12px; border-radius: 0 0 12px 12px;
-  background: radial-gradient(circle at 20% 30%, rgba(91,127,209,.75) 0 1.2px, transparent 1.8px) 0 0 / 15px 13px, radial-gradient(circle at 70% 65%, rgba(194,90,92,.7) 0 1.1px, transparent 1.7px) 0 0 / 17px 11px, radial-gradient(circle at 45% 80%, rgba(217,217,211,.45) 0 1px, transparent 1.6px) 0 0 / 13px 14px, linear-gradient(#2a2b2f, #1d1e21);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.07), inset 0 6px 8px -6px rgba(0,0,0,.6); }
-.cajones-pizarra.en-piso::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 26px; border-radius: 0 0 12px 12px; pointer-events: none; z-index: 1;
-  background: repeating-linear-gradient(90deg, transparent 0 calc(25% - 3px), rgba(0,0,0,.55) calc(25% - 3px) 25%); mask: linear-gradient(transparent 0 2px, #000 2px); }
-.light-mode .cajones-pizarra.en-piso { background: linear-gradient(#e4e5e8, #d6d8dc 70%); }
-.cajones-pizarra.en-piso .cajon { box-shadow: 0 4px 0 -1px rgba(0,0,0,.45); }
+/* EL RINCÓN DE LOS CAJONES (vista previa del 03/11, pedido: "que deje de
+   ser con el fondo negro; el casillero no es muy colorido, pero tiene esas
+   tonalidades de gris que lo diferencian"): en vez de la pizarra, la pared
+   de chapa perforada del depósito del gimnasio, cepillada como el casillero,
+   y los cajones parados sobre el piso de chapa antideslizante. Las veces que
+   fuiste siguen en tiza, escritas sobre la chapa. */
+.cajones-pizarra.en-chapa { --tiza: #e9e8e1; --tiza-suave: rgba(233,232,225,.5);
+  padding: 10px 12px 0; border-radius: 12px;
+  background:
+    radial-gradient(circle, rgba(10,11,13,.85) 0 1.6px, rgba(255,255,255,.06) 2.1px, transparent 2.6px) 6px 6px / 14px 14px,
+    repeating-linear-gradient(90deg, rgba(255,255,255,.022) 0 2px, transparent 2px 5px),
+    linear-gradient(170deg, #45484e, #393c41 55%, #34373c);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 0 0 5px rgba(0,0,0,.16), inset 0 10px 18px -12px rgba(0,0,0,.55), 0 12px 24px -18px rgba(0,0,0,.9); }
+.cajones-pizarra.en-chapa::after { height: 16px; margin: 0 -12px; border-radius: 0 0 12px 12px;
+  background:
+    repeating-linear-gradient(45deg, transparent 0 5px, rgba(255,255,255,.14) 5px 6.5px, transparent 6.5px 11px),
+    repeating-linear-gradient(-45deg, transparent 0 5px, rgba(0,0,0,.28) 5px 6.5px, transparent 6.5px 11px),
+    linear-gradient(#64676d, #4b4e54);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.22), inset 0 -1px 0 rgba(0,0,0,.35), 0 -1px 0 rgba(0,0,0,.45); }
+.cajones-pizarra.en-chapa .cajon { box-shadow: 0 3px 0 -1px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.18); }
+.light-mode .cajones-pizarra.en-chapa { --tiza: #3a3d43; --tiza-suave: rgba(58,61,67,.55);
+  background:
+    radial-gradient(circle, rgba(70,73,79,.75) 0 1.6px, rgba(255,255,255,.5) 2.1px, transparent 2.6px) 6px 6px / 14px 14px,
+    repeating-linear-gradient(90deg, rgba(0,0,0,.02) 0 2px, transparent 2px 5px),
+    linear-gradient(170deg, #dfe1e5, #d3d6db 55%, #cdd0d5);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.08), inset 0 0 0 5px rgba(255,255,255,.35), 0 12px 24px -18px rgba(0,0,0,.35); }
+.light-mode .cajones-pizarra.en-chapa::after { background:
+    repeating-linear-gradient(45deg, transparent 0 5px, rgba(255,255,255,.55) 5px 6.5px, transparent 6.5px 11px),
+    repeating-linear-gradient(-45deg, transparent 0 5px, rgba(0,0,0,.12) 5px 6.5px, transparent 6.5px 11px),
+    linear-gradient(#b9bcc2, #a3a6ac); }
 /* La repisa de madera, donde se paran los cajones. */
 .cajones-pizarra::after { content: ""; display: block; height: 10px; margin: 0 -12px; border-radius: 0 0 12px 12px; background: linear-gradient(#7c6349, #4e3f30); box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 -1px 0 rgba(0,0,0,.5); }
 .cajones { display: flex; align-items: stretch; gap: 6px; }
@@ -7205,42 +7203,8 @@ function seriesDeLaHoja(ex) {
   const reps = ex.sets[0]?.repRange;
   return `${ex.sets.length}${reps ? ` × ${reps}` : ""}`;
 }
-function HojaRutina({ routineDef, compacta = false, onGoToDay = null, accion = null }) {
+function HojaRutina({ routineDef }) {
   const model = useMemo(() => buildRoutineModel(routineDef), [routineDef]);
-  // T1 (vista previa del 03/11): la hoja como la rutina activa de Rutinas,
-  // un renglón por día (el nombre con resaltador y sus ejercicios y series);
-  // tocás uno y vas a entrenarlo.
-  if (compacta) {
-    return (
-      <div className="planilla hoja-rutina compacta">
-        <BrocheTabla />
-        <div className="planilla-hoja">
-          <div className="hoja-rutina-cabeza">
-            <div className="min-w-0 flex-1">
-              <p className="hoja-rutina-titulo">{routineDef.name || "Mi rutina"}</p>
-              <p className="hoja-rutina-a-mano a-mano">{model.dayOrder.length} {model.dayOrder.length === 1 ? "día" : "días"} por semana</p>
-            </div>
-            {accion}
-          </div>
-          <ul className="hoja-rutina-renglones">
-            {model.dayOrder.map((dk, i) => {
-              const d = model.days[dk];
-              const series = d.exercises.reduce((a, e) => a + (e.sets?.length || 0), 0);
-              return (
-                <li key={dk} style={{ "--dia": d.color, "--i": i }}>
-                  <button onClick={onGoToDay ? () => onGoToDay(dk) : undefined} disabled={!onGoToDay} className="hoja-rutina-renglon" aria-label={`${d.label}: ${d.exercises.length} ejercicios, ${series} series`}>
-                    <span className="hoja-rutina-dia-nombre"><span>{d.label}</span></span>
-                    <i aria-hidden="true" />
-                    <b>{d.exercises.length} ej · {series} series</b>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      </div>
-    );
-  }
   const ejercicios = model.dayOrder.reduce((t, dk) => t + model.days[dk].exercises.length, 0);
   return (
     <div className="planilla hoja-rutina">
@@ -13856,15 +13820,15 @@ function PesaRusa({ vacia = false }) {
   );
 }
 // `dias`: siete { clave, corto ("Lun"), nombre ("lunes"), dia: { label, color } | null, hoy }.
-function EstantePesas({ dias = [], onElegir = null, etiqueta = "Tu semana", grande = false, chapa = null }) {
+function EstantePesas({ dias = [], onElegir = null, etiqueta = "Tu semana", rack = null }) {
   const lista = (
-    <ol className={`estante ${grande ? "grande" : ""}`} aria-label={etiqueta}>
+    <ol className={`estante ${rack ? "en-rack" : ""}`} aria-label={etiqueta}>
       {dias.map((d, i) => {
         const texto = `${d.nombre || d.corto}: ${d.dia ? d.dia.label : "descanso"}${d.hoy ? " (hoy)" : ""}`;
         const clase = `estante-lugar ${d.dia ? "con-pesa" : ""} ${d.hoy ? "hoy" : ""}`;
-        // T2 (vista previa del 03/11): con el estante grande, de cada pesa
-        // cuelga una etiqueta de cartón con lo que toca ese día.
-        const contenido = <><PesaRusa vacia={!d.dia} /><span className="estante-dia" aria-hidden="true">{d.corto}</span>{grande && d.dia && <span className="estante-etiqueta" aria-hidden="true">{d.dia.label}</span>}</>;
+        // En el rack, de cada pesa cuelga su etiqueta de cartón con el día
+        // de la rutina, atada con un hilo al canto del estante.
+        const contenido = <><PesaRusa vacia={!d.dia} /><span className="estante-dia" aria-hidden="true">{d.corto}</span>{rack && d.dia && <span className="estante-etiqueta" aria-hidden="true" style={{ "--i": i }}><i />{d.dia.label}</span>}</>;
         return (
           <li key={d.clave || i} style={d.dia ? { "--dia": d.dia.color } : undefined}>
             {onElegir && d.dia
@@ -13875,11 +13839,13 @@ function EstantePesas({ dias = [], onElegir = null, etiqueta = "Tu semana", gran
       })}
     </ol>
   );
-  if (!chapa) return lista;
+  if (!rack) return lista;
   return (
-    <div className="estante-con-chapa">
+    <div className="rack-pesas">
       {lista}
-      <p className="estante-chapa"><span>{chapa}</span></p>
+      <div className="rack-pesas-travesano" aria-hidden="true">
+        <p className="rack-pesas-chapa"><i /><span>{rack}</span><i /></p>
+      </div>
     </div>
   );
 }
@@ -14511,7 +14477,7 @@ function CajonesCiclo({ semanas = [], trainWeeks = TRAIN_WEEKS, alto = 100, anim
   const altura = (wi, descarga) => Math.round(lugar * (descarga ? 0.36 : 0.45 + (Math.min(wi, trainWeeks - 1) / Math.max(1, trainWeeks - 1)) * 0.55));
   const pintura = (wi) => PINTURA_CAJON[Math.round((trainWeeks > 1 ? Math.min(wi, trainWeeks - 1) / (trainWeeks - 1) : 1) * (PINTURA_CAJON.length - 1))];
   return (
-    <div className={`cajones-pizarra en-piso ${conTiza ? "con-tiza" : ""}`} aria-hidden="true">
+    <div className={`cajones-pizarra en-chapa ${conTiza ? "con-tiza" : ""}`} aria-hidden="true">
       <div className="cajones" style={{ height: alto }}>
         {semanas.map((s, wi) => {
           const cumplida = !!meta && !s.descarga && s.estado !== "futura" && (s.sesiones || 0) >= meta;
@@ -18868,45 +18834,6 @@ function ExercisePickerModal({ groups, selId, onSelect, onClose }) {
   );
 }
 
-// P2 (vista previa del 03/11): LA CARTELERA DE RÉCORDS. El tablero de
-// madera de los gimnasios con plaquetas grabadas: tus cinco mejores
-// ejercicios por su 1RM estimado, con la mejor serie. La primera es de oro,
-// la segunda de plata y la tercera de bronce; las demás, de chapa. La
-// plaqueta de un récord de esta semana se atornilla al aparecer.
-function CarteleraRecords({ logs, unidad = "kg" }) {
-  const [haceUnaSemana] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 7); return localDateStr(d); });
-  const filas = useMemo(() => {
-    const mejor = {};
-    Object.entries(logs || {}).forEach(([k, arr]) => {
-      if (k.endsWith("_pr_override") || !Array.isArray(arr)) return;
-      const { exerciseId } = parseLogKey(k);
-      arr.forEach((h) => {
-        if (!h?.date || h.deload || !(h.kg > 0) || !(h.reps > 0)) return;
-        const rm = estimate1RM(h.kg, h.reps);
-        if (!mejor[exerciseId] || rm > mejor[exerciseId].rm) mejor[exerciseId] = { rm, h, nombre: EXERCISE_LIBRARY_BY_ID[exerciseId]?.name || h.exName || exerciseId.replace(/_/g, " ") };
-      });
-    });
-    return Object.entries(mejor).sort((a, b) => b[1].rm - a[1].rm).slice(0, 5).map(([id, m]) => ({ id, ...m }));
-  }, [logs]);
-  if (!filas.length) return null;
-  const metales = ["oro", "plata", "bronce", "chapa", "chapa"];
-  return (
-    <section className="cartelera" aria-label="Tus récords">
-      <p className="cartelera-titulo">Tus récords</p>
-      <ol className="cartelera-lista">
-        {filas.map((f, i) => (
-          <li key={f.id} className={`cartelera-placa ${metales[i]} ${f.h.date >= haceUnaSemana ? "nueva" : ""}`} style={{ "--i": i }}>
-            <i className="cartelera-tornillo" aria-hidden="true" />
-            <span className="cartelera-nombre">{f.nombre}</span>
-            <span className="cartelera-marca">{conComa(kgToDisplay(f.h.kg, unidad))} {weightLabel(unidad)} · {f.h.reps}</span>
-            <i className="cartelera-tornillo" aria-hidden="true" />
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
-}
-
 function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS, onResetAll, onDeleteDay, onUpdateSettings, onGoToProfile, onGoToRoutines, weekSchedule = null, sex, age, onGoToDeload, measurements, onAddMeasurement, photos, photosLoading, onAddPhoto, onDeletePhoto }) {
   // Los logs se guardan en kg. chartData es lo único que lee la sección de
   // evolución (lista, gráfico, tooltip y los tres KPI de abajo), así que
@@ -19034,7 +18961,6 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
             y en Ejercicios, Historial y Medidas empujaban la gráfica y el
             calendario a la mitad de la pantalla. Ahora el riel va primero y
             el ciclo es parte de tu rango. */}
-        {activeSection === "rank" && <CarteleraRecords logs={logs} unidad={settings?.weightUnit === "lbs" ? "lbs" : "kg"} />}
         {activeSection === "rank" && (cycleStart ? (
           <WeekCalendar cycleStart={cycleStart} logs={logs} sessions={sessions} settings={settings} onGoToDeload={onGoToDeload} metaSemanal={weekSchedule ? Object.values(weekSchedule).filter(Boolean).length || null : null} />
         ) : (
@@ -29681,7 +29607,6 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
 
 function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpdateProfile, openScheduleSignal = 0, openEditorSignal = 0, onSignalConsumed = null, onGoToDay = null }) {
   const [mode, setMode] = useState("catalog");
-  const [pruebaRutinas] = useState(() => { try { return localStorage.getItem("modusfit_prueba_rutinas") || "t1"; } catch { return "t1"; } });
   const [showWizard, setShowWizard] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [showPresetsForced, setShowPresetsForced] = useState(false);
@@ -29951,25 +29876,22 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
         // grande: ves sus días de un vistazo (con su color), y el detalle
         // (balance, cronograma) queda a un toque para no saturar.
         <section className="tarjeta-tonal rutina-activa p-4 space-y-4" style={{ "--c": "#3B82F6" }} aria-label="Tu rutina activa">
-          {/* Vista previa del 03/11: T1 (la hoja en su tabla, de fábrica) o T2
-              (el estante grande con su chapa), con modusfit_prueba_rutinas. */}
-          {pruebaRutinas === "t2" ? (
-            <div className="flex items-start gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="rutina-activa-linea">Tu rutina</p>
-              </div>
-              <button onClick={() => setShareTarget(activeDef)} aria-label="Compartir rutina activa" className="boton-redondo shrink-0"><Share2 size={16} /></button>
-            </div>
-          ) : (
-            <HojaRutina routineDef={activeDef} compacta onGoToDay={onGoToDay} accion={<button onClick={() => setShareTarget(activeDef)} aria-label="Compartir rutina activa" className="hoja-rutina-compartir shrink-0"><Share2 size={16} /></button>} />
-          )}
+          {/* EL RACK DE LAS PESAS RUSAS (vista previa del 03/11, la T2 con una
+              vuelta de tuerca): la rutina activa es el rack del gimnasio, de
+              la chapa del casillero. Arriba, el estante con la pesa de cada
+              día (la de hoy, levantada) y su etiqueta de cartón colgando con
+              lo que toca; abajo, en el travesaño, la chapa con el nombre de
+              tu rutina atornillada. Reemplaza a las baldosas de los días. */}
+          <div className="flex items-center gap-3">
+            <p className="rutina-activa-linea flex-1 min-w-0">Tu rutina</p>
+            <button onClick={() => setShareTarget(activeDef)} aria-label="Compartir rutina activa" className="boton-redondo shrink-0"><Share2 size={16} /></button>
+          </div>
           {/* LA SEMANA, EN EL ESTANTE DE LAS PESAS RUSAS (ver EstantePesas):
               una pesa del color de lo que toca cada día que entrenás, el lugar
               vacío los de descanso y la de hoy, levantada. Arriba, los días de
               la rutina como baldosas, con sus ejercicios y sus series. */}
           <EstantePesas
-            grande={pruebaRutinas === "t2"}
-            chapa={pruebaRutinas === "t2" ? activeDef.name : null}
+            rack={activeDef.name}
             dias={WEEKDAY_KEYS.map((wk, i) => {
               const dk = activeSchedule[wk] || null;
               const d = dk ? activeDef.days[dk] : null;
