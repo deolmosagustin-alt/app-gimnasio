@@ -46,7 +46,7 @@ try {
   await nav.getByRole("button", { name: /Rutinas/ }).click();
   await page.waitForTimeout(900);
   ok("quedó en Rutinas", await page.locator(".titulo-pagina h1", { hasText: "Rutinas" }).isVisible());
-  const pesa = page.locator(".estante-lugar.con-pesa").first();
+  const pesa = page.locator(".rack-kb-pesa.con-pesa").first();
   await pesa.click();
   await page.waitForTimeout(200);
   await page.screenshot({ path: `${SALIDA}/vt-viaja.png` });

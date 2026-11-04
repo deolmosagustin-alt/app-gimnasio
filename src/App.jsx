@@ -6724,16 +6724,11 @@ label.ajuste-rotulo { display: block; }
 .light-mode .soga-cuerda { stroke: #4a3626; }
 
 
-/* ── VISTA PREVIA 16 (04/11): el rodillo de espuma ── */
-
-.rodillo-bloque { stroke: rgba(0,0,0,.35); stroke-width: .5; }
-
-.rodillo-punta { fill: #2a2c33; stroke: rgba(0,0,0,.55); stroke-width: .8; }
-.rodillo-nucleo { fill: #8a8d94; }
-.rodillo-tubo { fill: #101113; }
 
 
-/* ── VISTA PREVIA 17 (04/11): el cinturón de palanca, el rodillo GRID y el piso del rack ── */
+
+
+/* ── VISTA PREVIA 17 (04/11): el cinturón de palanca y el piso del rack ── */
 .cp-borde { stroke: rgba(0,0,0,.55); stroke-width: .8; }
 .cp-costura { stroke: #c9a27a; stroke-width: .8; stroke-dasharray: 2 1.6; opacity: .8; }
 .cp-hebilla { stroke: #4a4d53; stroke-width: .8; }
@@ -6753,21 +6748,11 @@ label.ajuste-rotulo { display: block; }
 .light-mode .rutina-activa.rack-nuevo .rack-kb::before { background: linear-gradient(rgba(0,0,0,.14), transparent 40%, rgba(255,255,255,.2)), repeating-linear-gradient(90deg, transparent 0 calc(25% - 1px), rgba(0,0,0,.14) calc(25% - 1px) 25%), #b4b5b3; }
 
 
-/* ── VISTA PREVIA 18 (04/11): el rodillo en perspectiva y el piso del rack ── */
-.rodillo-fondo { fill: #0d0e10; }
-.rodillo-relieve rect { stroke: rgba(0,0,0,.35); stroke-width: .4; }
-.rodillo-brillo { stroke: rgba(255,255,255,.2); stroke-width: 1.6; stroke-linecap: round; }
+/* ── VISTA PREVIA 18 (04/11): el piso del rack ── */
 .rutina-activa.rack-nuevo .rack-kb::before { display: none; }
 .piso-rack { position: absolute; z-index: 0; left: -16px; right: -16px; bottom: -10px; width: calc(100% + 32px); height: 12%; }
 .piso-rack-junta { stroke: rgba(0,0,0,.5); stroke-width: 1.2; vector-effect: non-scaling-stroke; }
 
-/* ── VISTA PREVIA 19 (04/11): el rodillo parado ── */
-.rodillo-grano circle { fill: #0b1220; opacity: .35; }
-.rodillo-franja { fill: color-mix(in oklab, #3B82F6 62%, #23252b); }
-.rodillo-luz { stroke: rgba(255,255,255,.17); stroke-width: 2.4; stroke-linecap: round; }
-.rodillo-luz.fina { stroke: rgba(255,255,255,.06); stroke-width: 1.2; }
-.rodillo-boca { fill: #5a7cb8; stroke: rgba(0,0,0,.45); stroke-width: .6; }
-.light-mode .rodillo-boca { fill: #6d8dc6; }
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -14427,31 +14412,6 @@ function RackKettlebells({ dias = [], nombre = "", onElegir = null, etiqueta = "
           <path d="M338 33 C333 62 332 104 339 132 C343 146 353 146 356 132 C361 104 357 62 344 33 Z" className="rack-kb-banda-lazo" />
           <path d="M341 38 C337 64 337 102 343 126 C346 135 351 135 352 126 C356 102 353 66 343 38 Z" className="rack-kb-banda-hueco" />
           <path d="M339 46 C336 70 336 98 340 118" className="rack-kb-banda-brillo" />
-        </g>
-        <defs>
-          <linearGradient id={`${uid}-rodillo`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#40434a" /><stop offset=".28" stopColor="#2a2c33" /><stop offset=".7" stopColor="#16171b" /><stop offset="1" stopColor="#0b0c0e" />
-          </linearGradient>
-          <linearGradient id={`${uid}-rodillo-relieve`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#5d89d6" /><stop offset=".4" stopColor="#3d66b0" /><stop offset="1" stopColor="#1c335e" />
-          </linearGradient>
-          <linearGradient id={`${uid}-rod-cuerpo`} x1="0" x2="1">
-            <stop offset="0" stopColor="#1a2a47" /><stop offset=".2" stopColor="#2f4a7a" /><stop offset=".42" stopColor="#4a6ba6" /><stop offset=".66" stopColor="#2f4a7a" /><stop offset="1" stopColor="#152238" />
-          </linearGradient>
-        </defs>
-        {/* EL RODILLO DE ESPUMA, parado y apoyado contra la pata izquierda
-            del rack, como se guardan en los gimnasios: el cilindro de goma
-            EVA lisa con su grano, la sombra que da la vuelta, la boca de
-            arriba con el núcleo hueco y una franja de color en la punta. */}
-        <ellipse cx="58" cy="286.8" rx="33" ry="3.8" fill="#000" opacity=".55" />
-        <g className="rack-kb-rodillo" transform="translate(86 285) rotate(-56)">
-          <path d="M-13.5 0 L-13.5 -70 A13.5 4.6 0 0 1 13.5 -70 L13.5 0 A13.5 4.6 0 0 1 -11 0 Z" fill={`url(#${uid}-rod-cuerpo)`} />
-          <g className="rodillo-grano"><circle cx="-5.3" cy="-63.2" r="0.49" /><circle cx="-6.9" cy="-65.6" r="0.49" /><circle cx="8.4" cy="-17.2" r="0.62" /><circle cx="-5.6" cy="-34.6" r="0.45" /><circle cx="-6.5" cy="-63.0" r="0.43" /><circle cx="8.5" cy="-15.3" r="0.63" /><circle cx="6.0" cy="-57.2" r="0.46" /><circle cx="2.5" cy="-21.7" r="0.65" /><circle cx="7.6" cy="-64.3" r="0.56" /><circle cx="3.4" cy="-36.6" r="0.41" /><circle cx="-0.5" cy="-64.1" r="0.68" /><circle cx="7.3" cy="-33.9" r="0.46" /><circle cx="8.2" cy="-32.2" r="0.66" /><circle cx="7.0" cy="-36.4" r="0.49" /><circle cx="2.0" cy="-41.6" r="0.41" /><circle cx="-3.9" cy="-16.4" r="0.37" /><circle cx="-9.1" cy="-28.7" r="0.45" /><circle cx="0.7" cy="-38.9" r="0.47" /><circle cx="9.9" cy="-57.1" r="0.49" /><circle cx="-5.9" cy="-28.2" r="0.45" /><circle cx="-2.9" cy="-20.7" r="0.46" /><circle cx="1.2" cy="-10.3" r="0.39" /><circle cx="-8.8" cy="-54.9" r="0.62" /><circle cx="2.3" cy="-54.3" r="0.47" /><circle cx="-6.4" cy="-39.7" r="0.36" /><circle cx="3.9" cy="-10.9" r="0.68" /><circle cx="4.7" cy="-6.6" r="0.36" /><circle cx="-4.2" cy="-6.2" r="0.62" /><circle cx="-1.8" cy="-7.7" r="0.57" /><circle cx="6.4" cy="-50.6" r="0.42" /><circle cx="-1.1" cy="-61.0" r="0.48" /><circle cx="9.2" cy="-48.1" r="0.35" /><circle cx="-9.1" cy="-58.8" r="0.62" /><circle cx="-2.7" cy="-50.8" r="0.38" /><circle cx="9.6" cy="-42.0" r="0.42" /><circle cx="-8.8" cy="-66.4" r="0.41" /><circle cx="3.5" cy="-60.1" r="0.36" /><circle cx="-0.2" cy="-53.6" r="0.70" /><circle cx="-7.6" cy="-35.1" r="0.62" /><circle cx="-1.8" cy="-4.8" r="0.52" /><circle cx="-5.2" cy="-42.9" r="0.36" /><circle cx="-1.6" cy="-53.6" r="0.66" /><circle cx="6.6" cy="-37.1" r="0.36" /><circle cx="-4.9" cy="-54.0" r="0.42" /><circle cx="-5.4" cy="-12.6" r="0.40" /><circle cx="-9.0" cy="-8.7" r="0.55" /></g>
-          <path d="M-8.5 -68 L-8.5 -3" className="rodillo-luz" />
-          <path d="M5 -66 L5 -6" className="rodillo-luz fina" />
-          <ellipse cx="0" cy="-70" rx="13.5" ry="4.6" className="rodillo-boca" />
-          <ellipse cx="0" cy="-70" rx="7" ry="2.4" className="rodillo-nucleo" />
-          <ellipse cx="0" cy="-70" rx="4.6" ry="1.6" className="rodillo-tubo" />
         </g>
         {/* La chapa con el nombre de la rutina, atornillada al travesaño. */}
         <rect x="95" y="10" width="170" height="27" rx="4" className="rack-kb-chapa" />
@@ -33199,7 +33159,7 @@ export default function App() {
             <PrimeraVezRecorrido tab={tab} nuevo={(profile?.trainingSessions?.length || 0) < 3 && !profile?.activeSession} activo={!!recorrido || !!bienvenidaRecorrido} onEmpezar={setBienvenidaRecorrido} />
             </div>
             {verPestana("rutinas") && <PestanaGuardada activa={tab === "rutinas"} clase={tabSlideClass}><RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleDeleteRoutine} onUpdateProfile={handleUpdateProfile} onGoToDay={(dayKey) => {
-              const tocado = document.activeElement?.closest?.(".estante-lugar, .dia-rutina") || null;
+              const tocado = document.activeElement?.closest?.(".rack-kb-pesa, .estante-lugar, .dia-rutina") || null;
               cambiarConTransicion(() => goToSection("rutina", "go-to-day", dayKey), { direccion: "izq", viaja: tocado, destino: ".dia-hero" });
             }} /></PestanaGuardada>}
             {verPestana("rutina") && <PestanaGuardada activa={tab === "rutina"} clase={tabSlideClass}>{!enDescarga && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
