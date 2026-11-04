@@ -4276,7 +4276,7 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 .cardio-reloj.en-marcha { background: var(--surface-1); }
 .light-mode .cardio-reloj.en-marcha { background: var(--surface-1); }
 /* La cabecera del día. */
-.dia-reset { position: absolute; top: 11px; right: 11px; z-index: 1; width: 44px; height: 44px; background: var(--velo); color: var(--text-muted); }
+.dia-reset { position: absolute; top: 11px; right: 11px; z-index: 3; width: 44px; height: 44px; background: var(--velo); color: var(--text-muted); }
 .dia-aviso {
   width: 100%; display: flex; align-items: center; gap: 10px; text-align: left;
   padding: 11px 14px; border-radius: 18px; font-size: 0.8125rem; font-weight: 600;
@@ -6306,6 +6306,42 @@ label.ajuste-rotulo { display: block; }
 .rutina-activa.es-rack > .piso-goma { margin: 0 -26px; min-height: 34px; }
 .light-mode .rutina-activa.es-rack::before, .light-mode .rutina-activa.es-rack::after { background: linear-gradient(90deg, #9da0a6, #c9ccd1 45%, #d6d8dd 60%, #a3a6ac); box-shadow: 0 6px 0 -1px #3a3c41; }
 .light-mode .rutina-activa.es-rack .estante.en-rack::before { background: linear-gradient(#c9ccd1 0 7px, #9da0a6 7px 9px, transparent 9px), linear-gradient(#e2e4e8, #cfd2d7); box-shadow: inset 0 1px 0 #fff, inset 0 -2px 0 rgba(0,0,0,.12), 0 10px 14px -10px rgba(0,0,0,.35); }
+
+
+/* ── LA PLATAFORMA (Rutina, vista previa del 03/11) ── */
+.dia-seccion > .dia-hero.con-plataforma { padding-top: 0; }
+.plataforma { position: relative; margin: 0 -20px; padding: 24px 20px 0; border-radius: 30px 30px 0 0; overflow: hidden;
+  background:
+    radial-gradient(circle, rgba(10,11,13,.85) 0 1.6px, rgba(255,255,255,.06) 2.1px, transparent 2.6px) 8px 8px / 14px 14px,
+    repeating-linear-gradient(90deg, rgba(255,255,255,.022) 0 2px, transparent 2px 5px),
+    linear-gradient(170deg, #45484e, #393c41 55%, #34373c);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07); }
+.plataforma .dia-chip { position: relative; z-index: 1; color: #eef0f2; background: rgba(13,14,16,.55); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+.plataforma-plaqueta { position: relative; z-index: 1; display: inline-grid; max-width: calc(100% - 52px); margin-top: 2px; padding: 10px 18px 10px; border-radius: 6px;
+  background: linear-gradient(#bfc2c8, #9c9fa5); box-shadow: inset 0 1px 0 rgba(255,255,255,.55), inset 0 -2px 0 rgba(0,0,0,.18), 0 8px 14px -8px rgba(0,0,0,.85); }
+.plataforma-plaqueta::before, .plataforma-plaqueta::after { content: ""; position: absolute; top: 7px; width: 7px; height: 7px; border-radius: 999px; background: radial-gradient(circle at 35% 35%, rgba(255,255,255,.6), transparent 45%), #6b6e75; }
+.plataforma-plaqueta::before { left: 6px; }
+.plataforma-plaqueta::after { right: 6px; }
+.plataforma-plaqueta .dia-titulo { margin: 0; color: #1d1f24; text-shadow: 0 1px 0 rgba(255,255,255,.4); }
+.plataforma-plaqueta .dia-bajada { margin-top: 4px; color: #3b3f47; }
+.plataforma-llave { position: relative; z-index: 1; margin-top: 12px; background: rgba(13,14,16,.6) !important; }
+.plataforma-rack { position: relative; margin-top: 16px; padding-bottom: 18px; }
+.plataforma-rack > * { position: relative; z-index: 1; }
+/* Los parantes del rack, justo adentro de los collarines, y los ganchos. */
+.plataforma-rack::before, .plataforma-rack::after { content: ""; position: absolute; z-index: 0; top: -14px; bottom: 0; width: 12px; border-radius: 2px 2px 0 0;
+  background: radial-gradient(circle, rgba(0,0,0,.6) 0 1.8px, transparent 2.4px) 50% 6px / 12px 14px repeat-y, linear-gradient(90deg, #2c2e33, #55585e 45%, #63666c 58%, #2f3136); }
+.plataforma-rack::before { left: 31%; }
+.plataforma-rack::after { right: 31%; }
+.plataforma > .piso-goma { margin: 0 -20px; min-height: 30px; }
+.plataforma-pie { padding-top: 10px; }
+.dia-seccion.en-descarga .plataforma .dia-chip { color: #eef0f2; }
+.light-mode .plataforma { background:
+    radial-gradient(circle, rgba(70,73,79,.7) 0 1.6px, rgba(255,255,255,.5) 2.1px, transparent 2.6px) 8px 8px / 14px 14px,
+    repeating-linear-gradient(90deg, rgba(0,0,0,.02) 0 2px, transparent 2px 5px),
+    linear-gradient(170deg, #dfe1e5, #d3d6db 55%, #cdd0d5); }
+.light-mode .plataforma .dia-chip { color: #1d2433; background: rgba(255,255,255,.6); }
+.light-mode .plataforma-rack::before, .light-mode .plataforma-rack::after { background: radial-gradient(circle, rgba(40,42,48,.55) 0 1.8px, transparent 2.4px) 50% 6px / 12px 14px repeat-y, linear-gradient(90deg, #8f9298, #b9bcc2 45%, #c9ccd1 58%, #94979d); }
+.light-mode .plataforma-llave { background: rgba(255,255,255,.65) !important; }
 
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
@@ -15568,41 +15604,6 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
 
   return (
     <div className="space-y-4">
-      {/* TU PLAN, EN LA HOJA DEL PROFE, arriba de todo (ver HojaDelPlan): lo
-          que el plan dice para el día que mirás. Antes fue un casillero (no
-          decía "plan": pedido "un enfoque más relacionado a lo que es la
-          planificación") y, antes, una tarjeta al pie de Rutina.
-          No es un "modo" (Récord | Planificada) sino una ACCIÓN sobre el plan
-          — pausarlo o reanudarlo — y si no hay ningún plan no se ofrece esa
-          decisión. El dato guardado sigue siendo settings.trainingMode. */}
-      {onUpdateSettings && (() => {
-        const unidad = settings?.weightUnit === "lbs" ? "lbs" : "kg";
-        const u = weightLabel(unidad);
-        const filas = (planResumen?.planificados || [])
-          .filter((e) => e.dayKey === activeDay && e.meta?.reps)
-          .map((e) => ({ id: e.id, nombre: e.nombre, meta: e.meta.kg > 0 ? `${e.meta.reps} × ${conComa(kgToDisplay(e.meta.kg, unidad))} ${u}` : `${e.meta.reps} reps`, nota: NOTA_DE_AJUSTE[e.meta.ajuste] || null }));
-        const enPausa = settings.trainingMode !== "planned";
-        // En la descarga el plan no corre (sus metas son de las semanas de
-        // trabajo): la hoja se pliega mientras dura.
-        return (
-          <div className={`plegable-descarga ${modoDescarga ? "plegada" : ""}`} inert={modoDescarga}><div>
-          <HojaDelPlan
-            dia={day ? { label: day.label, color: day.color } : null}
-            semana={weekInfo ? { n: weekInfo.weekInCycle, de: weekInfo.cycleWeeks } : null}
-            filas={filas}
-            hayPlan={hasAnyPlan}
-            enPausa={enPausa}
-            sinRutina={!activeRoutineDef}
-            invitar={!hasAnyPlan && !enPausa}
-            terminados={planResumen?.terminados?.length || 0}
-            onSeguir={onApplyOwnProgression && activeRoutineDef ? () => onApplyOwnProgression(planesParaSeguir(activeRoutineDef, logs, settings, cicloActual, weekInCycle || 1)) : null}
-            onPlanificar={onApplyOwnProgression ? () => setShowSelfProgression(true) : null}
-            onPausa={() => onUpdateSettings({ trainingMode: enPausa ? "planned" : "record" })}
-            onCampos={onGoToFieldSettings}
-          />
-          </div></div>
-        );
-      })()}
       {/* "Hoy descansás" ya no es un aviso aparte: va al lado de la fecha,
           arriba de todo (ver TituloPestana). El aviso, con tu semana en un
           estante chico, empujaba el día y "Iniciar sesión" hasta abajo de la
@@ -15646,7 +15647,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         style={{ "--c": day.color }}
         aria-label={modoDescarga ? `Día ${day.label}, semana de descarga` : `Día ${day.label}`}
       >
-        <div className="dia-hero">
+        <div className="dia-hero con-plataforma">
           {/* "Resetear sesión de hoy": un ícono en la esquina. Sirve para
               arreglar un error, no es algo que necesites a mano cada día; el
               diálogo de confirmación es el mismo. */}
@@ -15655,18 +15656,36 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
               <RotateCcw size={15} />
             </button>
           )}
+          {/* LA PLATAFORMA (vista previa del 03/11, pedido: "aplicar este nuevo
+              formato a la mini sección superior: programado para hoy, el día,
+              la barra; iniciar sesión no"): la esquina del gimnasio donde
+              entrenás hoy. La pared de chapa perforada (la del ciclo), el
+              nombre del día en una plaqueta atornillada, la barra cargada
+              apoyada en los ganchos del rack y el piso de goma. Iniciar
+              sesión queda abajo, afuera del dibujo. */}
+          <div className="plataforma">
           {modoDescarga ? (
             <span className="dia-chip descarga"><Zap size={12} /> {previa ? "Así va a ser tu descarga" : "Semana de descarga"}</span>
           ) : activeDay === suggestedDay && (
             <span className="dia-chip"><Calendar size={12} /> {scheduledDay === activeDay ? "Programado para hoy" : "Sugerido para hoy"}</span>
           )}
-          {(() => { const { larga, total } = etiquetaDeDia(day.label); return <h2 className="dia-titulo" style={{ "--largo": larga, "--total": total }}>{day.label}</h2>; })()}
-          {day.description && <p className="dia-bajada">{day.description}</p>}
-          {/* La barra del día: un disco por serie. En la descarga suelta los
-              discos que sobran (los de afuera se deslizan por la manga) y los
-              que quedan se cargan con las series de descarga. */}
+          <div className="plataforma-plaqueta">
+            {(() => { const { larga, total } = etiquetaDeDia(day.label); return <h2 className="dia-titulo" style={{ "--largo": larga, "--total": total }}>{day.label}</h2>; })()}
+            {day.description && <p className="dia-bajada">{day.description}</p>}
+          </div>
+          {/* En la semana de descarga se elige acá mismo: descarga o
+              entrenamiento normal, en una placa de dos posiciones. */}
+          {esSemanaDescarga && onModoDescarga && (
+            <div className="segmentado chico dia-modo plataforma-llave" role="group" aria-label="Qué hacés esta semana">
+              <button onClick={() => onModoDescarga(false)} aria-pressed={!pideDescarga} className={!pideDescarga ? "activo" : ""}>Entrenamiento</button>
+              <button onClick={() => onModoDescarga(true)} aria-pressed={pideDescarga} className={pideDescarga ? "activo" : ""}><Zap size={13} /> Descarga</button>
+            </div>
+          )}
+          {/* La barra del día: un disco por serie, en los ganchos del rack. En
+              la descarga suelta los discos que sobran y los que quedan se
+              cargan con las series de descarga. */}
           {avanceDia.total > 0 && (
-            <div className={`dia-barra ${arranca ? "se-desengancha" : ""}`}>
+            <div className={`dia-barra plataforma-rack ${arranca ? "se-desengancha" : ""}`}>
               <BarraCargada
                 hechas={modoDescarga ? avanceDescarga.hechas : avanceDia.hechas}
                 total={avanceDia.total}
@@ -15675,6 +15694,12 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
                 alto="clamp(60px, 17cqi, 108px)"
                 detalle
               />
+            </div>
+          )}
+          <PisoGoma />
+          </div>
+          {avanceDia.total > 0 && (
+            <div className="plataforma-pie">
               <p className="dia-barra-texto">
                 {modoDescarga
                   ? <><b><NumberFlow value={Math.min(avanceDescarga.hechas, avanceDescarga.total)} /></b> de {avanceDescarga.total} series de descarga{avanceDescarga.hechas >= avanceDescarga.total ? ": listo por hoy" : ""}</>
@@ -15684,15 +15709,6 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             </div>
           )}
           {day.isNew && <div className="mt-3 inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 text-[12px] rounded-full px-3 py-1.5">🆕 Empezás a registrar tus marcas desde hoy.</div>}
-          {/* En la semana de descarga se elige acá mismo: descarga o
-              entrenamiento normal (antes, una cruz cerraba la pantalla de la
-              descarga y un renglón la volvía a abrir). */}
-          {esSemanaDescarga && onModoDescarga && (
-            <div className="segmentado chico dia-modo" role="group" aria-label="Qué hacés esta semana">
-              <button onClick={() => onModoDescarga(false)} aria-pressed={!pideDescarga} className={!pideDescarga ? "activo" : ""}>Entrenamiento</button>
-              <button onClick={() => onModoDescarga(true)} aria-pressed={pideDescarga} className={pideDescarga ? "activo" : ""}><Zap size={13} /> Descarga</button>
-            </div>
-          )}
           {/* La vista previa: cuándo toca y, si venís cansado, hacerla ya. */}
           {previa && (
             <div className="dia-previa cuerpo-cambia">
@@ -15812,6 +15828,44 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           </div>
         )}
       </section>
+
+      {/* TU PLAN, EN LA HOJA DEL PROFE, al final de la rutina (vista previa
+          del 03/11, pedido: "mover la hoja de tu plan abajo del todo, donde
+          termina toda la rutina con las series"): lo que el plan dice para el
+          día que mirás; cada serie ya trae su meta. Antes fue un casillero (no
+          decía "plan": pedido "un enfoque más relacionado a lo que es la
+          planificación") y, antes, una tarjeta al pie de Rutina.
+          No es un "modo" (Récord | Planificada) sino una ACCIÓN sobre el plan
+          — pausarlo o reanudarlo — y si no hay ningún plan no se ofrece esa
+          decisión. El dato guardado sigue siendo settings.trainingMode. */}
+      {onUpdateSettings && (() => {
+        const unidad = settings?.weightUnit === "lbs" ? "lbs" : "kg";
+        const u = weightLabel(unidad);
+        const filas = (planResumen?.planificados || [])
+          .filter((e) => e.dayKey === activeDay && e.meta?.reps)
+          .map((e) => ({ id: e.id, nombre: e.nombre, meta: e.meta.kg > 0 ? `${e.meta.reps} × ${conComa(kgToDisplay(e.meta.kg, unidad))} ${u}` : `${e.meta.reps} reps`, nota: NOTA_DE_AJUSTE[e.meta.ajuste] || null }));
+        const enPausa = settings.trainingMode !== "planned";
+        // En la descarga el plan no corre (sus metas son de las semanas de
+        // trabajo): la hoja se pliega mientras dura.
+        return (
+          <div className={`plegable-descarga ${modoDescarga ? "plegada" : ""}`} inert={modoDescarga}><div>
+          <HojaDelPlan
+            dia={day ? { label: day.label, color: day.color } : null}
+            semana={weekInfo ? { n: weekInfo.weekInCycle, de: weekInfo.cycleWeeks } : null}
+            filas={filas}
+            hayPlan={hasAnyPlan}
+            enPausa={enPausa}
+            sinRutina={!activeRoutineDef}
+            invitar={!hasAnyPlan && !enPausa}
+            terminados={planResumen?.terminados?.length || 0}
+            onSeguir={onApplyOwnProgression && activeRoutineDef ? () => onApplyOwnProgression(planesParaSeguir(activeRoutineDef, logs, settings, cicloActual, weekInCycle || 1)) : null}
+            onPlanificar={onApplyOwnProgression ? () => setShowSelfProgression(true) : null}
+            onPausa={() => onUpdateSettings({ trainingMode: enPausa ? "planned" : "record" })}
+            onCampos={onGoToFieldSettings}
+          />
+          </div></div>
+        );
+      })()}
 
       {/* "Finalizar sesión" ya no vive acá abajo: es la barra fija de abajo
           (ver ActiveSessionBar, al nivel de App), que además lleva el
