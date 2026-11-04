@@ -6940,6 +6940,47 @@ label.ajuste-rotulo { display: block; }
 .light-mode .sumar-amigos-boton svg { color: color-mix(in oklab, var(--tono) 80%, black); }
 .sumar-amigos-boton:active { transform: scale(.95); }
 .sumar-amigos-boton:disabled { opacity: .5; }
+
+/* ── LA TARJETA DE ASISTENCIA (04/11, pedido: "mejoremos la estética del
+   historial y de medidas") ── Cartón impreso, claro también en oscuro (un
+   poco apagado, como el resto del papel): cada día en su casillero, el
+   número impreso en la punta, y el día que fuiste, perforado, con el aro de
+   tinta del color del día. Las veces por semana, a mano. */
+.tarjeta-perforada.carton { position: relative; padding: 14px 14px 16px; border-radius: 14px; color: #2c2924;
+  background: radial-gradient(rgba(120,100,70,.05) .7px, transparent 1px) 0 0 / 5px 5px, linear-gradient(#ece7da, #e2dccc);
+  box-shadow: 0 1px 0 rgba(255,255,255,.5) inset, 0 10px 18px -12px rgba(0,0,0,.7), 0 2px 4px rgba(0,0,0,.25); filter: brightness(.93); }
+.light-mode .tarjeta-perforada.carton { filter: none; box-shadow: 0 8px 18px -12px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.14); }
+.carton-rotulo { font-size: 11px; font-weight: 700; letter-spacing: .08em; color: #8a7f6a; text-align: center; margin-bottom: 2px; }
+.carton-mes { font-size: 17px; font-weight: 800; font-stretch: 85%; color: #2c2924; }
+.tarjeta-perforada.carton .boton-redondo { background: transparent; color: #4a443a; box-shadow: inset 0 0 0 1.5px rgba(60,52,40,.3); }
+.tarjeta-perforada.carton .perforada-cabeza span { color: #8a7f6a; font-weight: 700; }
+.tarjeta-perforada.carton .hueco-dia, .light-mode .tarjeta-perforada.carton .hueco-dia { position: relative; align-items: flex-start; justify-content: flex-start; padding: 3px 0 0 5px; border-radius: 6px; font-size: 11px; font-weight: 650; color: #8a7f6a; background: transparent; box-shadow: inset 0 0 0 1px rgba(80,68,50,.22); }
+.tarjeta-perforada.carton .hueco-dia.picado, .tarjeta-perforada.carton .hueco-dia.picado:not(.elegido), .light-mode .tarjeta-perforada.carton .hueco-dia.picado, .light-mode .tarjeta-perforada.carton .hueco-dia.picado:not(.elegido) { color: #3a352c; background: rgba(255,255,255,.18); }
+/* El aro de tinta (con dos días, mitad y mitad) y el agujero. */
+.tarjeta-perforada.carton .hueco-dia.picado::before { content: ""; position: absolute; left: 60%; top: 63%; width: 52%; aspect-ratio: 1; translate: -50% -50%; border-radius: 50%;
+  --anillo: color-mix(in oklab, var(--dia) 62%, #8a8c92); background: conic-gradient(from -45deg, var(--anillo) 0 50%, color-mix(in oklab, var(--dia2, var(--dia)) 62%, #8a8c92) 50% 100%); }
+.tarjeta-perforada.carton .hueco-dia.picado::after { content: ""; position: absolute; left: 60%; top: 63%; width: 31%; aspect-ratio: 1; translate: -50% -50%; border-radius: 50%; background: #16171a; box-shadow: inset 0 2px 2px rgba(0,0,0,.75), 0 1px 0 rgba(255,255,255,.55); }
+.light-mode .tarjeta-perforada.carton .hueco-dia.picado::after { background: #c3c5ca; box-shadow: inset 0 2px 2px rgba(0,0,0,.3), 0 1px 0 rgba(255,255,255,.7); }
+.tarjeta-perforada.carton .hueco-dia.elegido { outline: 2px solid #2c2924; outline-offset: 1px; }
+.tarjeta-perforada.carton .hueco-dia.elegido::before { --anillo: color-mix(in oklab, var(--dia) 80%, white); background: conic-gradient(from -45deg, var(--anillo) 0 50%, color-mix(in oklab, var(--dia2, var(--dia)) 80%, white) 50% 100%); }
+.tarjeta-perforada.carton .hueco-dia.hoy { outline: 1.5px dashed #6b6252; outline-offset: 1px; }
+.tarjeta-perforada.carton .hueco-dia.hoy.elegido { outline-style: solid; }
+.tarjeta-perforada.carton .hueco-estrella { position: absolute; top: 3px; right: 3px; color: #b0892d; }
+.tarjeta-perforada.carton .perforada-total { font-size: 24px; font-weight: 700; line-height: 1; color: #2f5d8f; font-stretch: normal; }
+.tarjeta-perforada.carton .perforada-total.cero { opacity: .35; color: #6b6252; }
+.tarjeta-perforada.carton .medida-leyenda { color: #5c5546; }
+.tarjeta-perforada.carton .medida-leyenda i { background: color-mix(in oklab, var(--dia) 62%, #8a8c92) !important; }
+
+/* Medidas: anotá lo de hoy con el visor de la serie. */
+.medida-visor { display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 18px; border-radius: 24px; background: var(--panel-sunken); box-shadow: inset 0 1px 0 rgba(255,255,255,.04); }
+.medida-visor-campo { flex: 1; min-width: 0; display: grid; gap: 0; }
+.medida-visor-campo input { width: 100%; min-width: 0; background: transparent; border: 0; outline: none; font-size: 44px; line-height: 1.05; font-weight: 800; font-stretch: 75%; color: var(--text-strong); }
+.medida-visor-campo input::placeholder { color: var(--text-faint); }
+.medida-visor-rotulo { font-size: 13px; font-weight: 600; color: var(--text-faint); }
+.medida-visor-guardar:disabled { opacity: .4; }
+.medida-foto { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border-radius: 999px; font-size: 15px; font-weight: 650; color: var(--text-strong); box-shadow: inset 0 0 0 1px var(--hairline-fuerte); }
+.medida-foto svg { color: var(--text-muted); }
+.medida-foto:active { transform: scale(.97); }
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -17190,10 +17231,11 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
               cada día que entrenaste queda "picado" con el color de lo que
               hiciste, y al final de cada semana, cuántas veces fuiste. Se
               lee de un vistazo si venís constante, sin contar casilleros. */}
-          <div className="tarjeta-perforada">
+          <div className="tarjeta-perforada carton">
+            <p className="carton-rotulo" aria-hidden="true">Tarjeta de asistencia</p>
             <div className="flex items-center justify-between mb-3">
               <button onClick={() => setCursor((c) => { const m = c.m === 0 ? 11 : c.m - 1; const y = c.m === 0 ? c.y - 1 : c.y; return { y, m }; })} aria-label="Mes anterior" className="boton-redondo !w-9 !h-9"><ChevronLeft size={17} /></button>
-              <p className="text-[15px] font-bold text-white">{MONTH_LABELS[cursor.m]} {cursor.y}</p>
+              <p className="carton-mes">{MONTH_LABELS[cursor.m]} {cursor.y}</p>
               <button onClick={() => setCursor((c) => { const m = c.m === 11 ? 0 : c.m + 1; const y = c.m === 11 ? c.y + 1 : c.y; return { y, m }; })} aria-label="Mes siguiente" className="boton-redondo !w-9 !h-9"><ChevronRight size={17} /></button>
             </div>
             <div className="perforada">
@@ -17226,7 +17268,7 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
                         </button>
                       );
                     })}
-                    <span className={`perforada-total ${veces ? "" : "cero"}`}>{veces}</span>
+                    <span className={`perforada-total a-mano ${veces ? "" : "cero"}`}>{veces || "–"}</span>
                   </div>
                 );
               })}
@@ -19625,10 +19667,11 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
             {/* La misma tarjeta perforada de Historial: cada día que anotaste
                 algo queda picado con el color de lo que anotaste (foto, peso,
                 medidas; con las tres, una estrellita). */}
-            <div className="tarjeta-perforada">
+            <div className="tarjeta-perforada carton">
+              <p className="carton-rotulo" aria-hidden="true">Control de medidas</p>
               <div className="flex items-center justify-between mb-3">
                 <button onClick={() => setCursor((c) => { const m = c.m === 0 ? 11 : c.m - 1; const y = c.m === 0 ? c.y - 1 : c.y; return { y, m }; })} aria-label="Mes anterior" className="boton-redondo !w-9 !h-9"><ChevronLeft size={17} /></button>
-                <p className="text-[15px] font-bold text-white">{MONTH_LABELS[cursor.m]} {cursor.y}</p>
+                <p className="carton-mes">{MONTH_LABELS[cursor.m]} {cursor.y}</p>
                 <button onClick={() => setCursor((c) => { const m = c.m === 11 ? 0 : c.m + 1; const y = c.m === 11 ? c.y + 1 : c.y; return { y, m }; })} aria-label="Mes siguiente" className="boton-redondo !w-9 !h-9"><ChevronRight size={17} /></button>
               </div>
               <div className="perforada">
@@ -19777,13 +19820,18 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
             <button key={t.k} role="radio" aria-checked={selType === t.k} onClick={() => { setSelType(t.k); setInputVal(""); }} className="buscador-region">{t.l}</button>
           ))}
         </div>
-        <div className="medida-anotar">
-          <input type="number" inputMode="decimal" min="0" value={inputVal} onChange={(e) => setInputVal(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
-            placeholder={`${selMeta.l} (${selUnidad})`} aria-label={`Anotar ${selMeta.l.toLowerCase()} de hoy, en ${selUnidad}`} />
-          <button onClick={handleAdd} disabled={!inputVal.trim()} className="boton-pildora !min-h-[46px] !px-5 disabled:opacity-40">Guardar</button>
+        {/* El visor (04/11): el número grande y angosto, como el de la serie,
+            con la unidad al lado y el ✓ para guardarlo. */}
+        <div className="medida-visor">
+          <label className="medida-visor-campo">
+            <input type="number" inputMode="decimal" min="0" value={inputVal} onChange={(e) => setInputVal(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+              placeholder="–" aria-label={`Anotar ${selMeta.l.toLowerCase()} de hoy, en ${selUnidad}`} />
+            <span className="medida-visor-rotulo">{selMeta.l} · {selUnidad}</span>
+          </label>
+          <button onClick={handleAdd} disabled={!inputVal.trim()} className="foco-guardar medida-visor-guardar" aria-label={`Guardar ${selMeta.l.toLowerCase()}`}><Check size={24} strokeWidth={2.6} /></button>
         </div>
-        <label className={`boton-tonal w-full ${addingPhoto ? "opacity-50" : "cursor-pointer"}`} style={{ "--c": "#FB7185" }}>
-          <Camera size={16} /> {addingPhoto ? "Guardando la foto…" : "Sacar la foto de hoy"}
+        <label className={`medida-foto ${addingPhoto ? "opacity-50" : "cursor-pointer"}`}>
+          <Camera size={18} aria-hidden="true" /> {addingPhoto ? "Guardando la foto…" : "Sacar la foto de hoy"}
           <input type="file" accept="image/*" capture="environment" className="hidden" disabled={addingPhoto} onChange={(e) => { handlePhotoChange(e.target.files?.[0]); e.target.value = ""; }} />
         </label>
         {photoError && <p className="medida-nota" role="alert">No se pudo guardar la foto. Probá de nuevo.</p>}
