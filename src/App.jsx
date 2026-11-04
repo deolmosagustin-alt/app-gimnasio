@@ -6253,6 +6253,66 @@ label.ajuste-rotulo { display: block; }
 .light-mode .rack-pesas::before, .light-mode .rack-pesas::after { background: linear-gradient(90deg, #b4b7bd, #cfd2d7 50%, #b0b3b9); }
 .light-mode .rack-pesas-travesano { background: linear-gradient(#d3d6db, #bfc2c8); box-shadow: inset 0 1px 0 #fff, 0 6px 10px -6px rgba(0,0,0,.3); }
 @media (prefers-reduced-motion: reduce) { .estante-etiqueta { animation: none; } }
+
+/* ── VISTA PREVIA 3 (03/11, pedido: "que el diseño abarque todo el recuadro
+   como lo hace el casillero" y "le falta color") ── */
+/* Progreso: la tarjeta entera es la pared de chapa perforada, pintada del
+   azul de la pestaña (apagado, como los colores de la app); los cajones se
+   paran en el piso de chapa, que va de punta a punta y abajo lleva el enlace. */
+.ciclo-cajones.en-pared { --pintura-pared: color-mix(in oklab, #3B82F6 34%, #2b2e34); position: relative; overflow: hidden; padding-bottom: 0;
+  background:
+    radial-gradient(circle, rgba(8,10,14,.8) 0 1.7px, rgba(255,255,255,.07) 2.2px, transparent 2.7px) 8px 8px / 15px 15px,
+    repeating-linear-gradient(90deg, rgba(255,255,255,.025) 0 2px, transparent 2px 5px),
+    linear-gradient(165deg, color-mix(in oklab, var(--pintura-pared) 100%, white 6%), var(--pintura-pared) 50%, color-mix(in oklab, var(--pintura-pared) 88%, black));
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.09), inset 0 0 0 6px rgba(0,0,0,.16), 0 12px 30px -18px rgba(0,0,0,.8); }
+.ciclo-cajones.en-pared .cajones-pizarra.en-chapa { background: none; box-shadow: none; padding: 6px 0 0; margin-top: 10px; border-radius: 0; }
+.ciclo-cajones.en-pared .cajones-pizarra.en-chapa::after { margin: 0 -16px; border-radius: 0; height: 14px; }
+.ciclo-cajones.en-pared .escalera-enlace { justify-self: stretch; margin: 0 -16px; padding: 0 16px; min-height: 48px; border-radius: 0;
+  background:
+    repeating-linear-gradient(45deg, transparent 0 5px, rgba(255,255,255,.12) 5px 6.5px, transparent 6.5px 11px),
+    repeating-linear-gradient(-45deg, transparent 0 5px, rgba(0,0,0,.26) 5px 6.5px, transparent 6.5px 11px),
+    linear-gradient(#4f5258, #3f4247);
+  color: #e9eaee; }
+.ciclo-cajones.en-pared .escalera-cabeza { color: #f2f3f5; text-shadow: 0 1px 2px rgba(0,0,0,.55), 0 0 10px color-mix(in oklab, #3B82F6 30%, #1d2433); }
+.ciclo-cajones.en-pared .escalera-cabeza * { color: inherit; }
+.ciclo-cajones.en-pared .escalera-cabeza :is(p, span):not(.num-display) { color: rgba(242,243,245,.78); }
+.light-mode .ciclo-cajones.en-pared { --pintura-pared: color-mix(in oklab, #3B82F6 26%, #d6d9de);
+  background:
+    radial-gradient(circle, rgba(40,48,66,.55) 0 1.7px, rgba(255,255,255,.55) 2.2px, transparent 2.7px) 8px 8px / 15px 15px,
+    repeating-linear-gradient(90deg, rgba(0,0,0,.02) 0 2px, transparent 2px 5px),
+    linear-gradient(165deg, color-mix(in oklab, var(--pintura-pared) 92%, white), var(--pintura-pared)); }
+.light-mode .ciclo-cajones.en-pared .escalera-cabeza { color: #1d2433; text-shadow: 0 1px 0 rgba(255,255,255,.6), 0 0 8px rgba(255,255,255,.55); }
+.light-mode .ciclo-cajones.en-pared .escalera-cabeza :is(p, span):not(.num-display) { color: rgba(29,36,51,.72); }
+.light-mode .ciclo-cajones.en-pared .cajones-pizarra.en-chapa { --tiza: #1d2433; --tiza-suave: rgba(29,36,51,.55); }
+.light-mode .ciclo-cajones.en-pared .escalera-enlace { color: #1d2433; background:
+    repeating-linear-gradient(45deg, transparent 0 5px, rgba(255,255,255,.55) 5px 6.5px, transparent 6.5px 11px),
+    repeating-linear-gradient(-45deg, transparent 0 5px, rgba(0,0,0,.1) 5px 6.5px, transparent 6.5px 11px),
+    linear-gradient(#bfc2c8, #aaadb3); }
+
+/* Rutinas: la tarjeta entera es el rack. La pared de atrás, de chapa oscura
+   cepillada; los parantes, el canto del estante y el travesaño, pintados
+   del azul de la pestaña, como los racks de los gimnasios; las etiquetas,
+   de cartón con el ojal del color de su día. */
+.rutina-activa.es-rack { --pintura-rack: color-mix(in oklab, #3B82F6 62%, #3a3d44); position: relative; overflow: hidden; padding-left: 26px; padding-right: 26px;
+  background: repeating-linear-gradient(90deg, rgba(255,255,255,.02) 0 2px, transparent 2px 5px), linear-gradient(170deg, #2b2d32, #232529);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), 0 12px 30px -18px rgba(0,0,0,.8); }
+.rutina-activa.es-rack::before, .rutina-activa.es-rack::after { content: ""; position: absolute; top: 0; bottom: 0; width: 14px; z-index: 0;
+  background:
+    radial-gradient(circle, rgba(0,0,0,.55) 0 2px, transparent 2.6px) 50% 10px / 14px 22px repeat-y,
+    linear-gradient(90deg, color-mix(in oklab, var(--pintura-rack) 80%, black), var(--pintura-rack) 45%, color-mix(in oklab, var(--pintura-rack) 85%, white 10%) 60%, color-mix(in oklab, var(--pintura-rack) 80%, black)); }
+.rutina-activa.es-rack::before { left: 6px; }
+.rutina-activa.es-rack::after { right: 6px; }
+.rutina-activa.es-rack > * { position: relative; z-index: 1; }
+.rutina-activa.es-rack .rack-pesas { padding: 0 0 6px; }
+.rutina-activa.es-rack .rack-pesas::before, .rutina-activa.es-rack .rack-pesas::after { display: none; }
+.rutina-activa.es-rack .estante.en-rack::before { left: -20px; right: -20px; background: repeating-linear-gradient(90deg, rgba(255,255,255,.04) 0 2px, transparent 2px 5px), linear-gradient(color-mix(in oklab, var(--pintura-rack) 90%, white 12%), color-mix(in oklab, var(--pintura-rack) 85%, black)); }
+.rutina-activa.es-rack .estante-dia { color: rgba(255,255,255,.82); }
+.rutina-activa.es-rack .rack-pesas-travesano { margin: 0 -20px; height: 16px; background: repeating-linear-gradient(90deg, rgba(255,255,255,.04) 0 2px, transparent 2px 5px), linear-gradient(color-mix(in oklab, var(--pintura-rack) 90%, white 12%), color-mix(in oklab, var(--pintura-rack) 85%, black)); }
+.rutina-activa.es-rack .rutina-activa-linea { color: rgba(242,243,245,.72); }
+.estante-etiqueta i { background: var(--dia, #3a342b); box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--dia, #b9aa8b) 55%, #2b2620); width: 7px; height: 7px; }
+.estante-etiqueta { border-top: 3px solid color-mix(in oklab, var(--dia, #cbbd9f) 70%, #d9cdb4); }
+.light-mode .rutina-activa.es-rack { --pintura-rack: color-mix(in oklab, #3B82F6 55%, #8b9099); background: repeating-linear-gradient(90deg, rgba(0,0,0,.02) 0 2px, transparent 2px 5px), linear-gradient(170deg, #e3e5e9, #d5d8dd); }
+.light-mode .rutina-activa.es-rack .rutina-activa-linea { color: rgba(29,36,51,.7); }
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -13828,7 +13888,7 @@ function EstantePesas({ dias = [], onElegir = null, etiqueta = "Tu semana", rack
         const clase = `estante-lugar ${d.dia ? "con-pesa" : ""} ${d.hoy ? "hoy" : ""}`;
         // En el rack, de cada pesa cuelga su etiqueta de cartón con el día
         // de la rutina, atada con un hilo al canto del estante.
-        const contenido = <><PesaRusa vacia={!d.dia} /><span className="estante-dia" aria-hidden="true">{d.corto}</span>{rack && d.dia && <span className="estante-etiqueta" aria-hidden="true" style={{ "--i": i }}><i />{d.dia.label}</span>}</>;
+        const contenido = <><PesaRusa vacia={!d.dia} /><span className="estante-dia" aria-hidden="true">{d.corto}</span>{rack && d.dia && <span className="estante-etiqueta" aria-hidden="true" style={{ "--i": i, "--dia": d.dia.color }}><i />{d.dia.label}</span>}</>;
         return (
           <li key={d.clave || i} style={d.dia ? { "--dia": d.dia.color } : undefined}>
             {onElegir && d.dia
@@ -14557,7 +14617,7 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
   const estaSemana = semanas[weekInfo.weekInCycle - 1]?.sesiones || 0;
   const cumplida = !!metaSemanal && estaSemana >= metaSemanal;
   return (
-    <section className="tarjeta-tonal escalera-ciclo ciclo-cajones" aria-label={`Ciclo ${weekInfo.cycleNumber}, semana ${weekInfo.weekInCycle} de ${cycleWeeks}: ${falta}. ${estaSemana} ${estaSemana === 1 ? "sesión" : "sesiones"} esta semana.`}>
+    <section className="tarjeta-tonal escalera-ciclo ciclo-cajones en-pared" aria-label={`Ciclo ${weekInfo.cycleNumber}, semana ${weekInfo.weekInCycle} de ${cycleWeeks}: ${falta}. ${estaSemana} ${estaSemana === 1 ? "sesión" : "sesiones"} esta semana.`}>
       <div className="escalera-cabeza" aria-hidden="true">
         <div className="min-w-0">
           <p className="ciclo-rotulo">Tu ciclo</p>
@@ -29875,7 +29935,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
         // Antes era una tarjeta más entre otras. Ahora es lo primero y lo más
         // grande: ves sus días de un vistazo (con su color), y el detalle
         // (balance, cronograma) queda a un toque para no saturar.
-        <section className="tarjeta-tonal rutina-activa p-4 space-y-4" style={{ "--c": "#3B82F6" }} aria-label="Tu rutina activa">
+        <section className="tarjeta-tonal rutina-activa es-rack p-4 space-y-4" style={{ "--c": "#3B82F6" }} aria-label="Tu rutina activa">
           {/* EL RACK DE LAS PESAS RUSAS (vista previa del 03/11, la T2 con una
               vuelta de tuerca): la rutina activa es el rack del gimnasio, de
               la chapa del casillero. Arriba, el estante con la pesa de cada
