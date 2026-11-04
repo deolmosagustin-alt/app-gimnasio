@@ -6254,65 +6254,61 @@ label.ajuste-rotulo { display: block; }
 .light-mode .rack-pesas-travesano { background: linear-gradient(#d3d6db, #bfc2c8); box-shadow: inset 0 1px 0 #fff, 0 6px 10px -6px rgba(0,0,0,.3); }
 @media (prefers-reduced-motion: reduce) { .estante-etiqueta { animation: none; } }
 
-/* ── VISTA PREVIA 3 (03/11, pedido: "que el diseño abarque todo el recuadro
-   como lo hace el casillero" y "le falta color") ── */
-/* Progreso: la tarjeta entera es la pared de chapa perforada, pintada del
-   azul de la pestaña (apagado, como los colores de la app); los cajones se
-   paran en el piso de chapa, que va de punta a punta y abajo lleva el enlace. */
-.ciclo-cajones.en-pared { --pintura-pared: color-mix(in oklab, #3B82F6 34%, #2b2e34); position: relative; overflow: hidden; padding-bottom: 0;
+/* ── VISTA PREVIA 4 (03/11, pedido: "volvamos a como estaba antes, pero
+   abarcando todo el recuadro; el de los cajones con el piso de goma típico
+   pero bien hecho, y lo de las kettlebell como esos racks donde se dejan") ── */
+/* Progreso: la tarjeta entera es el rincón del gimnasio. Arriba, la pared de
+   chapa perforada gris (la de la vuelta anterior); abajo, de punta a punta,
+   el piso de goma encastrable: negro mate con las motas de colores del
+   caucho reciclado, las juntas en forma de rompecabezas y el canto de la
+   baldosa de adelante. Los cajones se paran sobre el piso con su sombra. */
+.ciclo-cajones.en-pared { position: relative; overflow: hidden; padding-bottom: 0;
   background:
-    radial-gradient(circle, rgba(8,10,14,.8) 0 1.7px, rgba(255,255,255,.07) 2.2px, transparent 2.7px) 8px 8px / 15px 15px,
-    repeating-linear-gradient(90deg, rgba(255,255,255,.025) 0 2px, transparent 2px 5px),
-    linear-gradient(165deg, color-mix(in oklab, var(--pintura-pared) 100%, white 6%), var(--pintura-pared) 50%, color-mix(in oklab, var(--pintura-pared) 88%, black));
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.09), inset 0 0 0 6px rgba(0,0,0,.16), 0 12px 30px -18px rgba(0,0,0,.8); }
+    radial-gradient(circle, rgba(10,11,13,.85) 0 1.6px, rgba(255,255,255,.06) 2.1px, transparent 2.6px) 8px 8px / 14px 14px,
+    repeating-linear-gradient(90deg, rgba(255,255,255,.022) 0 2px, transparent 2px 5px),
+    linear-gradient(170deg, #45484e, #393c41 55%, #34373c);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 0 0 6px rgba(0,0,0,.16), 0 12px 30px -18px rgba(0,0,0,.8); }
+.ciclo-cajones.en-pared .escalera-cabeza { color: #f2f3f5; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+.ciclo-cajones.en-pared .escalera-cabeza :is(p, span):not(.num-display) { color: rgba(242,243,245,.8); }
 .ciclo-cajones.en-pared .cajones-pizarra.en-chapa { background: none; box-shadow: none; padding: 6px 0 0; margin-top: 10px; border-radius: 0; }
-.ciclo-cajones.en-pared .cajones-pizarra.en-chapa::after { margin: 0 -16px; border-radius: 0; height: 14px; }
-.ciclo-cajones.en-pared .escalera-enlace { justify-self: stretch; margin: 0 -16px; padding: 0 16px; min-height: 48px; border-radius: 0;
-  background:
-    repeating-linear-gradient(45deg, transparent 0 5px, rgba(255,255,255,.12) 5px 6.5px, transparent 6.5px 11px),
-    repeating-linear-gradient(-45deg, transparent 0 5px, rgba(0,0,0,.26) 5px 6.5px, transparent 6.5px 11px),
-    linear-gradient(#4f5258, #3f4247);
-  color: #e9eaee; }
-.ciclo-cajones.en-pared .escalera-cabeza { color: #f2f3f5; text-shadow: 0 1px 2px rgba(0,0,0,.55), 0 0 10px color-mix(in oklab, #3B82F6 30%, #1d2433); }
-.ciclo-cajones.en-pared .escalera-cabeza * { color: inherit; }
-.ciclo-cajones.en-pared .escalera-cabeza :is(p, span):not(.num-display) { color: rgba(242,243,245,.78); }
-.light-mode .ciclo-cajones.en-pared { --pintura-pared: color-mix(in oklab, #3B82F6 26%, #d6d9de);
-  background:
-    radial-gradient(circle, rgba(40,48,66,.55) 0 1.7px, rgba(255,255,255,.55) 2.2px, transparent 2.7px) 8px 8px / 15px 15px,
+.ciclo-cajones.en-pared .cajones-pizarra.en-chapa::after { display: none; }
+.ciclo-cajones.en-pared .cajon { box-shadow: 0 6px 6px -3px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.18); }
+.piso-goma { position: relative; margin: 0 -16px; min-height: 64px; display: flex; align-items: flex-end; padding: 0 16px 8px; overflow: hidden; box-shadow: 0 -1px 0 rgba(0,0,0,.55); }
+.piso-goma-dibujo { position: absolute; inset: 0; width: 100%; height: 100%; }
+.piso-goma-caucho { fill: #1c1d20; }
+.piso-goma-junta { fill: none; stroke: #0b0c0d; stroke-width: 1.6; stroke-linejoin: round; }
+.piso-goma .escalera-enlace { position: relative; z-index: 1; margin: 0; color: #e9eaee; text-shadow: 0 1px 2px rgba(0,0,0,.7); }
+.light-mode .ciclo-cajones.en-pared { background:
+    radial-gradient(circle, rgba(70,73,79,.7) 0 1.6px, rgba(255,255,255,.5) 2.1px, transparent 2.6px) 8px 8px / 14px 14px,
     repeating-linear-gradient(90deg, rgba(0,0,0,.02) 0 2px, transparent 2px 5px),
-    linear-gradient(165deg, color-mix(in oklab, var(--pintura-pared) 92%, white), var(--pintura-pared)); }
-.light-mode .ciclo-cajones.en-pared .escalera-cabeza { color: #1d2433; text-shadow: 0 1px 0 rgba(255,255,255,.6), 0 0 8px rgba(255,255,255,.55); }
+    linear-gradient(170deg, #dfe1e5, #d3d6db 55%, #cdd0d5); }
+.light-mode .ciclo-cajones.en-pared .escalera-cabeza { color: #1d2433; text-shadow: 0 1px 0 rgba(255,255,255,.6); }
 .light-mode .ciclo-cajones.en-pared .escalera-cabeza :is(p, span):not(.num-display) { color: rgba(29,36,51,.72); }
-.light-mode .ciclo-cajones.en-pared .cajones-pizarra.en-chapa { --tiza: #1d2433; --tiza-suave: rgba(29,36,51,.55); }
-.light-mode .ciclo-cajones.en-pared .escalera-enlace { color: #1d2433; background:
-    repeating-linear-gradient(45deg, transparent 0 5px, rgba(255,255,255,.55) 5px 6.5px, transparent 6.5px 11px),
-    repeating-linear-gradient(-45deg, transparent 0 5px, rgba(0,0,0,.1) 5px 6.5px, transparent 6.5px 11px),
-    linear-gradient(#bfc2c8, #aaadb3); }
+.light-mode .piso-goma-caucho { fill: #34363b; }
 
-/* Rutinas: la tarjeta entera es el rack. La pared de atrás, de chapa oscura
-   cepillada; los parantes, el canto del estante y el travesaño, pintados
-   del azul de la pestaña, como los racks de los gimnasios; las etiquetas,
-   de cartón con el ojal del color de su día. */
-.rutina-activa.es-rack { --pintura-rack: color-mix(in oklab, #3B82F6 62%, #3a3d44); position: relative; overflow: hidden; padding-left: 26px; padding-right: 26px;
+/* Rutinas: la tarjeta entera es el rack de las pesas rusas, de chapa gris
+   como el casillero: los parantes perforados a los costados, el estante con
+   las pesas y sus etiquetas de cartón, y el travesaño con la chapa de la
+   rutina. */
+.rutina-activa.es-rack { --pintura-rack: #50535a; position: relative; overflow: hidden; padding-left: 28px; padding-right: 28px;
   background: repeating-linear-gradient(90deg, rgba(255,255,255,.02) 0 2px, transparent 2px 5px), linear-gradient(170deg, #2b2d32, #232529);
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), 0 12px 30px -18px rgba(0,0,0,.8); }
 .rutina-activa.es-rack::before, .rutina-activa.es-rack::after { content: ""; position: absolute; top: 0; bottom: 0; width: 14px; z-index: 0;
   background:
-    radial-gradient(circle, rgba(0,0,0,.55) 0 2px, transparent 2.6px) 50% 10px / 14px 22px repeat-y,
-    linear-gradient(90deg, color-mix(in oklab, var(--pintura-rack) 80%, black), var(--pintura-rack) 45%, color-mix(in oklab, var(--pintura-rack) 85%, white 10%) 60%, color-mix(in oklab, var(--pintura-rack) 80%, black)); }
-.rutina-activa.es-rack::before { left: 6px; }
-.rutina-activa.es-rack::after { right: 6px; }
+    radial-gradient(circle, rgba(0,0,0,.6) 0 2px, transparent 2.6px) 50% 10px / 14px 22px repeat-y,
+    linear-gradient(90deg, #36383d, #5a5d63 45%, #6a6d73 60%, #3a3c41); }
+.rutina-activa.es-rack::before { left: 7px; }
+.rutina-activa.es-rack::after { right: 7px; }
 .rutina-activa.es-rack > * { position: relative; z-index: 1; }
 .rutina-activa.es-rack .rack-pesas { padding: 0 0 6px; }
 .rutina-activa.es-rack .rack-pesas::before, .rutina-activa.es-rack .rack-pesas::after { display: none; }
-.rutina-activa.es-rack .estante.en-rack::before { left: -20px; right: -20px; background: repeating-linear-gradient(90deg, rgba(255,255,255,.04) 0 2px, transparent 2px 5px), linear-gradient(color-mix(in oklab, var(--pintura-rack) 90%, white 12%), color-mix(in oklab, var(--pintura-rack) 85%, black)); }
-.rutina-activa.es-rack .estante-dia { color: rgba(255,255,255,.82); }
-.rutina-activa.es-rack .rack-pesas-travesano { margin: 0 -20px; height: 16px; background: repeating-linear-gradient(90deg, rgba(255,255,255,.04) 0 2px, transparent 2px 5px), linear-gradient(color-mix(in oklab, var(--pintura-rack) 90%, white 12%), color-mix(in oklab, var(--pintura-rack) 85%, black)); }
+.rutina-activa.es-rack .estante.en-rack::before { left: -22px; right: -22px; }
+.rutina-activa.es-rack .rack-pesas-travesano { margin: 0 -22px; height: 16px; }
 .rutina-activa.es-rack .rutina-activa-linea { color: rgba(242,243,245,.72); }
-.estante-etiqueta i { background: var(--dia, #3a342b); box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--dia, #b9aa8b) 55%, #2b2620); width: 7px; height: 7px; }
-.estante-etiqueta { border-top: 3px solid color-mix(in oklab, var(--dia, #cbbd9f) 70%, #d9cdb4); }
-.light-mode .rutina-activa.es-rack { --pintura-rack: color-mix(in oklab, #3B82F6 55%, #8b9099); background: repeating-linear-gradient(90deg, rgba(0,0,0,.02) 0 2px, transparent 2px 5px), linear-gradient(170deg, #e3e5e9, #d5d8dd); }
+.light-mode .rutina-activa.es-rack { background: repeating-linear-gradient(90deg, rgba(0,0,0,.02) 0 2px, transparent 2px 5px), linear-gradient(170deg, #e3e5e9, #d5d8dd); }
+.light-mode .rutina-activa.es-rack::before, .light-mode .rutina-activa.es-rack::after { background: radial-gradient(circle, rgba(60,63,70,.55) 0 2px, transparent 2.6px) 50% 10px / 14px 22px repeat-y, linear-gradient(90deg, #a7aab0, #c9ccd1 45%, #d6d8dd 60%, #a9acb2); }
 .light-mode .rutina-activa.es-rack .rutina-activa-linea { color: rgba(29,36,51,.7); }
+
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -13888,7 +13884,7 @@ function EstantePesas({ dias = [], onElegir = null, etiqueta = "Tu semana", rack
         const clase = `estante-lugar ${d.dia ? "con-pesa" : ""} ${d.hoy ? "hoy" : ""}`;
         // En el rack, de cada pesa cuelga su etiqueta de cartón con el día
         // de la rutina, atada con un hilo al canto del estante.
-        const contenido = <><PesaRusa vacia={!d.dia} /><span className="estante-dia" aria-hidden="true">{d.corto}</span>{rack && d.dia && <span className="estante-etiqueta" aria-hidden="true" style={{ "--i": i, "--dia": d.dia.color }}><i />{d.dia.label}</span>}</>;
+        const contenido = <><PesaRusa vacia={!d.dia} /><span className="estante-dia" aria-hidden="true">{d.corto}</span>{rack && d.dia && <span className="estante-etiqueta" aria-hidden="true" style={{ "--i": i }}><i />{d.dia.label}</span>}</>;
         return (
           <li key={d.clave || i} style={d.dia ? { "--dia": d.dia.color } : undefined}>
             {onElegir && d.dia
@@ -14594,6 +14590,37 @@ function IconoCajones({ size = 16 }) {
    sesiones de cada semana en tiza arriba de su cajón. Lo de cuánto falta para
    la descarga queda para el lector de pantalla.
 ============================================================================ */
+// EL PISO DE GOMA (vista previa del 03/11, pedido: "el piso de goma típico
+// pero bien hecho"): las baldosas encastrables del gimnasio, de caucho negro
+// mate con las motas de colores del reciclado, unidas por las juntas de
+// rompecabezas. Va de punta a punta, abajo de los cajones.
+const MOTAS_GOMA = [[22.4, 37.0, 0.73, "#d9d9d3"], [23.5, 7.4, 0.76, "#d9d9d3"], [31.7, 3.8, 0.63, "#5f9e78"], [32.4, 27.7, 0.48, "#5b7fd1"], [38.6, 26.2, 0.82, "#9a9ca2"], [0.6, 21.1, 0.49, "#5b7fd1"], [9.7, 1.2, 0.73, "#c25a5c"], [33.7, 20.8, 0.83, "#d9d9d3"], [26.5, 18.3, 0.62, "#d9d9d3"], [39.8, 33.6, 0.87, "#9a9ca2"], [9.2, 11.6, 0.49, "#c25a5c"], [16.0, 33.9, 0.68, "#9a9ca2"], [33.9, 0.0, 0.58, "#9a9ca2"], [18.8, 39.2, 0.69, "#9a9ca2"], [25.2, 31.1, 0.61, "#5b7fd1"], [13.3, 38.6, 0.90, "#5b7fd1"], [9.9, 4.0, 0.49, "#5b7fd1"], [7.1, 22.4, 0.72, "#9a9ca2"], [29.3, 5.2, 0.84, "#c25a5c"], [16.8, 8.5, 0.61, "#5b7fd1"], [32.1, 12.2, 0.98, "#9a9ca2"], [15.8, 34.2, 0.84, "#c25a5c"], [39.6, 8.5, 0.60, "#5b7fd1"], [13.2, 11.9, 0.49, "#9a9ca2"], [23.3, 9.7, 0.81, "#5b7fd1"], [18.1, 38.4, 0.74, "#d9d9d3"], [34.7, 7.3, 0.54, "#d9d9d3"], [32.7, 10.0, 0.56, "#9a9ca2"], [37.6, 7.9, 1.02, "#d1b25a"], [24.1, 16.9, 0.51, "#9a9ca2"], [38.5, 9.5, 0.87, "#5b7fd1"], [32.9, 23.9, 0.63, "#c25a5c"], [28.8, 2.8, 0.59, "#5b7fd1"], [34.1, 24.6, 0.62, "#d9d9d3"]];
+const JUNTAS_GOMA = ["M133 0 L133 3 L136.2 3 L136.2 7 L133 7 L133 13 L129.8 13 L129.8 17 L133 17 L133 23 L136.2 23 L136.2 27 L133 27 L133 33 L129.8 33 L129.8 37 L133 37 L133 43 L136.2 43 L136.2 47 L133 47 L133 53 L129.8 53 L129.8 57 L133 57 L133 63 L136.2 63 L136.2 67 L133 67 L133 72", "M266 0 L266 3 L269.2 3 L269.2 7 L266 7 L266 13 L262.8 13 L262.8 17 L266 17 L266 23 L269.2 23 L269.2 27 L266 27 L266 33 L262.8 33 L262.8 37 L266 37 L266 43 L269.2 43 L269.2 47 L266 47 L266 53 L262.8 53 L262.8 57 L266 57 L266 63 L269.2 63 L269.2 67 L266 67 L266 72", "M0 38 L3 38 L3 40.6 L7 40.6 L7 38 L13 38 L13 35.4 L17 35.4 L17 38 L23 38 L23 40.6 L27 40.6 L27 38 L33 38 L33 35.4 L37 35.4 L37 38 L43 38 L43 40.6 L47 40.6 L47 38 L53 38 L53 35.4 L57 35.4 L57 38 L63 38 L63 40.6 L67 40.6 L67 38 L73 38 L73 35.4 L77 35.4 L77 38 L83 38 L83 40.6 L87 40.6 L87 38 L93 38 L93 35.4 L97 35.4 L97 38 L103 38 L103 40.6 L107 40.6 L107 38 L113 38 L113 35.4 L117 35.4 L117 38 L123 38 L123 40.6 L127 40.6 L127 38 L133 38 L133 35.4 L137 35.4 L137 38 L143 38 L143 40.6 L147 40.6 L147 38 L153 38 L153 35.4 L157 35.4 L157 38 L163 38 L163 40.6 L167 40.6 L167 38 L173 38 L173 35.4 L177 35.4 L177 38 L183 38 L183 40.6 L187 40.6 L187 38 L193 38 L193 35.4 L197 35.4 L197 38 L203 38 L203 40.6 L207 40.6 L207 38 L213 38 L213 35.4 L217 35.4 L217 38 L223 38 L223 40.6 L227 40.6 L227 38 L233 38 L233 35.4 L237 35.4 L237 38 L243 38 L243 40.6 L247 40.6 L247 38 L253 38 L253 35.4 L257 35.4 L257 38 L263 38 L263 40.6 L267 40.6 L267 38 L273 38 L273 35.4 L277 35.4 L277 38 L283 38 L283 40.6 L287 40.6 L287 38 L293 38 L293 35.4 L297 35.4 L297 38 L303 38 L303 40.6 L307 40.6 L307 38 L313 38 L313 35.4 L317 35.4 L317 38 L323 38 L323 40.6 L327 40.6 L327 38 L333 38 L333 35.4 L337 35.4 L337 38 L343 38 L343 40.6 L347 40.6 L347 38 L353 38 L353 35.4 L357 35.4 L357 38 L363 38 L363 40.6 L367 40.6 L367 38 L373 38 L373 35.4 L377 35.4 L377 38 L383 38 L383 40.6 L387 40.6 L387 38 L393 38 L393 35.4 L397 35.4 L397 38 L400 38"];
+function PisoGoma({ children = null }) {
+  const uid = `pg${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
+  return (
+    <div className="piso-goma">
+      <svg className="piso-goma-dibujo" viewBox="0 0 400 72" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <defs>
+          <pattern id={`${uid}-m`} width="40" height="40" patternUnits="userSpaceOnUse">
+            {MOTAS_GOMA.map(([x, y, rr, c], k) => <circle key={k} cx={x} cy={y} r={rr} fill={c} opacity=".55" />)}
+          </pattern>
+          <linearGradient id={`${uid}-l`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#000" stopOpacity=".55" />
+            <stop offset=".25" stopColor="#000" stopOpacity="0" />
+            <stop offset="1" stopColor="#fff" stopOpacity=".03" />
+          </linearGradient>
+        </defs>
+        <rect width="400" height="72" className="piso-goma-caucho" />
+        <rect width="400" height="72" fill={`url(#${uid}-m)`} />
+        {JUNTAS_GOMA.map((d, k) => <path key={k} d={d} className="piso-goma-junta" />)}
+        <rect width="400" height="72" fill={`url(#${uid}-l)`} />
+      </svg>
+      {children}
+    </div>
+  );
+}
+
 function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS, onGoToDeload, metaSemanal = null }) {
   const weekInfo = getWeekInfo(cycleStart, settings);
   // BUG ARREGLADO: este useMemo estaba DESPUÉS del `return null` de abajo.
@@ -14629,7 +14656,7 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
         </div>
       </div>
       <CajonesCiclo semanas={semanas} trainWeeks={trainWeeks} meta={metaSemanal} animar={!yaAnimado && cajonesHoy} />
-      <button onClick={onGoToDeload} className="enlace-suave escalera-enlace"><Zap size={13} /> Ver mi semana de descarga</button>
+      <PisoGoma><button onClick={onGoToDeload} className="enlace-suave escalera-enlace"><Zap size={13} /> Ver mi semana de descarga</button></PisoGoma>
     </section>
   );
 }
