@@ -6497,6 +6497,49 @@ label.ajuste-rotulo { display: block; }
 .light-mode .rack-dos-pisos::before, .light-mode .rack-dos-pisos::after { background: linear-gradient(90deg, #26272a, #4c4f54 40%, #5c5f64 55%, #2a2b2e); }
 .rutina-activa.rack-nuevo > .cemento { margin: 0 -16px; }
 
+
+/* ── VISTA PREVIA 10 (03/11) ── */
+/* Rutina: la escena es la placa entera, de arriba hasta Iniciar sesión. */
+.dia-seccion > .dia-hero.escena-completa { position: relative; overflow: hidden; margin: 0 -6px; padding: 22px 20px 20px; border-radius: 30px 30px 0 0;
+  background: radial-gradient(ellipse 70% 55% at 50% -8%, rgba(255,244,222,.16), transparent 72%), linear-gradient(#202125, #18191c); }
+.light-mode .dia-seccion > .dia-hero.escena-completa { background: radial-gradient(ellipse 70% 55% at 50% -8%, rgba(255,250,240,.95), transparent 72%), linear-gradient(#d9dadd, #cfd0d4); }
+.dia-hero.escena-completa > .tarima-quemada { position: absolute; z-index: 0; left: 0; right: 0; top: 70px; bottom: 0; width: 100%; height: calc(100% - 70px); }
+.dia-hero.escena-completa > :not(.tarima-quemada):not(.dia-reset) { position: relative; z-index: 1; }
+.dia-hero.escena-completa > .dia-reset { z-index: 3; }
+/* Al pie, la tarima se funde con la lista de ejercicios. */
+.dia-hero.escena-completa::after { content: ""; position: absolute; z-index: 0; left: 0; right: 0; bottom: 0; height: 64px; pointer-events: none; background: linear-gradient(transparent, color-mix(in oklab, var(--surface-1) 85%, transparent) 70%, var(--surface-1)); }
+.dia-hero.escena-completa .escena-barra { position: relative; left: auto; right: auto; bottom: auto; margin: 92px -6px 0; }
+.dia-hero.escena-completa .plataforma-pie { margin-top: 2px; }
+.dia-hero.escena-completa .dia-barra-texto, .dia-hero.escena-completa .dia-barra-texto b, .dia-hero.escena-completa .dia-descarga-regla { color: #eef0f2; text-shadow: 0 1px 3px rgba(0,0,0,.8); }
+.dia-hero.escena-completa .escena-musculos { color: rgba(238,240,244,.72); }
+.light-mode .dia-hero.escena-completa .escena-musculos { color: rgba(29,36,51,.72); }
+.dia-hero.escena-completa .dia-chip { background: rgba(13,14,16,.55); color: #eef0f2; }
+.light-mode .dia-hero.escena-completa .dia-chip { background: rgba(255,255,255,.7); color: #1d2433; }
+.modo-semana { margin: 0 auto; width: min(100%, 320px); }
+/* Rutinas: el rack dibujado entero, contra la pared de cemento liso. */
+.rutina-activa.rack-nuevo { background:
+    radial-gradient(ellipse at 20% 25%, rgba(255,255,255,.035), transparent 45%), radial-gradient(ellipse at 80% 70%, rgba(0,0,0,.18), transparent 50%),
+    linear-gradient(#2b2c2f, #232427) !important; }
+.light-mode .rutina-activa.rack-nuevo { background: radial-gradient(ellipse at 20% 25%, rgba(255,255,255,.5), transparent 45%), radial-gradient(ellipse at 80% 70%, rgba(0,0,0,.06), transparent 50%), linear-gradient(#e2e2e0, #d6d6d3) !important; }
+.rack-kb { position: relative; width: 100%; aspect-ratio: 360 / 250; }
+.rack-kb-fondo, .rack-kb-frente { position: absolute; inset: 0; width: 100%; height: 100%; }
+.rack-kb-frente { pointer-events: none; z-index: 2; }
+.rack-kb-pesa { position: absolute; z-index: 1; width: 15%; display: block; padding: 0; background: none; transition: transform var(--dur-chico) var(--resorte, ease); }
+.rack-kb-pesa .pesa-rusa { width: 100%; height: auto; display: block; }
+.rack-kb-pesa.con-pesa { --d: color-mix(in oklab, var(--dia) 62%, #8a8c92); }
+.light-mode .rack-kb-pesa.con-pesa { --d: color-mix(in oklab, var(--dia) 72%, #a7a9ae); }
+.rack-kb-pesa.hoy { transform: translateY(-9%); }
+.rack-kb-pesa:active { transform: scale(.95); }
+.rack-kb-regaton { fill: #0b0b0c; }
+.rack-kb-escuadra { fill: #1b1c1f; }
+.rack-kb-dia { font: 800 11px 'Mona Sans Variable', system-ui, sans-serif; fill: #eef0f2; }
+.rack-kb-que { font: 800 11px 'Mona Sans Variable', system-ui, sans-serif; font-stretch: 85%; fill: color-mix(in oklab, var(--dia, #a3a8b0) 70%, white); }
+.rack-kb-rotulo.hoy .rack-kb-dia { text-decoration: underline; }
+.rack-kb-chapa { fill: #a9acb2; stroke: #6f7279; stroke-width: 1; }
+.rack-kb-tornillo { fill: #5d6066; }
+.rack-kb-nombre { font: 800 13px 'Mona Sans Variable', system-ui, sans-serif; font-stretch: 80%; letter-spacing: .05em; fill: #1d1f24; }
+.rutina-activa.rack-nuevo .rack-dos-pisos { display: none; }
+
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -14064,6 +14107,80 @@ function PesaRusa({ vacia = false }) {
   );
 }
 // `dias`: siete { clave, corto ("Lun"), nombre ("lunes"), dia: { label, color } | null, hoy }.
+// EL RACK DE LAS PESAS RUSAS, dibujado entero (vista previa del 03/11;
+// pedido: "pulir ese rack, que toque el piso"; investigado en los racks de
+// Valor BG-23, REP 2.0 y TAG Fitness): el marco de caño ovalado negro con sus
+// patas y regatones, dos bandejas inclinadas con el forro de goma y el labio
+// de chapa adelante (tapa la base de las pesas, como en uno de verdad) y la
+// chapa con el nombre de la rutina arriba. En el labio, el día y lo que toca.
+// Las pesas son botones encima del dibujo: tocás una y vas a ese día.
+const RACK_ARRIBA = [67.5, 142.5, 217.5, 292.5];
+const RACK_ABAJO = [80, 180, 280];
+function RackKettlebells({ dias = [], nombre = "", onElegir = null, etiqueta = "Tu semana" }) {
+  const uid = `rk${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
+  const lugares = [
+    ...dias.slice(0, 4).map((d, k) => ({ d, x: RACK_ARRIBA[k], base: 106, labio: 100 })),
+    ...dias.slice(4).map((d, k) => ({ d, x: RACK_ABAJO[k], base: 210, labio: 204 })),
+  ];
+  const rotulo = (texto) => (String(texto).length > 9 ? { textLength: 64, lengthAdjust: "spacingAndGlyphs" } : {});
+  return (
+    <div className="rack-kb" role="group" aria-label={etiqueta}>
+      <svg className="rack-kb-fondo" viewBox="0 0 360 250" aria-hidden="true">
+        <defs>
+          <linearGradient id={`${uid}-c`} x1="0" x2="1">
+            <stop offset="0" stopColor="#121315" /><stop offset=".45" stopColor="#3a3c41" /><stop offset=".6" stopColor="#4a4d52" /><stop offset="1" stopColor="#151618" />
+          </linearGradient>
+          <linearGradient id={`${uid}-b`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#0c0d0f" /><stop offset="1" stopColor="#1d1e21" />
+          </linearGradient>
+        </defs>
+        {/* Las patas, con el pie y el regatón de goma. */}
+        <rect x="14" y="16" width="11" height="222" rx="5" fill={`url(#${uid}-c)`} />
+        <rect x="335" y="16" width="11" height="222" rx="5" fill={`url(#${uid}-c)`} />
+        <rect x="2" y="234" width="35" height="9" rx="3" fill={`url(#${uid}-c)`} />
+        <rect x="323" y="234" width="35" height="9" rx="3" fill={`url(#${uid}-c)`} />
+        <rect x="0" y="241" width="9" height="7" rx="2" className="rack-kb-regaton" /><rect x="30" y="241" width="9" height="7" rx="2" className="rack-kb-regaton" />
+        <rect x="321" y="241" width="9" height="7" rx="2" className="rack-kb-regaton" /><rect x="351" y="241" width="9" height="7" rx="2" className="rack-kb-regaton" />
+        {/* El travesaño de arriba. */}
+        <rect x="20" y="18" width="320" height="11" rx="4" fill={`url(#${uid}-c)`} />
+        {/* Las bandejas: la goma que se ve por la inclinación. */}
+        <path d="M30 84 L330 84 L334 100 L26 100 Z" fill={`url(#${uid}-b)`} />
+        <path d="M30 188 L330 188 L334 204 L26 204 Z" fill={`url(#${uid}-b)`} />
+        {/* Las escuadras de las patas que sostienen cada bandeja. */}
+        <path d="M25 96 L40 120 L25 120 Z M335 96 L320 120 L335 120 Z M25 200 L40 224 L25 224 Z M335 200 L320 224 L335 224 Z" className="rack-kb-escuadra" />
+      </svg>
+      {lugares.map(({ d, x, base }, i) => {
+        const texto = `${d.nombre || d.corto}: ${d.dia ? d.dia.label : "descanso"}${d.hoy ? " (hoy)" : ""}`;
+        const estilo = { left: `${((x - 27) / 360) * 100}%`, top: `${((base - 49.7) / 250) * 100}%`, ...(d.dia ? { "--dia": d.dia.color } : null) };
+        const clase = `rack-kb-pesa ${d.dia ? "con-pesa" : ""} ${d.hoy ? "hoy" : ""}`;
+        return onElegir && d.dia
+          ? <button key={d.clave || i} onClick={() => onElegir(d)} className={clase} style={estilo} aria-label={`${texto}. Tocá para entrenarlo`}><PesaRusa /></button>
+          : <span key={d.clave || i} className={clase} style={estilo} role="img" aria-label={texto}><PesaRusa vacia={!d.dia} /></span>;
+      })}
+      <svg className="rack-kb-frente" viewBox="0 0 360 250" aria-hidden="true">
+        <defs>
+          <linearGradient id={`${uid}-l`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#5c5f65" /><stop offset=".12" stopColor="#3b3e43" /><stop offset="1" stopColor="#25272b" />
+          </linearGradient>
+        </defs>
+        {/* Los labios de chapa, adelante de las pesas. */}
+        <rect x="24" y="100" width="312" height="24" rx="3" fill={`url(#${uid}-l)`} />
+        <rect x="24" y="204" width="312" height="24" rx="3" fill={`url(#${uid}-l)`} />
+        {lugares.map(({ d, x, labio }, i) => (
+          <g key={i} className={`rack-kb-rotulo ${d.hoy ? "hoy" : ""}`} style={d.dia ? { "--dia": d.dia.color } : undefined}>
+            <text x={x} y={labio + 11} textAnchor="middle" className="rack-kb-dia">{d.corto}</text>
+            {d.dia && <text x={x} y={labio + 21} textAnchor="middle" className="rack-kb-que" {...rotulo(d.dia.label)}>{d.dia.label}</text>}
+          </g>
+        ))}
+        {/* La chapa con el nombre de la rutina, atornillada al travesaño. */}
+        <rect x="95" y="10" width="170" height="27" rx="4" className="rack-kb-chapa" />
+        <circle cx="104" cy="23.5" r="2.6" className="rack-kb-tornillo" /><circle cx="256" cy="23.5" r="2.6" className="rack-kb-tornillo" />
+        <text x="180" y="28" textAnchor="middle" className="rack-kb-nombre" {...(String(nombre).length > 16 ? { textLength: 136, lengthAdjust: "spacingAndGlyphs" } : {})}>{nombre}</text>
+      </svg>
+    </div>
+  );
+}
+
 function EstantePesas({ dias = [], onElegir = null, etiqueta = "Tu semana", rack = null }) {
   // EL RACK DE DOS PISOS (vista previa del 03/11; investigado en los racks de
   // Valor BG-23, REP 2.0 y TAG Fitness): dos bandejas inclinadas con su labio
@@ -14071,27 +14188,7 @@ function EstantePesas({ dias = [], onElegir = null, etiqueta = "Tu semana", rack
   // nombre de la rutina arriba. Lunes a jueves en la de arriba, viernes a
   // domingo en la de abajo; en el labio, como el peso en los racks de verdad,
   // el día y lo que toca.
-  if (rack) {
-    const lugar = (d, i) => {
-      const texto = `${d.nombre || d.corto}: ${d.dia ? d.dia.label : "descanso"}${d.hoy ? " (hoy)" : ""}`;
-      const clase = `estante-lugar ${d.dia ? "con-pesa" : ""} ${d.hoy ? "hoy" : ""}`;
-      const contenido = <><PesaRusa vacia={!d.dia} /><span className="bandeja-rotulo" aria-hidden="true"><b>{d.corto}</b>{d.dia ? <i>{d.dia.label}</i> : <i className="vacio" />}</span></>;
-      return (
-        <li key={d.clave || i} style={d.dia ? { "--dia": d.dia.color } : undefined}>
-          {onElegir && d.dia
-            ? <button onClick={() => onElegir(d)} className={clase} aria-label={`${texto}. Tocá para entrenarlo`}>{contenido}</button>
-            : <span className={clase} role="img" aria-label={texto}>{contenido}</span>}
-        </li>
-      );
-    };
-    return (
-      <div className="rack-dos-pisos" aria-label={etiqueta} role="group">
-        <div className="rack-dos-pisos-arriba" aria-hidden="true"><p className="rack-pesas-chapa"><i /><span>{rack}</span><i /></p></div>
-        <ol className="bandeja">{dias.slice(0, 4).map(lugar)}</ol>
-        <ol className="bandeja">{dias.slice(4).map((d, k) => lugar(d, k + 4))}</ol>
-      </div>
-    );
-  }
+  if (rack) return <RackKettlebells dias={dias} nombre={rack} onElegir={onElegir} etiqueta={etiqueta} />;
   const lista = (
     <ol className={`estante ${rack ? "en-rack" : ""}`} aria-label={etiqueta}>
       {dias.map((d, i) => {
@@ -14821,33 +14918,17 @@ function TarimaQuemada({ titulo = "" }) {
   const largo = Math.max(3, String(titulo).length);
   const tam = Math.min(46, Math.round(220 / (largo * 0.6)));
   return (
-    <svg className="tarima-quemada" viewBox="0 62 400 128" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+    <svg className="tarima-quemada" viewBox="0 66 400 124" preserveAspectRatio="xMidYMin slice" aria-hidden="true">
       <path d="M-200 190 L40 70 L140 70 L102.5 190 Z" className="tq-goma" />
       <path d="M600 190 L360 70 L260 70 L297.5 190 Z" className="tq-goma" />
       <path d="M140 70 L260 70 L297.5 190 L102.5 190 Z" className="tq-madera" />
       {["M160.0 70 L135.0 190", "M180.0 70 L167.5 190", "M200.0 70 L200.0 190", "M220.0 70 L232.5 190", "M240.0 70 L265.0 190"].map((d, k) => <path key={k} d={d} className="tq-tabla" />)}
       <path d="M40 70 L360 70" className="tq-canto-fondo" />
-      <g transform="translate(200 96) scale(1 .4)">
+      <g transform="translate(200 84) scale(1 .38)">
         <text x="0" y="0" textAnchor="middle" dominantBaseline="middle" className="tq-quemado-halo" style={{ fontSize: tam }}>{titulo}</text>
         <text x="0" y="0" textAnchor="middle" dominantBaseline="middle" className="tq-quemado" style={{ fontSize: tam }}>{titulo}</text>
       </g>
     </svg>
-  );
-}
-
-// EL CEMENTO ALISADO (Rutinas): el piso del rack de las pesas rusas, gris,
-// con sus manchas y las juntas de corte en perspectiva.
-const MANCHAS_CEMENTO = [[185, 27, 18, 0.082], [3, 36, 43, 0.035], [222, 44, 15, 0.053], [281, 33, 37, 0.039], [95, 8, 30, 0.085], [236, 56, 26, 0.075], [41, 21, 36, 0.074], [169, 6, 23, 0.043], [112, 58, 20, 0.083], [352, 4, 26, 0.060], [9, 31, 43, 0.037], [239, 9, 33, 0.084], [81, 1, 17, 0.062], [7, 6, 30, 0.085]];
-function PisoCemento() {
-  return (
-    <div className="cemento">
-      <svg className="cemento-dibujo" viewBox="0 0 400 72" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-        <rect width="400" height="72" className="cemento-base" />
-        {MANCHAS_CEMENTO.map(([x, y, rr, o], k) => <ellipse key={k} cx={x} cy={y} rx={rr} ry={rr * 0.4} className="cemento-mancha" opacity={o} />)}
-        {["M-362.0 0 L-600.0 72", "M-221.5 0 L-400.0 72", "M-81.0 0 L-200.0 72", "M59.5 0 L0.0 72", "M200.0 0 L200.0 72", "M340.5 0 L400.0 72", "M481.0 0 L600.0 72", "M621.5 0 L800.0 72", "M762.0 0 L1000.0 72", "M0 30 L400 30"].map((d, k) => <path key={k} d={d} className="cemento-junta" />)}
-        <path d="M0 0 L400 0 L400 72 L0 72 Z" className="cemento-luz" />
-      </svg>
-    </div>
   );
 }
 
@@ -15835,6 +15916,12 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           El elegido se vuelve una píldora llena de su color (el resorte
           cierra las puntas) y le da el tono a la pantalla (ver ponerTono).
           Los demás van sin color. */}
+      {esSemanaDescarga && onModoDescarga && (
+        <div className="segmentado chico dia-modo modo-semana" role="group" aria-label="Qué hacés esta semana">
+          <button onClick={() => onModoDescarga(false)} aria-pressed={!pideDescarga} className={!pideDescarga ? "activo" : ""}>Entrenamiento</button>
+          <button onClick={() => onModoDescarga(true)} aria-pressed={pideDescarga} className={pideDescarga ? "activo" : ""}><Zap size={13} /> Descarga</button>
+        </div>
+      )}
       <div className="selector-dias" role="tablist" aria-label="Días de tu rutina">
         {(() => {
           const { minHeight } = dayTabTextSizing(DAY_ORDER.length);
@@ -15869,7 +15956,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         style={{ "--c": day.color }}
         aria-label={modoDescarga ? `Día ${day.label}, semana de descarga` : `Día ${day.label}`}
       >
-        <div className="dia-hero con-plataforma">
+        <div className="dia-hero con-plataforma escena-completa">
           {/* "Resetear sesión de hoy": un ícono en la esquina. Sirve para
               arreglar un error, no es algo que necesites a mano cada día; el
               diálogo de confirmación es el mismo. */}
@@ -15885,7 +15972,9 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
               nombre del día en una plaqueta atornillada, la barra cargada
               apoyada en los ganchos del rack y el piso de goma. Iniciar
               sesión queda abajo, afuera del dibujo. */}
-          <div className="plataforma escena-tarima">
+          {/* La tarima ocupa toda la placa del día, de arriba hasta Iniciar
+              sesión, y se funde con la lista de ejercicios. */}
+          <TarimaQuemada titulo={day.label} />
           {modoDescarga ? (
             <span className="dia-chip descarga"><Zap size={12} /> {previa ? "Así va a ser tu descarga" : "Semana de descarga"}</span>
           ) : activeDay === suggestedDay && (
@@ -15893,28 +15982,18 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           )}
           <h2 className="sr-only">{day.label}</h2>
           {day.description && <p className="escena-musculos">{day.description}</p>}
-          {esSemanaDescarga && onModoDescarga && (
-            <div className="segmentado chico dia-modo plataforma-llave" role="group" aria-label="Qué hacés esta semana">
-              <button onClick={() => onModoDescarga(false)} aria-pressed={!pideDescarga} className={!pideDescarga ? "activo" : ""}>Entrenamiento</button>
-              <button onClick={() => onModoDescarga(true)} aria-pressed={pideDescarga} className={pideDescarga ? "activo" : ""}><Zap size={13} /> Descarga</button>
+          {avanceDia.total > 0 && (
+            <div className={`dia-barra escena-barra ${arranca ? "se-desengancha" : ""}`}>
+              <BarraCargada
+                hechas={modoDescarga ? avanceDescarga.hechas : avanceDia.hechas}
+                total={avanceDia.total}
+                fuera={modoDescarga ? avanceDia.total - avanceDescarga.total : 0}
+                etiqueta={modoDescarga ? `${avanceDescarga.hechas} de ${avanceDescarga.total} series de descarga` : null}
+                alto="clamp(84px, 25cqi, 140px)"
+                detalle
+              />
             </div>
           )}
-          <div className="escena-tarima-piso">
-            <TarimaQuemada titulo={day.label} />
-            {avanceDia.total > 0 && (
-              <div className={`dia-barra escena-barra ${arranca ? "se-desengancha" : ""}`}>
-                <BarraCargada
-                  hechas={modoDescarga ? avanceDescarga.hechas : avanceDia.hechas}
-                  total={avanceDia.total}
-                  fuera={modoDescarga ? avanceDia.total - avanceDescarga.total : 0}
-                  etiqueta={modoDescarga ? `${avanceDescarga.hechas} de ${avanceDescarga.total} series de descarga` : null}
-                  alto="clamp(84px, 25cqi, 140px)"
-                  detalle
-                />
-              </div>
-            )}
-          </div>
-          </div>
           {avanceDia.total > 0 && (
             <div className="plataforma-pie">
               <p className="dia-barra-texto">
@@ -30295,7 +30374,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
             </div>
           )}
           {/* El rack se para en el piso de goma, de punta a punta. */}
-          <PisoCemento />
+
         </section>
       )}
 
