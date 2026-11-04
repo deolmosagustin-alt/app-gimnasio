@@ -6309,7 +6309,8 @@ label.ajuste-rotulo { display: block; }
 
 
 /* ── LA PLATAFORMA (Rutina, vista previa del 03/11) ── */
-.dia-seccion > .dia-hero.con-plataforma { padding-top: 0; }
+.dia-seccion > .dia-hero.con-plataforma { padding-top: 0; overflow: visible; }
+.dia-seccion:has(.con-plataforma) { overflow: clip; }
 .plataforma { position: relative; margin: 0 -20px; padding: 24px 20px 0; border-radius: 30px 30px 0 0; overflow: hidden;
   background:
     radial-gradient(circle, rgba(10,11,13,.85) 0 1.6px, rgba(255,255,255,.06) 2.1px, transparent 2.6px) 8px 8px / 14px 14px,
