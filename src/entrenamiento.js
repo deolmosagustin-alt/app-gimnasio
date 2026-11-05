@@ -100,3 +100,29 @@ export function ejerciciosEnBaja(logs, routine, hoy = todayStr()) {
   }));
   return lista;
 }
+
+// EL PLAN DE UN ENTRENADOR, SEMANA POR SEMANA (04/11, pedido: "planificaciones
+// coherentes, nada de saltos muy bruscos"). Desde lo último que hiciste en
+// esa serie (`base`, en la unidad que se ve), cada semana repite o da UN
+// paso de la doble progresión (siguientePaso). Cuándo da el paso depende de
+// la experiencia: el principiante, todas las semanas; el intermedio, dos de
+// cada tres (la tercera consolida); el avanzado, una de cada dos. Mantener no
+// sube nada. La evidencia: el ACSM (2009) sube la carga de a 2-10 % cuando
+// sobran una o dos reps, y la fuerza crece del orden de 1,5 a 2,6 % por
+// semana (metaanálisis de frecuencia, Stronger by Science); una rep más ronda
+// un 3 % de 1RM estimado, así que nunca hay más de un paso por semana.
+export const CADENCIAS = { principiante: [true], intermedio: [true, true, false], avanzado: [true, false], mantenimiento: [false] };
+export function planDeEntrenador(base, { repRange, salto = 2.5, desde = 1, semanas = 4, cadencia = "intermedio" } = {}) {
+  if (!base || !(base.reps > 0)) return [];
+  const patron = CADENCIAS[cadencia] || CADENCIAS.intermedio;
+  const out = [];
+  let actual = { kg: base.kg || 0, reps: base.reps };
+  for (let k = 0; k < Math.max(1, semanas); k++) {
+    if (patron[k % patron.length]) {
+      const p = siguientePaso(actual.kg, actual.reps, repRange || `${actual.reps}-${actual.reps + 2}`, salto);
+      if (p) actual = { kg: p.kg, reps: p.reps };
+    }
+    out.push({ week: desde + k, kg: actual.kg, reps: actual.reps });
+  }
+  return out;
+}

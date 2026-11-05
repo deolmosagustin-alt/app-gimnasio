@@ -72,3 +72,23 @@ describe("ejerciciosEnBaja", () => {
     expect(ejerciciosEnBaja(logs, rutina, "2026-12-20")).toEqual([]);
   });
 });
+
+import { planDeEntrenador } from "./entrenamiento.js";
+describe("planDeEntrenador", () => {
+  it("el principiante da un paso por semana, sin saltos bruscos", () => {
+    const p = planDeEntrenador({ kg: 80, reps: 8 }, { repRange: "8-10", salto: 2.5, semanas: 4, cadencia: "principiante" });
+    expect(p.map((e) => `${e.reps}x${e.kg}`)).toEqual(["9x80", "10x80", "8x82.5", "9x82.5"]);
+  });
+  it("el intermedio consolida una de cada tres semanas", () => {
+    const p = planDeEntrenador({ kg: 80, reps: 8 }, { repRange: "8-12", salto: 2.5, semanas: 3, cadencia: "intermedio", desde: 2 });
+    expect(p.map((e) => [e.week, e.reps, e.kg])).toEqual([[2, 9, 80], [3, 10, 80], [4, 10, 80]]);
+  });
+  it("con una máquina de 15 lb y poco peso, suma reps antes de saltar", () => {
+    const p = planDeEntrenador({ kg: 60, reps: 12 }, { repRange: "10-12", salto: 15, semanas: 3, cadencia: "principiante" });
+    expect(p.map((e) => `${e.reps}x${e.kg}`)).toEqual(["13x60", "14x60", "10x75"]);
+  });
+  it("mantener no sube nada", () => {
+    const p = planDeEntrenador({ kg: 50, reps: 10 }, { repRange: "8-12", semanas: 3, cadencia: "mantenimiento" });
+    expect(new Set(p.map((e) => `${e.reps}x${e.kg}`)).size).toBe(1);
+  });
+});

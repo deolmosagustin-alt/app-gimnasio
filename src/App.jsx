@@ -69,7 +69,7 @@ import {
 // Buscar ejercicios como los escribe la gente (sin tildes, en cualquier
 // orden, con errores de tipeo, en inglés o con el apodo del gimnasio).
 import { buscarEjercicios, mejorEjercicio, nombreCoincide, partesResaltadas, REGIONES_BUSCADOR, alternativasDe } from "./buscar-ejercicios.js";
-import { rangoDeReps, siguientePaso, seriesDeDescarga, cargaDeDescarga, ejerciciosEnBaja } from "./entrenamiento.js";
+import { rangoDeReps, siguientePaso, seriesDeDescarga, cargaDeDescarga, ejerciciosEnBaja, planDeEntrenador } from "./entrenamiento.js";
 // Modus Fit Premium: preparada y con el cobro apagado por bandera (ver
 // src/suscripcion.js y docs/suscripcion.md).
 import {
@@ -6981,6 +6981,41 @@ label.ajuste-rotulo { display: block; }
 .medida-foto { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border-radius: 999px; font-size: 15px; font-weight: 650; color: var(--text-strong); box-shadow: inset 0 0 0 1px var(--hairline-fuerte); }
 .medida-foto svg { color: var(--text-muted); }
 .medida-foto:active { transform: scale(.97); }
+
+/* ── PLANIFICAR CON IA, POR PASOS (04/11) ── */
+.plan-pasos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 0 20px 10px; }
+.plan-pasos span { padding-top: 8px; border-top: 3px solid var(--hairline-fuerte); font-size: 12px; font-weight: 650; color: var(--text-faint); }
+.plan-pasos span.hecho { border-top-color: color-mix(in oklab, var(--tono) 55%, #8a8c92); color: var(--text-muted); }
+.plan-pasos span.actual { border-top-color: color-mix(in oklab, var(--tono) 72%, white); color: var(--text-strong); }
+.plan-meta-recomendada { width: 100%; text-align: left; }
+.plan-meta-recomendada b { font-size: 18px; font-weight: 800; color: #1f1f22; }
+.plan-meta-recomendada > span:last-child { font-size: 14px; line-height: 1.4; color: #4d4d52; }
+.plan-meta-recomendada.elegida { box-shadow: 0 0 0 2.5px color-mix(in oklab, var(--tono) 72%, white), 0 14px 30px -18px rgba(0,0,0,.8); }
+.plan-ej-fila { display: grid; gap: 6px; }
+.plan-salto { flex: none; display: grid; justify-items: center; min-width: 64px; min-height: 44px; padding: 4px 10px; border-radius: 14px; background: var(--velo); }
+.plan-salto span { font-size: 11px; color: var(--text-faint); }
+.plan-salto b { font-size: 13px; font-weight: 750; color: var(--text-strong); white-space: nowrap; }
+.plan-salto[aria-expanded="true"] { background: color-mix(in oklab, var(--tono) 18%, var(--surface-1)); }
+.plan-ej-fila .plan-tilde { width: auto; min-width: 0; }
+.plan-saltos .armado-saltos-opciones { flex-wrap: wrap; }
+.plan-saltos { display: grid; gap: 6px; margin: 0 0 6px; padding: 10px 12px; border-radius: 16px; background: var(--panel-sunken); }
+.plan-local { margin: 4px 0; }
+.plan-semanas-hojas { display: grid; gap: 10px; }
+.plan-hoja-semana { padding: 12px 14px; border-radius: 14px; color: #2b2d33; background: linear-gradient(transparent 0 30px, rgba(70,110,170,.0) 30px), #ece8dd; box-shadow: 0 8px 14px -10px rgba(0,0,0,.6); filter: brightness(.94); }
+.light-mode .plan-hoja-semana { filter: none; background: #f6f4ee; }
+.plan-hoja-semana.esta { box-shadow: 0 0 0 2px color-mix(in oklab, var(--tono) 60%, #8a8c92), 0 8px 14px -10px rgba(0,0,0,.6); }
+.plan-hoja-semana-titulo { display: flex; align-items: baseline; gap: 8px; padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1.5px solid #c95a5c55; }
+.plan-hoja-semana-titulo b { font-size: 16px; font-weight: 800; }
+.plan-hoja-semana-titulo span { font-size: 12px; font-weight: 700; color: #6b6252; }
+.plan-hoja-renglon { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "n v" "n c"; column-gap: 10px; padding: 6px 0; border-bottom: 1px solid rgba(90,110,150,.22); }
+.plan-hoja-renglon:last-child { border-bottom: 0; }
+.plan-hoja-nombre { grid-area: n; align-self: center; font-size: 14px; font-weight: 600; line-height: 1.25; }
+.plan-hoja-renglon b { grid-area: v; text-align: right; font-size: 17px; font-weight: 800; }
+.plan-hoja-renglon em { grid-area: c; text-align: right; font-style: normal; font-size: 12px; font-weight: 650; color: #7a7466; }
+.plan-hoja-renglon em.sube { color: #2f7a52; }
+
+.descarga-salto { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; font-size: 12px; color: var(--text-faint); }
+.descarga-saltos { margin: 0 0 10px; }
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -15202,7 +15237,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
             SeriesDescarga); el cuerpo cambia en el lugar, sin abrir nada. */}
         {descarga ? (
           <div key="descarga" className="cuerpo-cambia">
-            <SeriesDescarga exercise={exercise} descarga={descarga} accent={accent} logs={logs} settings={settings} cicloActual={cicloActual} restTimerId={restTimerId} restSeconds={restSeconds} />
+            <SeriesDescarga exercise={exercise} descarga={descarga} accent={accent} logs={logs} settings={settings} cicloActual={cicloActual} restTimerId={restTimerId} restSeconds={restSeconds} onUpdateSettings={onUpdateSettings} />
             {!exercise.cardio && !descarga.previa && settings.autoStartRestTimer !== true && restTimerId && (
               <div className="pt-2"><RestTimer seconds={restSeconds} accent={accent} timerId={restTimerId} exerciseName={exercise.name} /></div>
             )}
@@ -15528,9 +15563,19 @@ function groupExercisesIntoSupersets(exercises) {
    segunda forma de escribir plannedProgression.
 ============================================================================ */
 const PLANIF_PLAZOS = [
-  { k: "semana", l: "Esta semana", d: "Sólo la semana que viene", semanas: 1 },
-  { k: "mes", l: "Un mes", d: "Cuatro semanas de progresión", semanas: 4 },
-  { k: "ciclo", l: "Ciclo completo", d: "Todas las semanas de tu ciclo", semanas: null },
+  { k: "ciclo", l: "Lo que queda del ciclo", d: "Hasta la descarga", semanas: null },
+  { k: "mes", l: "Cuatro semanas", d: "Un bloque, y después ves cómo seguís", semanas: 4 },
+  { k: "dos", l: "Dos semanas", d: "Para probar el ritmo", semanas: 2 },
+  { k: "semana", l: "Una semana", d: "Sólo la que viene", semanas: 1 },
+];
+// QUÉ QUERÉS LOGRAR (04/11, pedido: "que te dé propuestas, como cuando
+// elegís la rutina apenas la instalás"): cuatro metas en palabras de gimnasio,
+// cada una con su objetivo de siempre por detrás. La primera, recomendada.
+const PLAN_METAS = [
+  { k: "cargas", objetivo: "mixto", l: "Subir mis cargas", d: "Una rep más por semana y, al llegar al tope del rango, un salto de peso." },
+  { k: "musculo", objetivo: "hipertrofia", l: "Ganar músculo", d: "De 8 a 12 reps, con volumen y sin ir al fallo." },
+  { k: "fuerza", objetivo: "fuerza", l: "Ganar fuerza", d: "De 3 a 6 reps, cargas altas y descansos largos." },
+  { k: "mantener", objetivo: "mantenimiento", l: "Mantener o volver de una pausa", d: "Las cargas de ahora, sin forzar." },
 ];
 // Objetivos del plan: además de recordarse de una planificación a la
 // siguiente (settings.planObjetivo), cada uno trae sus propias variables de
@@ -15577,20 +15622,22 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
   // ninguna semana marcada y el plan se pedía para una semana que no existe.
   const [desdeSemana, setDesdeSemana] = useState(() => Math.min(Math.max(1, weekInCycle || 1), Math.max(1, trainWeeks || TRAIN_WEEKS)));
   const [excluidos, setExcluidos] = useState(() => new Set());
-  const [verEjercicios, setVerEjercicios] = useState(false);
   const [verAjustes, setVerAjustes] = useState(false);
   const [respetarRango, setRespetarRango] = useState(settings.planRespetarRango !== false);
   const [soloVacios, setSoloVacios] = useState(settings.planSoloVacios === true);
   const [conRpe, setConRpe] = useState(true);
   const [nota, setNota] = useState(settings.planNota || "");
   const [estado, setEstado] = useState("form"); // form | generando | preview | error
+  const [paso, setPaso] = useState(0); // 0 qué lograr · 1 qué ejercicios · 2 cuánto tiempo
+  const [vista, setVista] = useState("semanas"); // la vista previa: por semana o por ejercicio
+  const [saltoAbierto, setSaltoAbierto] = useState(null);
   const [error, setError] = useState("");
   const [plan, setPlan] = useState(null); // { planes, noReconocidos }
   const [descartados, setDescartados] = useState(() => new Set()); // ejercicios sacados en la vista previa
 
   const model = useMemo(() => (routineDef ? buildRoutineModel(routineDef) : null), [routineDef]);
   const ciclo = trainWeeks || TRAIN_WEEKS;
-  const semanas = plazo === "ciclo" ? ciclo : PLANIF_PLAZOS.find((p) => p.k === plazo).semanas;
+  const semanas = plazo === "ciclo" ? ciclo : (PLANIF_PLAZOS.find((p) => p.k === plazo)?.semanas || ciclo);
   const dias = model?.dayOrder || [];
   // El plan no puede desbordar el ciclo: si arrancás en la semana 6 de un
   // ciclo de 8, "un mes" son 3 semanas, no 4 (la 9 no existe, el ciclo
@@ -15633,9 +15680,43 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
 
   const seleccionados = useMemo(() => candidatos.filter((e) => !excluidos.has(e.id) && !(soloVacios && e.yaPlanificado)), [candidatos, excluidos, soloVacios]);
   const toggleEjercicio = (id) => setExcluidos((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  // De a cuánto sube cada ejercicio, elegido acá mismo (pedido: "con barra de
+  // 2,5 kg en 2,5 kg, una máquina de 15 lb en 15 lb, y poder elegirlo"). Es
+  // el mismo dato que el "de a 2,5" de la serie: lo usan la serie, el plan y
+  // la descarga. Una máquina en libras se guarda en libras aunque entrenes en
+  // kilos.
+  const elegirSalto = (id, v, u) => {
+    const saltos = { ...(settings?.saltosDePeso || {}) };
+    const deFabrica = u === "lbs" ? 5 : 2.5;
+    if (u === unit && v === deFabrica) delete saltos[id];
+    else saltos[id] = { v, u };
+    onSavePrefs?.({ saltosDePeso: saltos });
+    haptic(8);
+  };
 
   const guardarPrefs = () => {
     onSavePrefs?.({ planPlazo: plazo, planObjetivo: objetivo, planNivel: nivel, planRespetarRango: respetarRango, planSoloVacios: soloVacios, planNota: nota.trim() });
+  };
+
+  // EL PLAN SIN LA IA: la misma regla que corrige a la IA (planDeEntrenador),
+  // desde tu última vez en cada serie. Sale si la IA no contesta o no tiene
+  // cupo: nunca te quedás sin plan.
+  const planLocal = () => {
+    const obj = planObjetivoDe(objetivo);
+    const cadencia = objetivo === "mantenimiento" ? "mantenimiento" : nivel;
+    const planes = [];
+    seleccionados.forEach((e) => {
+      const ex = model.exerciseById[e.id];
+      (ex?.sets || []).forEach((set, i) => {
+        const u = ultimaDeLaSerie(logs, e.id, i);
+        const base = u ? { kg: kgToDisplay(u.kg, unit), reps: u.reps } : (i === 0 && e.mejor ? e.mejor : null);
+        if (!base) return;
+        const entries = planDeEntrenador(base, { repRange: (respetarRango && set.repRange) || `${obj.reps}-${obj.tope}`, salto: e.salto, desde: desdeSemana, semanas: semanasReales, cadencia })
+          .map((x) => ({ ...x, kg: displayToKg(x.kg, unit) }));
+        if (entries.length) planes.push({ exerciseId: e.id, nombre: e.nombre, setIndex: i, entries });
+      });
+    });
+    return planes;
   };
 
   const generar = async () => {
@@ -15750,6 +15831,13 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
     } catch (e) {
       console.error("[planificador IA]", e);
       if (!e?.sinCupo) registrarFalloIA("planificador", e, null, prompt?.length ?? null);
+      const locales = planLocal();
+      if (locales.length) {
+        setPlan({ planes: locales, noReconocidos: [], local: e?.sinCupo ? "La IA no tiene cupo ahora: lo armamos con la regla del entrenador, desde tu última vez." : "La IA no respondió: lo armamos con la regla del entrenador, desde tu última vez." });
+        setDescartados(new Set());
+        setEstado("preview");
+        return;
+      }
       setError(e?.name === "AbortError" ? "La IA tardó demasiado. Probá con un plazo más corto o menos ejercicios." : (e?.message || "No pudimos armar el plan."));
       setEstado("error");
     } finally {
@@ -15776,6 +15864,29 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
     });
   }, [plan, candidatos, unit]);
   const aAplicar = useMemo(() => porEjercicio.filter((g) => !descartados.has(g.id)), [porEjercicio, descartados]);
+  // EL PANTALLAZO (pedido: "que primero te muestre: tal semana vas a tener
+  // estos ejercicios planificados"): una hoja por semana con la primera
+  // serie de cada ejercicio y qué cambia contra la semana anterior.
+  const porSemana = useMemo(() => {
+    if (!plan) return [];
+    const semanasPlan = [...new Set(aAplicar.flatMap((g) => g.series[0]?.entries.map((e) => e.week) || []))].sort((a, b) => a - b);
+    return semanasPlan.map((w) => ({
+      week: w,
+      filas: aAplicar.map((g) => {
+        const lista = g.series[0]?.entries || [];
+        const k = lista.findIndex((e) => e.week === w);
+        if (k < 0) return null;
+        const e = lista[k];
+        const u = k > 0 ? lista[k - 1] : ultimaDeLaSerie(logs, g.id, g.series[0].setIndex);
+        let cambio = "";
+        if (u) {
+          const dk = kgToDisplay(e.kg, unit) - kgToDisplay(u.kg, unit);
+          cambio = dk > 0.01 ? `+${conComa(Math.round(dk * 100) / 100)} ${uLabel}` : e.reps > u.reps ? `+${e.reps - u.reps} ${e.reps - u.reps === 1 ? "rep" : "reps"}` : e.reps < u.reps && dk < -0.01 ? "más liviano" : "igual";
+        }
+        return { id: g.id, nombre: g.nombre, reps: e.reps, kg: kgToDisplay(e.kg, unit), cambio, sube: cambio.startsWith("+") };
+      }).filter(Boolean),
+    }));
+  }, [plan, aAplicar, logs, unit, uLabel]);
 
   const aplicar = () => {
     const ids = new Set(aAplicar.map((g) => g.id));
@@ -15793,148 +15904,197 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
         <div className="modal-rutina-cabeza">
           <div className="min-w-0">
             <h3 className="ficha-titulo">Planificar con IA</h3>
-            <p className="ficha-bajada">Tu progresión entera, de una vez, desde tus marcas. La ves antes de aplicarla.</p>
+            <p className="ficha-bajada">Lo ves semana por semana antes de aplicarlo.</p>
           </div>
           <button onClick={onClose} aria-label="Cerrar" className="boton-redondo shrink-0"><X size={17} /></button>
         </div>
 
         {estado === "form" && (
           <>
-            <div className="modal-rutina-cuerpo">
-              <section className="plan-ia-bloque" aria-label="Para cuánto tiempo">
-                <p className="ficha-grupo-titulo">Para cuánto tiempo</p>
-                <div className="plan-lista">
-                  {PLANIF_PLAZOS.map((p) => {
-                    const n = p.k === "ciclo" ? ciclo : p.semanas;
+            {/* Los pasos, como una tira de tres: dónde estás y cuánto falta. */}
+            <div className="plan-pasos" aria-hidden="true">
+              {["Qué lograr", "Ejercicios", "Tiempo"].map((t, k) => <span key={t} className={k === paso ? "actual" : k < paso ? "hecho" : ""}>{t}</span>)}
+            </div>
+            <div className="modal-rutina-cuerpo" key={paso}>
+              {paso === 0 && (
+                <section className="plan-ia-bloque bounce-in" aria-label="Qué querés lograr">
+                  <p className="ficha-grupo-titulo">¿Qué querés lograr?</p>
+                  {/* La recomendada, en papel, como en el primer uso. */}
+                  {(() => {
+                    const m = PLAN_METAS[0];
+                    const elegida = objetivo === m.objetivo;
                     return (
-                      <button key={p.k} role="radio" aria-checked={plazo === p.k} onClick={() => setPlazo(p.k)} className="plan-objetivo fila">
-                        <span className="min-w-0 flex-1"><b>{p.l}</b><span>{p.d}</span></span>
-                        <em>{n} {n === 1 ? "semana" : "semanas"}</em>
+                      <button role="radio" aria-checked={elegida} onClick={() => setObjetivo(m.objetivo)} className={`eleccion-recomendada plan-meta-recomendada ${elegida ? "elegida" : ""}`}>
+                        <span className="eleccion-recomendada-ceja">Recomendada</span>
+                        <b>{m.l}</b>
+                        <span>{m.d}</span>
                       </button>
                     );
-                  })}
-                </div>
-              </section>
-
-              {/* Desde qué semana del ciclo: sin esto el plan pisaba semanas que
-                  ya habías entrenado. La escalera, como en el planificador. */}
-              {ciclo > 1 && (
-                <section className="plan-semanas" aria-label="Desde qué semana">
-                  <div className="plan-semanas-cabeza">
-                    <p className="plan-semana-titulo">Desde la semana {desdeSemana}{semanasReales > 1 ? <span>, hasta la {desdeSemana + semanasReales - 1}</span> : null}</p>
-                  </div>
-                  <div className="plan-escalera" role="tablist" aria-label="Semana en que arranca">
-                    {Array.from({ length: ciclo }, (_, i) => i + 1).map((w, i) => (
-                      <button key={w} role="tab" aria-selected={desdeSemana === w} onClick={() => setDesdeSemana(w)}
-                        className={`plan-escalon ${w > desdeSemana && w < desdeSemana + semanasReales ? "cargada" : ""} ${w === weekInCycle ? "hoy" : ""}`}
-                        style={{ "--f": 0.3 + (0.7 * (i + 1)) / ciclo }}
-                        aria-label={`Semana ${w}${w === weekInCycle ? ", la de ahora" : ""}`}>
-                        <span className="plan-escalon-bloque" aria-hidden="true" />
-                        <span className="plan-escalon-numero" aria-hidden="true">{w}</span>
+                  })()}
+                  <p className="armado-nota">o elegí otra</p>
+                  <div className="plan-lista" role="radiogroup" aria-label="Otras metas">
+                    {PLAN_METAS.slice(1).map((m) => (
+                      <button key={m.k} role="radio" aria-checked={objetivo === m.objetivo} onClick={() => setObjetivo(m.objetivo)} className="plan-objetivo fila">
+                        <span className="min-w-0 flex-1"><b>{m.l}</b><span>{m.d}</span></span>
                       </button>
                     ))}
                   </div>
-                  {weekInCycle && <p className="armado-nota">Subrayada, la semana que estás viviendo.</p>}
                 </section>
               )}
 
-              <section className="plan-ia-bloque" aria-label="Qué ejercicios">
-                <p className="ficha-grupo-titulo">Qué ejercicios</p>
-                <div className="armado-riel" role="tablist" aria-label="De qué días">
-                  {[{ k: "todos", l: "Toda la rutina" }, ...dias.map((dk) => ({ k: dk, l: model.days[dk]?.label || dk, c: model.days[dk]?.color }))].map((o) => (
-                    <button key={o.k} role="tab" aria-selected={dayKey === o.k} onClick={() => setDayKey(o.k)} className="armado-solapa" style={{ "--c": o.c || "var(--tono)" }}><span>{o.l}</span></button>
-                  ))}
-                </div>
-                <button onClick={() => setVerEjercicios((v) => !v)} aria-expanded={verEjercicios} className="plan-ia-resumen">
-                  <span className="min-w-0 flex-1">{seleccionados.length} de {candidatos.length} {candidatos.length === 1 ? "ejercicio" : "ejercicios"}, {seleccionados.filter((e) => e.mejor).length} con marcas para progresar</span>
-                  <span className="plan-ia-resumen-accion">{verEjercicios ? "Ocultar" : "Elegir uno por uno"}</span>
-                </button>
-                {/* Ejercicio por ejercicio: casi siempre hay uno que no querés
-                    que toque (el que estás rehabilitando, el que ya planificaste). */}
-                {verEjercicios && (
-                  <div className="plan-ia-ejercicios bounce-in">
-                    <div className="flex gap-2">
-                      <button onClick={() => setExcluidos(new Set())} className="armado-chip">Todos</button>
-                      <button onClick={() => setExcluidos(new Set(candidatos.map((e) => e.id)))} className="armado-chip">Ninguno</button>
-                    </div>
+              {paso === 1 && (
+                <section className="plan-ia-bloque bounce-in" aria-label="Qué ejercicios">
+                  <p className="ficha-grupo-titulo">¿Qué ejercicios querés planificar?</p>
+                  <div className="armado-riel" role="tablist" aria-label="De qué días">
+                    {[{ k: "todos", l: "Toda la rutina" }, ...dias.map((dk) => ({ k: dk, l: model.days[dk]?.label || dk, c: model.days[dk]?.color }))].map((o) => (
+                      <button key={o.k} role="tab" aria-selected={dayKey === o.k} onClick={() => setDayKey(o.k)} className="armado-solapa" style={{ "--c": o.c || "var(--tono)" }}><span>{o.l}</span></button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button onClick={() => setExcluidos(new Set())} className="armado-chip">Todos</button>
+                    <button onClick={() => setExcluidos(new Set(candidatos.filter((e) => !e.mejor).map((e) => e.id)))} className="armado-chip">Con marcas</button>
+                    <button onClick={() => setExcluidos(new Set(candidatos.map((e) => e.id)))} className="armado-chip">Ninguno</button>
+                  </div>
+                  <div className="plan-ia-ejercicios">
                     {candidatos.map((e) => {
                       const on = !excluidos.has(e.id);
+                      const guardado = settings?.saltosDePeso?.[e.id];
+                      const uSalto = guardado?.u === "lbs" || guardado?.u === "kg" ? guardado.u : unit;
+                      const vSalto = guardado?.v > 0 ? guardado.v : (uSalto === "lbs" ? 5 : 2.5);
+                      const abierto = saltoAbierto === e.id;
                       return (
-                        <button key={e.id} role="checkbox" aria-checked={on} onClick={() => toggleEjercicio(e.id)} className={`plan-tilde ${on ? "on" : ""}`}>
-                          <span className={`galleta plan-tilde-marca ${on ? "" : "hueca"}`} aria-hidden="true">{on && <Check size={13} strokeWidth={3} />}</span>
-                          <span className="min-w-0 flex-1">
-                            <span className="plan-tilde-nombre">{e.nombre}</span>
-                            <span className="plan-tilde-sub">{e.dia}, {e.mejor ? `tu mejor ${e.mejor.reps} × ${conComa(e.mejor.kg)} ${uLabel}` : "sin marcas"}{e.yaPlanificado ? ", ya planificado" : ""}</span>
-                          </span>
-                        </button>
+                        <div key={e.id} className={`plan-ej-fila ${on ? "on" : ""}`}>
+                          <div className="flex items-center gap-2">
+                            <button role="checkbox" aria-checked={on} onClick={() => toggleEjercicio(e.id)} className={`plan-tilde flex-1 min-w-0 ${on ? "on" : ""}`}>
+                              <span className={`galleta plan-tilde-marca ${on ? "" : "hueca"}`} aria-hidden="true">{on && <Check size={13} strokeWidth={3} />}</span>
+                              <span className="min-w-0 flex-1">
+                                <span className="plan-tilde-nombre">{e.nombre}</span>
+                                <span className="plan-tilde-sub">{e.dia}, {e.mejor ? `tu mejor ${e.mejor.reps} × ${conComa(e.mejor.kg)} ${uLabel}` : "sin marcas: primero medilo"}{e.yaPlanificado ? ", ya planificado" : ""}</span>
+                              </span>
+                            </button>
+                            {on && (
+                              <button onClick={() => setSaltoAbierto(abierto ? null : e.id)} aria-expanded={abierto} className="plan-salto" aria-label={`Sube de a ${conComa(vSalto)} ${weightLabel(uSalto)}. Cambiar`}>
+                                <span>de a</span><b>{conComa(vSalto)} {weightLabel(uSalto)}</b>
+                              </button>
+                            )}
+                          </div>
+                          {on && abierto && (
+                            <div className="plan-saltos bounce-in">
+                              <p className="armado-campo-rotulo">Barra o mancuernas (discos en kg)</p>
+                              <div className="armado-saltos-opciones">
+                                {SALTOS_KG.map((v) => <button key={`kg${v}`} onClick={() => elegirSalto(e.id, v, "kg")} aria-pressed={uSalto === "kg" && vSalto === v} className={`armado-salto ${uSalto === "kg" && vSalto === v ? "activo" : ""}`}>{conComa(v)}</button>)}
+                                <span className="armado-saltos-unidad">kg</span>
+                              </div>
+                              <p className="armado-campo-rotulo">Máquina o discos en libras</p>
+                              <div className="armado-saltos-opciones">
+                                {SALTOS_LBS.map((v) => <button key={`lb${v}`} onClick={() => elegirSalto(e.id, v, "lbs")} aria-pressed={uSalto === "lbs" && vSalto === v} className={`armado-salto ${uSalto === "lbs" && vSalto === v ? "activo" : ""}`}>{conComa(v)}</button>)}
+                                <span className="armado-saltos-unidad">lb</span>
+                              </div>
+                              <p className="armado-nota">Vale para la serie, el plan y la descarga de este ejercicio.</p>
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
-                )}
-              </section>
+                </section>
+              )}
 
-              <section className="plan-ia-bloque" aria-label="Objetivo">
-                <p className="ficha-grupo-titulo">Objetivo</p>
-                <div className="plan-objetivos" role="radiogroup" aria-label="Objetivo">
-                  {PLAN_OBJETIVOS.map((o) => (
-                    <button key={o.k} role="radio" aria-checked={objetivo === o.k} onClick={() => setObjetivo(o.k)} className="plan-objetivo"><b>{o.l}</b><span>{o.d}</span></button>
-                  ))}
-                </div>
-              </section>
-
-              <section className="plan-ia-bloque" aria-label="Tu experiencia">
-                <p className="ficha-grupo-titulo">Tu experiencia</p>
-                <div className="plan-objetivos tres" role="radiogroup" aria-label="Tu experiencia">
-                  {PLAN_NIVELES.map((n) => (
-                    <button key={n.k} role="radio" aria-checked={nivel === n.k} onClick={() => setNivel(n.k)} className="plan-objetivo"><b>{n.l}</b><span>{n.d}</span></button>
-                  ))}
-                </div>
-              </section>
-
-              {/* Lo que separa un plan genérico de uno tuyo; plegado porque lo
-                  de fábrica ya es razonable. */}
-              <div className={`plan-variables ${verAjustes ? "abierto" : ""}`}>
-                <button onClick={() => setVerAjustes((v) => !v)} aria-expanded={verAjustes} className="plan-opcion">
-                  <span className="plan-opcion-icono neutro" aria-hidden="true"><Sliders size={18} /></span>
-                  <span className="min-w-0 flex-1">
-                    <span className="plan-opcion-titulo">Ajustes finos</span>
-                    <span className="plan-opcion-desc">El rango de tu rutina, lo ya planificado, RPE y fases, y lo que tenga que saber</span>
-                  </span>
-                  <ChevronDown size={18} className="armado-ej-chevron" aria-hidden="true" />
-                </button>
-                {verAjustes && (
-                  <div className="plan-variables-cuerpo bounce-in">
-                    {[
-                      { on: respetarRango, set: setRespetarRango, l: "Respetar el rango de reps", d: "No cambia el 8-12 de tu rutina para poder subir más kilos" },
-                      { on: soloVacios, set: setSoloVacios, l: "No pisar lo ya planificado", d: "Sólo completa los ejercicios que todavía no tienen meta" },
-                      { on: conRpe, set: setConRpe, l: "Incluir RPE y fases", d: "Suma el esfuerzo y la fase del bloque a cada semana" },
-                    ].map((t) => (
-                      <InterruptorArmado key={t.l} titulo={t.l} desc={t.d} on={t.on} onToggle={() => t.set(!t.on)} />
-                    ))}
-                    <label className="plan-nota">
-                      <span className="armado-campo-rotulo">Algo que tenga en cuenta</span>
-                      <textarea value={nota} onChange={(e) => setNota(e.target.value)} rows={2} maxLength={300}
-                        placeholder={`Ej: vengo de una lesión de hombro, no tengo discos de ${enLibras ? "2,5 lb" : "1,25 kg"}, entreno 3 veces por semana`} />
-                      <span className="armado-nota">Se guarda para la próxima vez y pesa más que las reglas generales.</span>
-                    </label>
+              {paso === 2 && (
+                <>
+                  <section className="plan-ia-bloque bounce-in" aria-label="En cuánto tiempo">
+                    <p className="ficha-grupo-titulo">¿En cuánto tiempo?</p>
+                    <div className="plan-lista">
+                      {/* Sólo los plazos que entran en lo que queda del ciclo: en la
+                          semana 6 de 7, "cuatro semanas" también eran dos. */}
+                      {PLANIF_PLAZOS.filter((p) => p.k === "ciclo" || p.semanas < ciclo - desdeSemana + 1).map((p) => {
+                        const n = Math.max(1, Math.min(p.k === "ciclo" ? ciclo : p.semanas, ciclo - desdeSemana + 1));
+                        return (
+                          <button key={p.k} role="radio" aria-checked={p.k === "ciclo" ? !((PLANIF_PLAZOS.find((x) => x.k === plazo)?.semanas || 99) < ciclo - desdeSemana + 1) : plazo === p.k} onClick={() => setPlazo(p.k)} className="plan-objetivo fila">
+                            <span className="min-w-0 flex-1"><b>{p.l}</b><span>{p.d}</span></span>
+                            <em>{n} {n === 1 ? "semana" : "semanas"}</em>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                  {ciclo > 1 && (
+                    <section className="plan-semanas" aria-label="Desde qué semana">
+                      <div className="plan-semanas-cabeza">
+                        <p className="plan-semana-titulo">Desde la semana {desdeSemana}{semanasReales > 1 ? <span>, hasta la {desdeSemana + semanasReales - 1}</span> : null}</p>
+                      </div>
+                      <div className="plan-escalera" role="tablist" aria-label="Semana en que arranca">
+                        {Array.from({ length: ciclo }, (_, i) => i + 1).map((w, i) => (
+                          <button key={w} role="tab" aria-selected={desdeSemana === w} onClick={() => setDesdeSemana(w)}
+                            className={`plan-escalon ${w > desdeSemana && w < desdeSemana + semanasReales ? "cargada" : ""} ${w === weekInCycle ? "hoy" : ""}`}
+                            style={{ "--f": 0.3 + (0.7 * (i + 1)) / ciclo }}
+                            aria-label={`Semana ${w}${w === weekInCycle ? ", la de ahora" : ""}`}>
+                            <span className="plan-escalon-bloque" aria-hidden="true" />
+                            <span className="plan-escalon-numero" aria-hidden="true">{w}</span>
+                          </button>
+                        ))}
+                      </div>
+                      {weekInCycle && <p className="armado-nota">Subrayada, la semana que estás viviendo.</p>}
+                    </section>
+                  )}
+                  <section className="plan-ia-bloque" aria-label="Tu experiencia">
+                    <p className="ficha-grupo-titulo">¿Hace cuánto entrenás?</p>
+                    <div className="plan-objetivos tres" role="radiogroup" aria-label="Tu experiencia">
+                      {PLAN_NIVELES.map((n) => (
+                        <button key={n.k} role="radio" aria-checked={nivel === n.k} onClick={() => setNivel(n.k)} className="plan-objetivo"><b>{n.l}</b><span>{n.d}</span></button>
+                      ))}
+                    </div>
+                    <p className="armado-nota">{objetivo === "mantenimiento" ? "Mantener no sube nada: repite tus cargas de ahora." : nivel === "principiante" ? "Un paso por semana: una rep más o, al tope del rango, un salto de peso." : nivel === "avanzado" ? "Un paso cada dos semanas: la otra consolida." : "Dos semanas con un paso y una que consolida."}</p>
+                  </section>
+                  <div className={`plan-variables ${verAjustes ? "abierto" : ""}`}>
+                    <button onClick={() => setVerAjustes((v) => !v)} aria-expanded={verAjustes} className="plan-opcion">
+                      <span className="plan-opcion-icono neutro" aria-hidden="true"><Sliders size={18} /></span>
+                      <span className="min-w-0 flex-1">
+                        <span className="plan-opcion-titulo">Ajustes finos</span>
+                        <span className="plan-opcion-desc">El rango de tu rutina, lo ya planificado, RPE y fases, y lo que tenga que saber</span>
+                      </span>
+                      <ChevronDown size={18} className="armado-ej-chevron" aria-hidden="true" />
+                    </button>
+                    {verAjustes && (
+                      <div className="plan-variables-cuerpo bounce-in">
+                        {[
+                          { on: respetarRango, set: setRespetarRango, l: "Respetar el rango de reps", d: "No cambia el 8-12 de tu rutina para poder subir más kilos" },
+                          { on: soloVacios, set: setSoloVacios, l: "No pisar lo ya planificado", d: "Sólo completa los ejercicios que todavía no tienen meta" },
+                          { on: conRpe, set: setConRpe, l: "Incluir RPE y fases", d: "Suma el esfuerzo y la fase del bloque a cada semana" },
+                        ].map((t) => (
+                          <InterruptorArmado key={t.l} titulo={t.l} desc={t.d} on={t.on} onToggle={() => t.set(!t.on)} />
+                        ))}
+                        <label className="plan-nota">
+                          <span className="armado-campo-rotulo">Algo que tenga en cuenta</span>
+                          <textarea value={nota} onChange={(e) => setNota(e.target.value)} rows={2} maxLength={300}
+                            placeholder={`Ej: vengo de una lesión de hombro, no tengo discos de ${enLibras ? "2,5 lb" : "1,25 kg"}, entreno 3 veces por semana`} />
+                          <span className="armado-nota">Se guarda para la próxima vez y pesa más que las reglas generales.</span>
+                        </label>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-
-              <p className="armado-nota">Arranca desde tu última vez en cada serie y sube de a poco: una rep más por semana y, al llegar al tope del rango, un salto de peso.</p>
+                </>
+              )}
             </div>
             <div className="modal-rutina-pie">
-              {/* Si el que vació la lista es "No pisar lo ya planificado",
-                  decirlo: "elegí al menos un ejercicio" manda a buscar mal. */}
-              <button onClick={generar} disabled={!seleccionados.length} className="boton-pildora w-full disabled:opacity-40">
-                <Sparkles size={16} /> {seleccionados.length
-                  ? `Armar el plan: ${seleccionados.length} ${seleccionados.length === 1 ? "ejercicio" : "ejercicios"}`
-                  : soloVacios && candidatos.length && candidatos.every((e) => e.yaPlanificado || excluidos.has(e.id))
-                    ? "Ya están todos planificados"
-                    : "Elegí al menos un ejercicio"}
-              </button>
-              {!seleccionados.length && soloVacios && candidatos.length > 0 && candidatos.every((e) => e.yaPlanificado || excluidos.has(e.id)) && (
-                <p className="armado-nota text-center">Está prendido "No pisar lo ya planificado", en Ajustes finos. Apagalo para rehacer los planes que ya existen.</p>
+              {paso < 2 ? (
+                <div className="flex gap-2">
+                  {paso > 0 && <button onClick={() => setPaso(paso - 1)} className="armado-barra-cancelar flex-1">Atrás</button>}
+                  <button onClick={() => setPaso(paso + 1)} disabled={paso === 1 && !seleccionados.length} className="boton-pildora flex-1 disabled:opacity-40">
+                    {paso === 1 ? (seleccionados.length ? `Siguiente: ${seleccionados.length} ${seleccionados.length === 1 ? "ejercicio" : "ejercicios"}` : "Elegí al menos uno") : "Siguiente"}
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <button onClick={() => setPaso(1)} className="armado-barra-cancelar">Atrás</button>
+                  <button onClick={generar} disabled={!seleccionados.length} className="boton-pildora flex-1 disabled:opacity-40">
+                    <Sparkles size={16} /> {seleccionados.length
+                      ? `Ver el plan: ${semanasReales} ${semanasReales === 1 ? "semana" : "semanas"}`
+                      : soloVacios && candidatos.length && candidatos.every((e) => e.yaPlanificado || excluidos.has(e.id))
+                        ? "Ya están todos planificados"
+                        : "Elegí al menos un ejercicio"}
+                  </button>
+                </div>
               )}
             </div>
           </>
@@ -15965,11 +16125,33 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
         {estado === "preview" && plan && (
           <>
             <div className="modal-rutina-cuerpo">
-              <p className="armado-nota">{aAplicar.length} {aAplicar.length === 1 ? "ejercicio" : "ejercicios"}, de la semana {desdeSemana} a la {desdeSemana + semanasReales - 1}. Tocá uno para sacarlo.</p>
+              <p className="armado-nota">{aAplicar.length} {aAplicar.length === 1 ? "ejercicio" : "ejercicios"}, de la semana {desdeSemana} a la {desdeSemana + semanasReales - 1}. Nada se guarda hasta que toques Aplicar.</p>
+              {plan.local && <p className="ficha-aviso plan-local"><Info size={15} /> {plan.local}</p>}
+              <div className="segmentado chico" role="tablist" aria-label="Cómo ver el plan">
+                <button role="tab" aria-selected={vista === "semanas"} onClick={() => setVista("semanas")} className={vista === "semanas" ? "activo" : ""}>Semana por semana</button>
+                <button role="tab" aria-selected={vista === "ejercicios"} onClick={() => setVista("ejercicios")} className={vista === "ejercicios" ? "activo" : ""}>Por ejercicio</button>
+              </div>
+              {vista === "semanas" && (
+                <div className="plan-semanas-hojas">
+                  {porSemana.map((sem) => (
+                    <section key={sem.week} className={`plan-hoja-semana ${sem.week === weekInCycle ? "esta" : ""}`} aria-label={`Semana ${sem.week}`}>
+                      <p className="plan-hoja-semana-titulo"><b>Semana {sem.week}</b>{sem.week === weekInCycle ? <span>esta</span> : null}</p>
+                      {sem.filas.map((f) => (
+                        <p key={f.id} className="plan-hoja-renglon">
+                          <span className="plan-hoja-nombre">{f.nombre}</span>
+                          <b className="num-display">{f.reps} × {f.kg > 0 ? `${conComa(f.kg)} ${uLabel}` : "peso corporal"}</b>
+                          {f.cambio && <em className={f.sube ? "sube" : ""}>{f.cambio}</em>}
+                        </p>
+                      ))}
+                    </section>
+                  ))}
+                </div>
+              )}
               {plan.noReconocidos.length > 0 && (
                 <p className="ficha-aviso"><AlertTriangle size={15} /> Se descartaron {plan.noReconocidos.length} que no están en tu rutina: {plan.noReconocidos.join(", ")}.</p>
               )}
-              <div className="plan-ejercicios">
+              {vista === "ejercicios" && <p className="armado-nota">Tocá uno para sacarlo del plan.</p>}
+              {vista === "ejercicios" && <div className="plan-ejercicios">
                 {porEjercicio.map((g) => {
                   const fuera = descartados.has(g.id);
                   const primera = g.series[0]?.entries || [];
@@ -16007,7 +16189,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
                     </div>
                   );
                 })}
-              </div>
+              </div>}
             </div>
             <div className="modal-rutina-pie">
               <div className="flex gap-2">
@@ -17378,11 +17560,27 @@ function marcarDescargaVista() {
 // visor de la serie (lo de siempre tachado al lado, y el ✓); las que sobran,
 // tachadas en un renglón fino. En la vista previa (fuera de la semana de
 // descarga) no se marcan.
-function SeriesDescarga({ exercise, descarga, accent, logs, settings, cicloActual = null, restTimerId = null, restSeconds = null }) {
+function SeriesDescarga({ exercise, descarga, accent, logs, settings, cicloActual = null, restTimerId = null, restSeconds = null, onUpdateSettings = null }) {
   const { divisor, pct, unit, progreso, hoy, previa, onMarcar } = descarga;
   const u = weightLabel(unit);
   const quedan = seriesDeDescarga(exercise.sets.length, divisor);
   const salto = saltoDe(settings, exercise.id, unit);
+  // El salto también en la descarga (04/11, pedido: "eso de los saltos
+  // aplicarlo a la descarga, tendría más sentido"): el peso de la descarga se
+  // redondea a lo que se puede cargar en ese ejercicio, y acá se elige.
+  const [verSaltos, setVerSaltos] = useState(false);
+  const guardado = settings?.saltosDePeso?.[exercise.id];
+  const uSalto = guardado?.u === "lbs" || guardado?.u === "kg" ? guardado.u : unit;
+  const vSalto = guardado?.v > 0 ? guardado.v : (uSalto === "lbs" ? 5 : 2.5);
+  const elegirSalto = (v, un) => {
+    if (!onUpdateSettings) return;
+    const saltos = { ...(settings?.saltosDePeso || {}) };
+    if (un === unit && v === (un === "lbs" ? 5 : 2.5)) delete saltos[exercise.id];
+    else saltos[exercise.id] = { v, u: un };
+    onUpdateSettings({ saltosDePeso: saltos });
+    setVerSaltos(false);
+    haptic(10);
+  };
   const filas = exercise.sets.map((s, i) => {
     if (i >= quedan) return { i, s, sobra: true };
     const base = baseDeDescarga(exercise, i, logs, settings, cicloActual);
@@ -17393,6 +17591,28 @@ function SeriesDescarga({ exercise, descarga, accent, logs, settings, cicloActua
   const DE = { plan: "desde tu plan", reciente: "desde tu mejor serie del mes", ultima: "desde la vez pasada", record: "desde tu récord" };
   return (
     <div className="descarga-series" style={{ "--c": accent }}>
+      {!exercise.cardio && !sinDatos && onUpdateSettings && (
+        <div className="descarga-salto">
+          <span>Redondeado a lo que se puede cargar</span>
+          <button onClick={() => setVerSaltos((v) => !v)} aria-expanded={verSaltos} className="plan-salto" aria-label={`Sube de a ${conComa(vSalto)} ${weightLabel(uSalto)}. Cambiar`}>
+            <span>de a</span><b>{conComa(vSalto)} {weightLabel(uSalto)}</b>
+          </button>
+        </div>
+      )}
+      {verSaltos && (
+        <div className="plan-saltos descarga-saltos bounce-in">
+          <p className="armado-campo-rotulo">Barra o mancuernas (discos en kg)</p>
+          <div className="armado-saltos-opciones">
+            {SALTOS_KG.map((v) => <button key={`kg${v}`} onClick={() => elegirSalto(v, "kg")} aria-pressed={uSalto === "kg" && vSalto === v} className={`armado-salto ${uSalto === "kg" && vSalto === v ? "activo" : ""}`}>{conComa(v)}</button>)}
+            <span className="armado-saltos-unidad">kg</span>
+          </div>
+          <p className="armado-campo-rotulo">Máquina o discos en libras</p>
+          <div className="armado-saltos-opciones">
+            {SALTOS_LBS.map((v) => <button key={`lb${v}`} onClick={() => elegirSalto(v, "lbs")} aria-pressed={uSalto === "lbs" && vSalto === v} className={`armado-salto ${uSalto === "lbs" && vSalto === v ? "activo" : ""}`}>{conComa(v)}</button>)}
+            <span className="armado-saltos-unidad">lb</span>
+          </div>
+        </div>
+      )}
       {sinDatos && (
         <p className="descarga-sin-datos">Todavía no anotaste este ejercicio: hacé {quedan === 1 ? "una serie" : `${quedan} series`} con un peso cómodo, lejos del fallo.</p>
       )}
