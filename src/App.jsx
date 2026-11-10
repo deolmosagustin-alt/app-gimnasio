@@ -28159,8 +28159,16 @@ function RecetaPapel({ para = "", fecha = "", titulo = null, children }) {
 // Las notas adhesivas de la pizarra del Chatbot: amarilla, verde, rosa y celeste, apagadas.
 const COLORES_POSTIT = ["#ebe4bc", "#bfdac9", "#e8c6cc", "#c4d3e8"];
 const MAIL_SOPORTE = "deolmosagustin@gmail.com";
+// ¿Esta pestaña es la que se ve? Lo da PestanaGuardada. Lo que una pestaña
+// manda por un portal a document.body (la barra de escribir del Chatbot)
+// queda afuera del `hidden` de su pestaña: tiene que mirarlo acá (bug del
+// 10/11: "el lugar para escribir del Chatbot se queda aunque cambies de
+// pestaña").
+const PestanaActiva = createContext(true);
+
 function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMessages, conversations = [], activeConversationId = null, onNewConversation, onSwitchConversation, onDeleteConversation, onRenameConversation, settings, cycleStart, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onDeleteRoutine, onNavigate, onStartSession, onEndSession }) {
   const tizaHoy = usePrimeraVezHoy("pizarra");
+  const pestanaActiva = useContext(PestanaActiva);
   // EL BORRADOR (A9): con una charla nueva, el borrador pasa por la pizarra
   // y la tiza vuelve a escribir el saludo.
   const [borrando, setBorrando] = useState(false);
@@ -29191,7 +29199,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
           posición contra la pantalla real. Renderizándolo directo en
           document.body, queda totalmente afuera de esa animación, así que
           desde el primer frame está exactamente donde tiene que estar. */}
-      {typeof document !== "undefined" && createPortal(
+      {typeof document !== "undefined" && pestanaActiva && createPortal(
         <div className={`fixed bottom-0 left-0 right-0 z-10 pt-8 px-4 lg:pl-56 pointer-events-none ${settings.theme === "light" ? "light-mode" : ""}`}
              style={{
                // El degradado llega HASTA ABAJO DEL TODO (bottom-0) y el hueco
@@ -31267,7 +31275,7 @@ const TAB_ORDER = ["rutina", "progreso", "social", "descarga", "rutinas", "entre
 // Progreso, lo abierto). Lo que busque piezas en la pantalla tiene que usar
 // buscarVisible: las pestañas ocultas siguen en el documento.
 const PestanaGuardada = React.memo(function PestanaGuardada({ activa, clase = "", children }) {
-  return <div className={`pestana-guardada ${activa ? clase : ""}`} hidden={!activa}>{children}</div>;
+  return <PestanaActiva.Provider value={activa}><div className={`pestana-guardada ${activa ? clase : ""}`} hidden={!activa}>{children}</div></PestanaActiva.Provider>;
 }, (antes, ahora) => !antes.activa && !ahora.activa);
 // La primera pieza que coincide y está a la vista (no en una pestaña oculta).
 function buscarVisible(sel) {
