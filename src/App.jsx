@@ -7048,6 +7048,65 @@ label.ajuste-rotulo { display: block; }
 .codigo-regalo-cuerpo { display: grid; gap: 6px; padding: 0 10px; }
 .codigo-regalo-campo { letter-spacing: .06em; font-weight: 650; }
 .codigo-regalo-campo::placeholder { color: var(--text-faint); font-weight: 500; opacity: .7; }
+
+/* ── PERFIL, REDISEÑADO (05/11) ── */
+/* El carnet de socio: plástico grafito, con la proporción de una tarjeta. */
+.socio-tarjeta { position: relative; overflow: hidden; aspect-ratio: 1.586; max-width: 100%; border-radius: 18px; padding: 16px 18px 14px; display: grid; grid-template-rows: auto 1fr auto; color: #eef0f2; isolation: isolate;
+  background: linear-gradient(118deg, rgba(255,255,255,.07) 0 28%, transparent 28% 62%, rgba(255,255,255,.04) 62% 70%, transparent 70%), radial-gradient(120% 90% at 100% 0%, color-mix(in oklab, var(--rango) 26%, transparent), transparent 60%), linear-gradient(160deg, #2b2d33, #17181c);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.14), inset 0 0 0 1px rgba(255,255,255,.06), 0 18px 30px -18px rgba(0,0,0,.9), 0 3px 8px rgba(0,0,0,.35); }
+.socio-franja { position: absolute; z-index: -1; left: 0; right: 0; top: 0; height: 7px; background: linear-gradient(90deg, color-mix(in oklab, var(--rango) 75%, #8a8c92), color-mix(in oklab, var(--rango) 45%, #8a8c92)); }
+.socio-cabeza { display: flex; justify-content: space-between; align-items: baseline; padding-top: 4px; }
+.socio-marca { font-size: 15px; font-weight: 850; font-stretch: 80%; letter-spacing: .02em; }
+.socio-tipo { font-size: 12px; font-weight: 700; letter-spacing: .14em; color: rgba(238,240,242,.6); }
+.socio-cuerpo { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.socio-foto { position: relative; flex: none; width: 74px; height: 88px; border-radius: 10px; overflow: visible; padding: 0; background: #d9dbe0; box-shadow: 0 0 0 3px #f1f2f4, 0 4px 10px rgba(0,0,0,.45); display: grid; place-items: center; }
+.socio-foto img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; }
+.socio-foto > span { font-size: 34px; font-weight: 850; color: #3a3d44; }
+.socio-foto-camara { position: absolute; right: -8px; bottom: -8px; width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center; color: #1c1d21; background: color-mix(in oklab, var(--rango) 60%, white); box-shadow: 0 0 0 3px #1d1e22; }
+.socio-nombre { font-size: 22px; font-weight: 800; font-stretch: 85%; line-height: 1.05; overflow-wrap: anywhere; margin-bottom: 6px; }
+.socio-dato { display: flex; gap: 6px; align-items: baseline; font-size: 12px; line-height: 1.5; }
+.socio-dato span { color: rgba(238,240,242,.55); }
+.socio-dato b { font-size: 13px; font-weight: 700; }
+.socio-pie { display: flex; justify-content: space-between; align-items: end; gap: 10px; }
+.socio-barras { display: flex; align-items: stretch; gap: 1.5px; height: 26px; padding: 3px 5px; border-radius: 4px; background: #f1f2f4; }
+.socio-barras i { display: block; background: #1c1d21; }
+.socio-barras i:nth-child(3n) { background: transparent; }
+.socio-rango { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px 4px 6px; border-radius: 999px; font-size: 12px; font-weight: 750; color: color-mix(in oklab, var(--rango) 70%, white); background: rgba(0,0,0,.35); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+.carnet-con-lector.pasa .socio-tarjeta { animation: carnetPasa 1s cubic-bezier(.3,.7,.4,1) both; }
+/* Los tres sellos. */
+.socio-sellos { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr) minmax(0, 1fr); gap: 8px; }
+.socio-sello { display: grid; align-content: start; gap: 4px; padding: 10px 12px; border-radius: 16px; background: var(--surface-1); box-shadow: var(--placa-canto); min-width: 0; }
+.socio-sello-rotulo { font-size: 12px; font-weight: 650; color: var(--text-faint); }
+.socio-sello-valor { display: flex; align-items: baseline; gap: 4px; }
+.socio-sello-valor b { font-size: 24px; font-weight: 800; line-height: 1; color: var(--text-strong); }
+.socio-sello-valor small { font-size: 12px; color: var(--text-muted); }
+.socio-sello .semana-perforada { zoom: .74; margin-top: 6px; }
+/* Los grupos de ajustes: un rótulo y una sola placa con renglones. */
+.grupo-ajustes { display: grid; gap: 8px; }
+.grupo-ajustes-titulo { padding: 6px 6px 0; font-size: 13px; font-weight: 700; color: var(--text-faint); }
+.grupo-ajustes-placa { border-radius: 22px; background: var(--surface-1); box-shadow: var(--placa-canto); overflow: hidden; }
+.grupo-ajustes-placa > * + * { border-top: 1px solid var(--hairline); }
+.grupo-ajustes-filas > * + * { border-top: 1px solid var(--hairline); }
+.grupo-ajustes-placa > .seccion-plegable, .grupo-ajustes-placa > div > .seccion-plegable { border-radius: 0; box-shadow: none; background: transparent; }
+.grupo-ajustes-placa .rounded-2xl:not(.rounded-full) { border-radius: 0; box-shadow: none; background: transparent; border-color: transparent; }
+.grupo-ajustes-placa .seccion-plegable > button, .grupo-ajustes-placa > button.seccion-plegable { min-height: 60px; }
+.grupo-ajustes-placa .placa-icono { width: 28px !important; height: 28px !important; background: none; color: var(--text-muted); }
+.grupo-ajustes-placa .seccion-plegable p.text-sm { font-size: 15px; font-weight: 650; }
+.ajuste-renglon { width: 100%; display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 10px 16px; text-align: left; color: var(--text-muted); }
+.ajuste-renglon.boton:active { background: var(--velo); }
+.ajuste-renglon-nombre { flex: 1; min-width: 0; font-size: 15px; font-weight: 550; color: var(--text-strong); }
+.ajuste-renglon-nombre small { display: block; margin-top: 1px; font-size: 12px; font-weight: 500; color: var(--text-faint); }
+.ajuste-renglon-valor { font-size: 14px; font-weight: 600; text-align: right; color: var(--text-muted); }
+.ajuste-renglon-valor.sube { color: #5fbf8f; }
+.ajuste-renglon-valor.alerta { color: #e0b25a; }
+.ajuste-renglon-flecha { flex: none; color: var(--text-faint); }
+.ajuste-renglon.peligro .ajuste-renglon-nombre, .ajuste-renglon.peligro .icono-suelto { color: #e06a6f; }
+.light-mode .ajuste-renglon.peligro .ajuste-renglon-nombre, .light-mode .ajuste-renglon.peligro .icono-suelto { color: #b0353b; }
+.light-mode .ajuste-renglon-valor.sube { color: #2f7a52; }
+.light-mode .ajuste-renglon-valor.alerta { color: #946414; }
+.perfil-guardado { padding: 4px 12px 0; font-size: 12px; line-height: 1.5; color: var(--text-faint); text-align: center; text-wrap: balance; }
+.perfil-guardado svg { display: inline-block; vertical-align: -2px; margin-right: 4px; }
+.codigo-regalo-enlace { font-size: 13px; color: var(--text-faint); }
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -12722,13 +12781,8 @@ function CodigoRegalo({ uid, regalo, onCanjeado }) {
   };
   return (
     <section className={`codigo-regalo ${abierto ? "tarjeta-tonal abierto" : ""}`} aria-label="Código de regalo">
-      <button onClick={() => setAbierto((v) => !v)} aria-expanded={abierto} className="codigo-regalo-fila">
-        <span className="icono-suelto" aria-hidden="true"><Award size={17} /></span>
-        <span className="flex-1 min-w-0 text-left">
-          <span className="block text-[15px] font-semibold text-[color:var(--text-strong)]">Tengo un código</span>
-          <span className="block text-[13px] text-[color:var(--text-faint)]">Premium de regalo, de un amigo o de la familia</span>
-        </span>
-        <ChevronDown size={17} className={`shrink-0 transition-transform ${abierto ? "rotate-180" : ""}`} aria-hidden="true" />
+      <button onClick={() => setAbierto((v) => !v)} aria-expanded={abierto} className="enlace-suave mx-auto codigo-regalo-enlace">
+        <Award size={14} aria-hidden="true" /> ¿Tenés un código de regalo?
       </button>
       {abierto && (
         <div className="codigo-regalo-cuerpo bounce-in">
@@ -14894,38 +14948,67 @@ function semanaDeSesiones(sesiones = [], colorDe = () => null) {
   });
 }
 
-// EL CARNET DE SOCIO: tu ficha, como la tarjeta del gimnasio. Arriba quién
-// sos; abajo del troquel, tu racha (la cadena) y tu semana (los agujeros).
-function CarnetSocio({ color = "#8B5CF6", foto = null, inicial = "?", nombre, linea = null, medalla = null, racha = 0, semana = [], children = null }) {
+// EL CARNET DE SOCIO (05/11, rediseño de Perfil: "que tenga la estética
+// correspondiente a lo que es" y "que no tenga una pista de cómo está
+// ahora"): la tarjeta de plástico del gimnasio, con la proporción de una
+// tarjeta, la franja del color de tu rango, la foto (tocarla la cambia), tu
+// nombre, "Socio desde", tu número de socio, tu rango y el código de barras.
+// Abajo, tres sellos: la racha, la semana y las sesiones.
+function numeroDeSocio(semilla) {
+  let h = 7;
+  const t = String(semilla || "socio");
+  for (let k = 0; k < t.length; k++) h = (h * 31 + t.charCodeAt(k)) >>> 0;
+  return String(h % 100000).padStart(5, "0");
+}
+function CarnetSocio({ color = "#14B8A6", foto = null, inicial = "?", nombre, desde = null, numero = "00001", rango = null, racha = 0, semana = [], sesiones = 0, onFoto = null, semilla = "" }) {
   // EL CARNET EN EL LECTOR (A11): la primera vez del día que abrís Perfil,
   // el carnet baja por la ranura del lector del molinete y se prende la luz
   // verde, como al entrar al gimnasio.
   const pasa = usePrimeraVezHoy("carnet");
+  const barras = useMemo(() => codigoDeBarras(semilla || nombre || "socio", 38), [semilla, nombre]);
   return (
-    <div className={`carnet-con-lector ${pasa ? "pasa" : ""}`}>
-    {pasa && <span className="carnet-lector" aria-hidden="true"><i /></span>}
-    <section className="carnet elastic-in" style={{ "--rango": color }} aria-label="Tu carnet">
-      <div className="carnet-arriba">
-        <div className="carnet-avatar">{foto ? <img src={foto} alt="" /> : <span aria-hidden="true">{inicial}</span>}</div>
-        <div className="min-w-0 flex-1">
-          <p className="carnet-nombre">{nombre}</p>
-          {linea && <p className="carnet-linea">{linea}</p>}
-        </div>
-        {medalla}
+    <div className="space-y-3">
+      <div className={`carnet-con-lector ${pasa ? "pasa" : ""}`}>
+        {pasa && <span className="carnet-lector" aria-hidden="true"><i /></span>}
+        <section className="socio-tarjeta elastic-in" style={{ "--rango": rango?.color || color }} aria-label={`Tu carnet de socio: ${nombre}${desde ? `, socio desde ${desde}` : ""}, número ${numero}${rango ? `, rango ${rango.tier} ${rango.sub}` : ""}`}>
+          <div className="socio-franja" aria-hidden="true" />
+          <div className="socio-cabeza" aria-hidden="true">
+            <span className="socio-marca">Modus Fit</span>
+            <span className="socio-tipo">Socio</span>
+          </div>
+          <div className="socio-cuerpo">
+            <button onClick={onFoto || undefined} disabled={!onFoto} className="socio-foto" aria-label={foto ? "Cambiar la foto del carnet" : "Poner una foto en el carnet"}>
+              {foto ? <img src={foto} alt="" /> : <span aria-hidden="true">{inicial}</span>}
+              {onFoto && <i className="socio-foto-camara" aria-hidden="true"><Camera size={13} /></i>}
+            </button>
+            <div className="min-w-0 flex-1" aria-hidden="true">
+              <p className="socio-nombre">{nombre}</p>
+              <p className="socio-dato"><span>Socio desde</span><b>{desde || "hoy"}</b></p>
+              <p className="socio-dato"><span>N.º</span><b className="num-display">{numero}</b></p>
+            </div>
+          </div>
+          <div className="socio-pie" aria-hidden="true">
+            <span className="socio-barras">{barras.map((w, k) => <i key={k} style={{ width: `${w * 1.5}px` }} />)}</span>
+            {rango && <span className="socio-rango"><RankBadgeIcon tier={rango.tier} sub={null} color={rango.color} size={18} />{rango.tier} {rango.sub}</span>}
+          </div>
+        </section>
       </div>
-      <div className="carnet-troquel" aria-hidden="true" />
-      <div className="carnet-abajo">
-        <div className="carnet-dato">
-          <p className="carnet-rotulo">Racha</p>
-          <div className="carnet-racha"><MarcasTiza dias={racha} max={10} alto={18} decorativa className={racha > 0 ? "viva" : ""} /><b className="num-display">{racha}</b><small>{racha === 1 ? "día seguido" : "días seguidos"}</small></div>
+      {/* Los tres sellos de abajo: lo que te dice cómo venís. */}
+      <div className="socio-sellos">
+        <div className="socio-sello">
+          <p className="socio-sello-rotulo">Racha</p>
+          <div className="socio-sello-valor"><b className="num-display">{racha}</b><small>{racha === 1 ? "día" : "días"}</small></div>
+          <MarcasTiza dias={racha} max={10} alto={14} decorativa className={racha > 0 ? "viva" : ""} />
         </div>
-        <div className="carnet-dato">
-          <p className="carnet-rotulo">Esta semana</p>
+        <div className="socio-sello">
+          <p className="socio-sello-rotulo">Esta semana</p>
           <SemanaPerforada dias={semana} />
         </div>
+        <div className="socio-sello">
+          <p className="socio-sello-rotulo">Sesiones</p>
+          <div className="socio-sello-valor"><b className="num-display">{sesiones}</b><small>en total</small></div>
+        </div>
       </div>
-      {children}
-    </section>
     </div>
   );
 }
@@ -21535,34 +21618,34 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
 
   return (
     <div className="space-y-4">
-      {/* TU CARNET DE SOCIO: el mismo de Social. Arriba quién sos y desde
-          cuándo; abajo del troquel, tu racha y tu semana. La foto se cambia
-          con los botones de abajo. */}
+      {/* TU CARNET DE SOCIO (05/11): la tarjeta de plástico; tocar la foto la
+          cambia. Abajo, los sellos de tu racha, tu semana y tus sesiones. */}
       <CarnetSocio
         color="#14B8A6"
         foto={avatarUrl}
         inicial={initial}
         nombre={profileName}
-        linea={sesionesTotales ? `${sesionesTotales} ${sesionesTotales === 1 ? "sesión" : "sesiones"}${mesDeAlta ? ` desde ${mesDeAlta}` : ""}` : mesDeAlta ? `Socio desde ${mesDeAlta}` : "Tu primera sesión te espera"}
+        desde={mesDeAlta}
+        numero={numeroDeSocio(profile?.googleUid || profile?.joinedAt || profileName)}
+        rango={computeTopRank(profile)}
         racha={rachaPerfil || 0}
         semana={semanaPerfil}
-      >
-        <div className="flex gap-2 mt-3">
-          <button onClick={handleAvatarClick} className="boton-tonal flex-1 !min-h-10 !text-[13px]" style={{ "--c": "#14B8A6" }}><Camera size={15} /> {avatarUrl ? "Cambiar foto" : "Poner una foto"}</button>
-          {avatarUrl && <button onClick={handleAvatarRemove} className="boton-tonal !min-h-10 !text-[13px]" style={{ "--c": "#F43F5E" }} aria-label="Quitar foto de perfil"><X size={15} /> Quitar</button>}
-        </div>
-        <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
-      </CarnetSocio>
+        sesiones={sesionesTotales || 0}
+        onFoto={handleAvatarClick}
+        semilla={profile?.googleUid || profileName}
+      />
+      <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
       {cropSrc && <AvatarCropModal src={cropSrc} onCancel={() => setCropSrc(null)} onConfirm={handleCropConfirm} />}
 
       <VitrinaMedallas logs={profile?.logs} trainingSessions={profile?.trainingSessions} />
 
       <SeccionPremium />
-      <CodigoRegalo uid={profile?.googleUid || null} regalo={profile?.premiumRegalo || null} onCanjeado={(regalo) => onUpdateProfile({ premiumRegalo: regalo })} />
 
-      <SocialPreviewCard profile={profile} uid={profile?.googleUid} onGoToSocial={onGoToSocial} onUpdateProfile={onUpdateProfile} />
-
-      <div className="seccion-plegable divide-y divide-slate-800/50 overflow-hidden">
+      {/* TUS DATOS, en un grupo como los ajustes del teléfono. */}
+      <section className="grupo-ajustes" aria-label="Tus datos">
+        <p className="grupo-ajustes-titulo">Tus datos</p>
+        <div className="grupo-ajustes-placa">
+      <div className="grupo-ajustes-filas">
         {[
           { icon: <Mail size={15} />, label: "Email", val: profile?.email || "Sin cargar" },
           { icon: <UserCog size={15} />, label: "Sexo", val: profile?.sex === "M" ? "Masculino" : profile?.sex === "F" ? "Femenino" : "Sin cargar" },
@@ -21570,7 +21653,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
             ? { icon: <Calendar size={15} />, label: "Cumpleaños", val: `${cumpleanosEscrito(profile.birthDate)}, ${edadDe(profile)} años` }
             : { icon: <Calendar size={15} />, label: "Edad", val: edadDe(profile) ? `${edadDe(profile)} años` : "Sin cargar" },
         ].map(({ icon, label, val }) => (
-          <div key={label} className="flex items-center gap-3 px-4 py-3.5"><span className="text-slate-500">{icon}</span><span className="text-slate-400 text-[13px] flex-1">{label}</span><span className="text-slate-200 text-[13px] font-semibold text-right">{val}</span></div>
+          <div key={label} className="ajuste-renglon"><span className="icono-suelto">{icon}</span><span className="ajuste-renglon-nombre">{label}</span><span className="ajuste-renglon-valor">{val}</span></div>
         ))}
       </div>
 
@@ -21607,22 +21690,26 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           </div>
         </div>
       ) : (
-        <button onClick={() => setEditing(true)} className="w-full flex items-center gap-2 justify-center py-3 rounded-2xl border border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white transition text-sm font-medium"><Edit3 size={14} /> Editar perfil</button>
+        <button onClick={() => setEditing(true)} className="ajuste-renglon boton"><span className="icono-suelto"><Edit3 size={15} /></span><span className="ajuste-renglon-nombre">Editar tus datos</span><ChevronRight size={16} className="ajuste-renglon-flecha" /></button>
       )}
+      {avatarUrl && <button onClick={handleAvatarRemove} className="ajuste-renglon boton"><span className="icono-suelto"><X size={15} /></span><span className="ajuste-renglon-nombre">Quitar la foto del carnet</span></button>}
+        </div>
+      </section>
+
+      <section className="grupo-ajustes" aria-label="Tu cuenta">
+        <p className="grupo-ajustes-titulo">Tu cuenta</p>
+        <div className="grupo-ajustes-placa">
 
       {profile?.googleUid ? (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2.5 px-4 py-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-emerald-400 text-sm font-medium">
-            <Check size={14} className="shrink-0" /> Vinculado con Google
-          </div>
-          <button onClick={handleManualSync} disabled={syncStatus === "syncing"} className={`w-full flex items-center gap-2 justify-center py-2.5 rounded-2xl border text-xs font-bold transition-all active:scale-[0.98] ${syncStatus === "ok" ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400" : syncStatus === "error" || syncStatus === "no_auth" ? "border-rose-500/40 bg-rose-500/10 text-rose-400" : syncStatus === "syncing" ? "border-slate-700 text-slate-500" : "border-slate-700 text-slate-400 hover:border-teal-500/40 hover:text-teal-400"}`}>
-            {syncStatus === "syncing" ? <><RefreshCw size={12} className="animate-spin" /> Subiendo datos...</>
-              : syncStatus === "ok" ? <><Check size={12} /> Datos subidos a la nube</>
-              : syncStatus === "no_auth" ? "Salí y volvé a entrar con Google primero"
-              : syncStatus === "error" ? "Error al subir: verificá tu conexión"
-              : <><Upload size={12} /> Subir mis datos a la nube ahora</>}
+        <div>
+          <div className="ajuste-renglon"><span className="icono-suelto"><Check size={15} /></span><span className="ajuste-renglon-nombre">Cuenta de Google</span><span className="ajuste-renglon-valor sube">Vinculada</span></div>
+          <button onClick={handleManualSync} disabled={syncStatus === "syncing"} className="ajuste-renglon boton">
+            <span className="icono-suelto">{syncStatus === "syncing" ? <RefreshCw size={15} className="animate-spin" /> : syncStatus === "ok" ? <Check size={15} /> : <Upload size={15} />}</span>
+            <span className="ajuste-renglon-nombre">Subir mis datos a la nube<small>Antes de cambiar de celular o reinstalar</small></span>
+            <span className={`ajuste-renglon-valor ${syncStatus === "ok" ? "sube" : syncStatus === "error" || syncStatus === "no_auth" ? "alerta" : ""}`}>
+              {syncStatus === "syncing" ? "Subiendo…" : syncStatus === "ok" ? "Listo" : syncStatus === "no_auth" ? "Volvé a entrar con Google" : syncStatus === "error" ? "Sin conexión" : ""}
+            </span>
           </button>
-          <p className="text-[11px] text-slate-600 text-center">Tocá este botón desde cada dispositivo antes de cambiar de celular o reinstalar.</p>
           {avisoNubeLlena && (
             <p className="ficha-aviso" role="alert"><AlertTriangle size={15} />{avisoNubeLlena.lleno
               ? "Tu historial ya no entra en la copia de la nube: lo nuevo queda sólo en este teléfono. Escribinos y lo resolvemos."
@@ -21631,19 +21718,25 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           )}
         </div>
       ) : (
-        <button onClick={handleLinkGoogle} className="w-full flex items-center gap-2.5 justify-center py-3 rounded-2xl border border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white transition text-sm font-medium">
-          <svg className="w-4 h-4" viewBox="0 0 24 24">
+        <button onClick={handleLinkGoogle} className="ajuste-renglon boton">
+          <svg className="w-4 h-4 shrink-0 mx-0.5" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
             <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
             <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
             <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
           </svg>
-          Vincular con Google
+          <span className="ajuste-renglon-nombre">Vincular con Google<small>Para Social, el entrenador y la copia en la nube</small></span>
+          <ChevronRight size={16} className="ajuste-renglon-flecha" />
         </button>
       )}
-      {googleLinkError && <p className="text-rose-400 text-xs text-center">{googleLinkError}</p>}
+      {profile?.googleUid && <SocialPreviewCard profile={profile} uid={profile?.googleUid} onGoToSocial={onGoToSocial} onUpdateProfile={onUpdateProfile} />}
+        </div>
+        {googleLinkError && <p className="text-rose-400 text-xs text-center pt-2">{googleLinkError}</p>}
+      </section>
 
-      <p className="ajuste-rotulo px-1 pt-2">Entrenamiento</p>
+      <section className="grupo-ajustes" aria-label="Tu entrenamiento">
+      <p className="grupo-ajustes-titulo">Tu entrenamiento</p>
+      <div className="grupo-ajustes-placa">
       {/* Tu rutina, con la misma forma que las secciones de abajo (antes era
           una fila con otro borde y otro fondo). */}
       <button onClick={onGoToRoutines} className="seccion-plegable w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors active:bg-slate-800/50">
@@ -21844,7 +21937,12 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
         </div>
         <ChevronRight size={16} className="text-slate-600 shrink-0" />
       </button>
+      </div>
+      </section>
 
+      <section className="grupo-ajustes" aria-label="La app">
+      <p className="grupo-ajustes-titulo">La app</p>
+      <div className="grupo-ajustes-placa">
       <CollapsibleSection title="Avisos" subtitle={settings.reminderEnabled ? `Recordatorio a las ${settings.reminderTime}` : "Recordatorio apagado"} icon={<Bell size={16} />} accent="#F59E0B">
         <div className="space-y-3">
           <ToggleRow
@@ -21924,11 +22022,8 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           </div>
         </div>
       </CollapsibleSection>
-
-      <div className="flex items-center gap-2.5 px-1 pt-2 text-[12px] text-slate-500">
-        <Save size={12} className="text-slate-600 shrink-0" />
-        <span>Tus datos se guardan en este dispositivo, con una copia de seguridad automática.</span>
       </div>
+      </section>
 
       {/* Los términos, en un panel: un window.open a la misma dirección de la
           app la reemplazaba adentro del WebView de Android. */}
@@ -21977,6 +22072,23 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
         </div>
       )}
 
+      <section className="grupo-ajustes" aria-label="Salir">
+      <div className="grupo-ajustes-placa">
+      <button onClick={onSignOut} className="ajuste-renglon boton"><span className="icono-suelto"><LogOut size={15} /></span><span className="ajuste-renglon-nombre">Cerrar sesión</span></button>
+      {!showDeletePin ? (
+        <button onClick={() => setShowDeletePin(true)} className="ajuste-renglon boton peligro"><span className="icono-suelto"><Trash2 size={15} /></span><span className="ajuste-renglon-nombre">Eliminar el perfil de {profileName}</span></button>
+      ) : (
+        <div className="bg-rose-500/5 border border-rose-500/20 rounded-2xl p-4 bounce-in">
+          <div className="flex items-start gap-2.5 mb-4"><AlertTriangle size={16} className="text-rose-400 mt-0.5 shrink-0" /><p className="text-xs text-rose-400 font-semibold">{profile?.pin ? "Esto borra el perfil y todo el historial de forma permanente. Ingresá tu PIN para confirmar." : "Esto borra el perfil y todo el historial de forma permanente. No se puede deshacer."}</p></div>
+          {profile?.pin ? <PinInput label="PIN para confirmar" onComplete={handleDeleteConfirm} error={deleteError} onCancel={() => setShowDeletePin(false)} /> : (
+            <div className="flex gap-2"><button onClick={() => setShowDeletePin(false)} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Cancelar</button><button onClick={onDelete} className="flex-1 py-3 rounded-xl bg-rose-500 !text-white text-sm font-bold">Eliminar perfil</button></div>
+          )}
+        </div>
+      )}
+      </div>
+      </section>
+
+      <p className="perfil-guardado"><Save size={12} aria-hidden="true" /> Tus datos se guardan en este teléfono, con una copia de seguridad automática.</p>
       <div className="flex items-center justify-center gap-1">
         <button onClick={() => setShowPrivacy(true)} className="flex items-center gap-2 justify-center py-3 px-2 rounded-2xl text-slate-500 hover:text-slate-300 transition text-xs font-semibold">
           <Info size={13} /> Política de privacidad
@@ -21987,17 +22099,8 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
         </button>
       </div>
 
-      <button onClick={onSignOut} className="w-full flex items-center gap-2 justify-center py-3.5 rounded-2xl border border-slate-800 text-slate-400 hover:text-white hover:border-slate-600 transition text-sm font-semibold"><LogOut size={14} /> Cerrar sesión</button>
-      {!showDeletePin ? (
-        <button onClick={() => setShowDeletePin(true)} className="w-full flex items-center gap-2 justify-center py-3.5 rounded-2xl border border-rose-500/20 text-rose-500/70 hover:text-rose-400 hover:border-rose-500/40 transition text-sm font-semibold"><Trash2 size={14} /> Eliminar perfil de {profileName}</button>
-      ) : (
-        <div className="bg-rose-500/5 border border-rose-500/20 rounded-2xl p-4 bounce-in">
-          <div className="flex items-start gap-2.5 mb-4"><AlertTriangle size={16} className="text-rose-400 mt-0.5 shrink-0" /><p className="text-xs text-rose-400 font-semibold">{profile?.pin ? "Esto borra el perfil y todo el historial de forma permanente. Ingresá tu PIN para confirmar." : "Esto borra el perfil y todo el historial de forma permanente. No se puede deshacer."}</p></div>
-          {profile?.pin ? <PinInput label="PIN para confirmar" onComplete={handleDeleteConfirm} error={deleteError} onCancel={() => setShowDeletePin(false)} /> : (
-            <div className="flex gap-2"><button onClick={() => setShowDeletePin(false)} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Cancelar</button><button onClick={onDelete} className="flex-1 py-3 rounded-xl bg-rose-500 !text-white text-sm font-bold">Eliminar perfil</button></div>
-          )}
-        </div>
-      )}
+      {/* El código de regalo, al final y chico: lo usan pocos (05/11). */}
+      <CodigoRegalo uid={profile?.googleUid || null} regalo={profile?.premiumRegalo || null} onCanjeado={(regalo) => onUpdateProfile({ premiumRegalo: regalo })} />
     </div>
   );
 }
