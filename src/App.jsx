@@ -12450,10 +12450,11 @@ function VitrinaMedallas({ logs, trainingSessions }) {
       </div>
       <div className="vitrina-estante">
         {colgados.map((x) => (!x.enCurso && x.dias > 0 ? (
-          <button key={x.prefijo} onClick={() => { setResumenEntero(false); setAbierto(x.prefijo); }} className={`vitrina-lugar con-medalla ${colgando === x.prefijo ? "se-cuelga" : ""}`} aria-label={`${capitalizar(NOMBRES_MES[x.mes])} de ${x.anio}: ${x.dias} ${x.dias === 1 ? "día" : "días"}. Ver el resumen`}>
+          <button key={x.prefijo} onClick={() => { setResumenEntero(false); setAbierto(x.prefijo); }} className={`vitrina-lugar con-medalla ${colgando === x.prefijo ? "se-cuelga" : ""}`}>
             <span className="vitrina-clavo" aria-hidden="true" />
-            <MedallaMes chica numero={x.dias} />
-            <span className="vitrina-mes">{MESES_CORTOS[x.mes]}</span>
+            <span aria-hidden="true" className="contents"><MedallaMes chica numero={x.dias} /></span>
+            <span className="sr-only">{capitalizar(NOMBRES_MES[x.mes])} de {x.anio}: {x.dias} {x.dias === 1 ? "día" : "días"}. Ver el resumen.</span>
+            <span className="vitrina-mes" aria-hidden="true">{MESES_CORTOS[x.mes]}</span>
           </button>
         ) : (
           // La de este mes, una medalla en construcción: el aro se llena con
@@ -15077,14 +15078,14 @@ function CarreraSemana({ filas = [], onVerPersona = null, vacios = 0 }) {
         return (
           <li key={c.uid || "yo"}>
             <Tag role={Tag === "div" ? "group" : undefined} onClick={onVerPersona && !c.yo ? () => onVerPersona(c.uid) : undefined} className={`carrera-carril ${c.yo ? "yo" : ""} ${i === 0 && n > 0 ? "primero" : ""}`}
-              aria-label={`${i + 1}º, ${c.yo ? "vos" : c.nombre}: ${n} ${n === 1 ? "sesión" : "sesiones"} esta semana`}>
-              <span className="carrera-puesto" aria-hidden="true">{i + 1}</span>
+              >
+              <span className="carrera-puesto">{i + 1}<span className="sr-only">º,</span></span>
               <span className={`carrera-avatar ${c.rango ? "con-rango" : ""}`} style={c.rango ? { "--rango-c": c.rango } : undefined} aria-hidden="true">{c.foto ? <img src={c.foto} alt="" /> : String(c.nombre || "?").charAt(0).toUpperCase()}</span>
-              <span className="carrera-cuerpo" aria-hidden="true">
+              <span className="carrera-cuerpo">
                 <span className="carrera-nombre">{c.yo ? "Vos" : String(c.nombre || "").split(" ")[0]}</span>
-                <CespedTrineo avance={n / largo} largo={largo} orden={i} />
+                <span aria-hidden="true"><CespedTrineo avance={n / largo} largo={largo} orden={i} /></span>
               </span>
-              <b className="carrera-n num-display" aria-hidden="true">{n}</b>
+              <b className="carrera-n num-display">{n}<span className="sr-only"> {n === 1 ? "sesión" : "sesiones"} esta semana</span></b>
             </Tag>
           </li>
         );
@@ -24444,7 +24445,8 @@ function CasilleroChico({ semilla = "", nombre, foto = null, rango = null, racha
         <span className="casillero-numero" aria-hidden="true">{String(numero).padStart(3, "0")}</span>
         {accion}
       </div>
-      <Puerta onClick={onAbrir || undefined} className="casillero-cuerpo" aria-label={onAbrir ? "Abrir tu casillero, como lo ven tus amigos" : undefined}>
+      <Puerta onClick={onAbrir || undefined} className="casillero-cuerpo">
+        {onAbrir && <span className="sr-only">Abrir tu casillero: </span>}
         <span className="casillero-foto" aria-hidden="true">
           <span className="casillero-cinta" />
           {foto ? <img src={foto} alt="" /> : <span className="casillero-inicial">{String(nombre).charAt(0).toUpperCase()}</span>}
