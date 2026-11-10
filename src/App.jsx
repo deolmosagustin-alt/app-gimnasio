@@ -7107,6 +7107,27 @@ label.ajuste-rotulo { display: block; }
 .perfil-guardado { padding: 4px 12px 0; font-size: 12px; line-height: 1.5; color: var(--text-faint); text-align: center; text-wrap: balance; }
 .perfil-guardado svg { display: inline-block; vertical-align: -2px; margin-right: 4px; }
 .codigo-regalo-enlace { font-size: 13px; color: var(--text-faint); }
+
+/* LOS BOTONES DE PERFIL, CON VIDA (05/11, pedido: "mejorá la parte de los
+   botones, está muy apagado"): adentro de los grupos de ajustes, lo elegido
+   en pastel con la letra oscura (como el botón principal), el − y el + llenos
+   con el signo en el tono, los íconos de cada renglón en el tono y los pasos
+   en la placa más clara, no en un pozo. */
+.grupo-ajustes .segmentado { background: var(--panel-sunken); }
+.grupo-ajustes .segmentado > button { height: 40px; font-size: 0.8125rem; color: var(--text-muted); }
+.grupo-ajustes .segmentado > button.activo { color: var(--accion-tinta) !important; background: var(--accion-fondo) !important; box-shadow: 0 1px 0 rgba(255,255,255,.25) inset, 0 2px 6px -2px rgba(0,0,0,.45); }
+.light-mode .grupo-ajustes .segmentado > button.activo { color: var(--accion-tinta) !important; background: var(--accion-fondo) !important; }
+.grupo-ajustes .ajuste-pasos { background: var(--surface-2); box-shadow: inset 0 1px 0 rgba(255,255,255,.04); }
+.grupo-ajustes .ajuste-pasos-control button { color: color-mix(in oklab, var(--tono) 75%, white); background: color-mix(in oklab, var(--tono) 14%, var(--surface-3)); box-shadow: none; }
+.light-mode .grupo-ajustes .ajuste-pasos-control button { color: color-mix(in oklab, var(--tono) 75%, black); background: color-mix(in oklab, var(--tono) 14%, white); }
+.grupo-ajustes .ajuste-pasos-control button:active { background: var(--accion-fondo); color: var(--accion-tinta); }
+.grupo-ajustes .ajuste-pasos-valor { min-width: 3em; }
+.grupo-ajustes-placa > .seccion-plegable > button .placa-icono, .grupo-ajustes-placa > button.seccion-plegable .placa-icono, .grupo-ajustes-placa .ajuste-renglon > .icono-suelto { color: color-mix(in oklab, var(--tono) 72%, white); }
+.light-mode .grupo-ajustes-placa > .seccion-plegable > button .placa-icono, .light-mode .grupo-ajustes-placa > button.seccion-plegable .placa-icono, .light-mode .grupo-ajustes-placa .ajuste-renglon > .icono-suelto { color: color-mix(in oklab, var(--tono) 75%, black); }
+.grupo-ajustes-placa .ajuste-renglon.peligro > .icono-suelto { color: #e06a6f; }
+.light-mode .grupo-ajustes-placa .ajuste-renglon.peligro > .icono-suelto { color: #b0353b; }
+.grupo-ajustes-placa > .seccion-plegable > button:active, .grupo-ajustes-placa > button.seccion-plegable:active { background: var(--velo); }
+.grupo-ajustes .boton-tonal { background: var(--accion-fondo); color: var(--accion-tinta); }
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
