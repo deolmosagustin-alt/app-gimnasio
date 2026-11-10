@@ -65,7 +65,9 @@ export function cargaDeDescarga(base, { pct = 0.75, salto = 2.5, unit = "kg", ca
   if (vista >= original) vista = Math.floor(objetivo / paso) * paso;
   if (vista <= 0) return { reps: menosReps, kg: base.kg, kgVista: original };
   vista = Math.round(vista * 100) / 100;
-  return { reps, kg: displayToKg(vista, unit), kgVista: vista };
+  // Si el redondeo la dejó más pesada que el porcentaje (64 → 65), una rep
+  // menos: la descarga nunca pide más esfuerzo del pensado (05/11).
+  return { reps: equilibrarReps(objetivo, vista, reps, { soloBajar: true }), kg: displayToKg(vista, unit), kgVista: vista };
 }
 // ¿VENÍS BAJANDO? Para ofrecer adelantar la descarga. La descarga puede ser
 // planeada y también autorregulada (consenso Delphi de Bell et al., 2023), y
@@ -125,4 +127,35 @@ export function planDeEntrenador(base, { repRange, salto = 2.5, desde = 1, seman
     out.push({ week: desde + k, kg: actual.kg, reps: actual.reps });
   }
   return out;
+}
+
+// REDONDEAR CON COHERENCIA (05/11, pedido: "que en los redondeos haya
+// coherencia; capaz bajar una rep si se redondea para arriba o al revés,
+// meterle mucho a eso"). Cuando un peso calculado (un porcentaje, la
+// descarga, una aproximación) se redondea a lo que se puede cargar, las reps
+// se ajustan para que el esfuerzo sea el mismo: se busca la cantidad de reps
+// que, con el peso redondeado, da el mismo 1RM estimado (Epley) que el peso
+// exacto con las reps pensadas. Nunca cambia más de dos reps ni baja de una,
+// y si la diferencia es chica no toca nada.
+export function equilibrarReps(objetivo, redondeado, reps, { maxCambio = 2, soloBajar = false } = {}) {
+  if (!(objetivo > 0) || !(redondeado > 0) || !(reps > 0)) return reps;
+  const rm = objetivo * (1 + reps / 30);
+  const exactas = 30 * (rm / redondeado - 1);
+  let nuevas = Math.round(exactas);
+  // Si el peso quedó más pesado, alcanza media rep de diferencia para bajar
+  // una (no pasarse); si quedó más liviano, sube sólo con una rep entera.
+  const dif = exactas - reps;
+  if (dif > -0.5 && dif < 1) return reps;
+  nuevas = Math.max(reps - maxCambio, Math.min(reps + maxCambio, nuevas));
+  if (soloBajar) nuevas = Math.min(nuevas, reps);
+  return Math.max(1, nuevas);
+}
+// Redondear un peso al salto del ejercicio, y las reps con él.
+export function redondearConReps(kg, reps, salto = 2.5, { hacia = "cerca", soloBajar = false } = {}) {
+  if (!(kg > 0) || !(salto > 0)) return { kg, reps };
+  const f = hacia === "abajo" ? Math.floor : hacia === "arriba" ? Math.ceil : Math.round;
+  let r = f(kg / salto - 1e-9) * salto;
+  if (r <= 0) r = salto;
+  r = Math.round(r * 100) / 100;
+  return { kg: r, reps: equilibrarReps(kg, r, reps, { soloBajar }) };
 }

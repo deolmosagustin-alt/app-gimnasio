@@ -92,3 +92,24 @@ describe("planDeEntrenador", () => {
     expect(new Set(p.map((e) => `${e.reps}x${e.kg}`)).size).toBe(1);
   });
 });
+
+import { equilibrarReps, redondearConReps } from "./entrenamiento.js";
+describe("redondeos coherentes", () => {
+  it("si el peso sube al redondear, baja una rep", () => {
+    // 8 × 76 → 77,5: mismo esfuerzo con una rep menos (≈7,4 → 7)
+    expect(equilibrarReps(76, 77.5, 8)).toBe(7);
+  });
+  it("si baja mucho, sube una rep", () => {
+    expect(equilibrarReps(40, 37.5, 10)).toBe(12);
+  });
+  it("una diferencia chica no toca las reps", () => {
+    expect(equilibrarReps(63.75, 62.5, 8)).toBe(8);
+  });
+  it("nunca cambia más de dos reps ni baja de una", () => {
+    expect(equilibrarReps(20, 30, 5)).toBe(3);
+    expect(equilibrarReps(20, 30, 1)).toBe(1);
+  });
+  it("redondea al salto de una máquina de 7 kg y ajusta", () => {
+    expect(redondearConReps(66, 10, 7)).toEqual({ kg: 63, reps: 12 });
+  });
+});

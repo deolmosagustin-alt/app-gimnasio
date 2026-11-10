@@ -220,7 +220,25 @@ try {
     await saltar.waitFor({ timeout: 6000 }).catch(() => {});
     if (await saltar.count()) {
       await capturar("Bienvenida");
-      await paso("saltar la bienvenida", () => saltar.first().click({ timeout: 8000 }));
+      // El último paso: la pregunta de la descarga y su explicación (05/11).
+      const puntos = page.locator(".bienvenida-punto");
+      if (await puntos.count()) {
+        await paso("ir a la pregunta de la descarga", () => puntos.last().click({ timeout: 8000 }));
+        await page.waitForTimeout(500);
+        await capturar("Bienvenida descarga pregunta");
+        await paso("pedir que la explique", () => page.getByRole("button", { name: "No, explicame" }).click({ timeout: 8000 }));
+        await page.waitForTimeout(600);
+        await capturar("Bienvenida descarga ciclo");
+        await paso("seguir", () => page.getByRole("button", { name: "Siguiente", exact: true }).click({ timeout: 8000 }));
+        await page.waitForTimeout(600);
+        await capturar("Bienvenida descarga explicada");
+        await paso("entendido", () => page.getByRole("button", { name: "Entendido" }).click({ timeout: 8000 }));
+        await page.waitForTimeout(500);
+        await capturar("Bienvenida descarga elegir");
+        await paso("activar la descarga", () => page.getByRole("button", { name: "Sí, activalas" }).click({ timeout: 8000 }));
+      } else {
+        await paso("saltar la bienvenida", () => saltar.first().click({ timeout: 8000 }));
+      }
     }
 
     if (conDatos) {

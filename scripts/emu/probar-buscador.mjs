@@ -1,7 +1,7 @@
 // Prueba de las reglas del buscador en el emulador (sin tocar producción).
 import { initializeApp } from "firebase/app";
 import { getAuth, connectAuthEmulator, signInAnonymously, signOut } from "firebase/auth";
-import { getFirestore, connectFirestoreEmulator, doc, setDoc, getDocs, query, collection, where, limit } from "firebase/firestore";
+import { getFirestore, connectFirestoreEmulator, doc, setDoc, getDoc, updateDoc, deleteDoc, getDocs, query, collection, where, limit } from "firebase/firestore";
 const app = initializeApp({ projectId: "demo-gymapp", apiKey: "fake-key", authDomain: "localhost" });
 const auth = getAuth(app); connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
 const db = getFirestore(app); connectFirestoreEmulator(db, "127.0.0.1", 8080);
@@ -24,5 +24,23 @@ console.log("  encontrados:", encontrados);
 if (!encontrados.includes("Martina Paz")) { mal++; console.log("✗ no apareció Martina"); } else ok++;
 await espera("sin límite no se lista", () => getDocs(query(collection(db, "buscador"), where("busqueda", "array-contains", "mar"))), false);
 await espera("con límite 200 no se lista", () => getDocs(query(collection(db, "buscador"), limit(200))), false);
+// LOS CÓDIGOS DE REGALO: el dueño los crea (acá, como administrador del emulador).
+const admin = (ruta, campos) => fetch(`http://127.0.0.1:8080/v1/projects/demo-gymapp/databases/(default)/documents/${ruta}`, { method: "PATCH", headers: { Authorization: "Bearer owner", "Content-Type": "application/json" }, body: JSON.stringify({ fields: campos }) });
+await admin("codigos/MODUS-TEST-0001", { dias: { integerValue: "30" }, nota: { stringValue: "prueba" } });
+await admin("codigos/MODUS-TEST-0002", { nota: { stringValue: "prueba" } });
+await signOut(auth);
+const canjeador = (await signInAnonymously(auth)).user.uid;
+await espera("leo un código puntual", () => getDoc(doc(db, "codigos", "MODUS-TEST-0001")), true);
+await espera("no listo los códigos", () => getDocs(query(collection(db, "codigos"), limit(5))), false);
+await espera("no creo un código", () => setDoc(doc(db, "codigos", "MODUS-FAKE-0000"), { dias: 9999 }), false);
+await espera("no lo canjeo a nombre de otro", () => updateDoc(doc(db, "codigos", "MODUS-TEST-0001"), { usadoPor: "otro", usadoEn: new Date().toISOString() }), false);
+await espera("no le cambio los días", () => updateDoc(doc(db, "codigos", "MODUS-TEST-0001"), { usadoPor: canjeador, usadoEn: "x", dias: 9999 }), false);
+await espera("lo canjeo a mi nombre", () => updateDoc(doc(db, "codigos", "MODUS-TEST-0001"), { usadoPor: canjeador, usadoEn: new Date().toISOString() }), true);
+await espera("no lo canjeo dos veces", () => updateDoc(doc(db, "codigos", "MODUS-TEST-0001"), { usadoPor: canjeador, usadoEn: "otra" }), false);
+await espera("no lo borro", () => deleteDoc(doc(db, "codigos", "MODUS-TEST-0002")), false);
+await signOut(auth);
+await signInAnonymously(auth);
+await espera("otro no usa uno ya canjeado", () => updateDoc(doc(db, "codigos", "MODUS-TEST-0001"), { usadoPor: auth.currentUser.uid, usadoEn: "x" }), false);
+await espera("otro canjea uno libre", () => updateDoc(doc(db, "codigos", "MODUS-TEST-0002"), { usadoPor: auth.currentUser.uid, usadoEn: new Date().toISOString() }), true);
 console.log(`\n${ok} bien, ${mal} mal`);
 process.exit(mal ? 1 : 0);

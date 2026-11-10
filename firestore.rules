@@ -93,6 +93,22 @@ service cloud.firestore {
       }
     }
 
+    // ============================== CÓDIGOS DE REGALO ==============================
+    // Premium gratis para amigos y familia (05/11). Los crea el dueño desde la
+    // consola (las reglas no dejan crearlos desde la app). Se lee un código
+    // puntual, nunca la lista, y se canjea una sola vez, a nombre propio:
+    // sólo cambian usadoPor (el uid de quien canjea) y usadoEn (texto).
+    match /codigos/{codigo} {
+      allow get: if isSignedIn();
+      allow list, create, delete: if false;
+      allow update: if isSignedIn()
+        && resource.data.get('usadoPor', null) == null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usadoPor', 'usadoEn'])
+        && request.resource.data.usadoPor == request.auth.uid
+        && request.resource.data.usadoEn is string
+        && request.resource.data.usadoEn.size() <= 40;
+    }
+
     // ============================== BUSCADOR (por nombre) ==============================
     // Desde el 04/11 los amigos se buscan por el nombre del casillero: cada
     // persona con Google tiene acá una ficha con su nombre y el principio de

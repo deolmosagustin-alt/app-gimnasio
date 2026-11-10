@@ -48,7 +48,7 @@ import {
 // Feature social (amigos + entrenador/alumno) — todo el acceso a Firestore
 // de esto vive en social.js, App.jsx solo llama y dibuja el resultado.
 import {
-  isValidUsername, normalizeUsername, lookupUserByUsername, buscarPorNombre, crearUsuarioAutomatico,
+  isValidUsername, normalizeUsername, lookupUserByUsername, buscarPorNombre, crearUsuarioAutomatico, canjearCodigo,
   syncPublicProfile, getPublicBasic, getPublicFull,
   sendFriendRequest, respondToFriendRequest, removeFriend, listMyFriendships,
   sendTrainerLinkRequest, respondToTrainerLink, removeTrainerLink, listTrainerLinksAsTrainer, listTrainerLinksAsStudent,
@@ -69,13 +69,13 @@ import {
 // Buscar ejercicios como los escribe la gente (sin tildes, en cualquier
 // orden, con errores de tipeo, en inglés o con el apodo del gimnasio).
 import { buscarEjercicios, mejorEjercicio, nombreCoincide, partesResaltadas, REGIONES_BUSCADOR, alternativasDe } from "./buscar-ejercicios.js";
-import { rangoDeReps, siguientePaso, seriesDeDescarga, cargaDeDescarga, ejerciciosEnBaja, planDeEntrenador } from "./entrenamiento.js";
+import { rangoDeReps, siguientePaso, seriesDeDescarga, cargaDeDescarga, ejerciciosEnBaja, planDeEntrenador, equilibrarReps, redondearConReps } from "./entrenamiento.js";
 // Modus Fit Premium: preparada y con el cobro apagado por bandera (ver
 // src/suscripcion.js y docs/suscripcion.md).
 import {
   suscripcionVisible, modoPrueba, PLAN_ELEGIDO, FUNCIONES, BENEFICIOS, CUPO_IA_PREMIUM,
   proveedor, estadoPremium, suscribirPremium, pedirPaywall, paywallAutomatico, ahorroContraMensual,
-  necesitaPremium, cupoDiarioIA, iniciarSuscripcion, EVENTO_PAYWALL,
+  necesitaPremium, cupoDiarioIA, iniciarSuscripcion, EVENTO_PAYWALL, aplicarRegalo,
 } from "./suscripcion.js";
 
 /* ============================================================================
@@ -405,7 +405,7 @@ function getCurrentUser() {
 // medidas, rutinas, configuración) sí sube completo.
 const CLOUD_PROFILE_FIELDS = [
   // Datos básicos del perfil
-  "name", "email", "sex", "age", "birthDate", "heightCm", "joinedAt", "googleUid", "tutorialSeen", "pin", "username",
+  "name", "email", "sex", "age", "birthDate", "heightCm", "joinedAt", "googleUid", "tutorialSeen", "pin", "username", "premiumRegalo",
   // Configuración y rutinas
   "settings", "activeRoutineId", "routines", "weekSchedule",
   // Historial de entrenamiento completo
@@ -426,7 +426,9 @@ function profileToCloud(profile) {
   return out;
 }
 
-// Rango PROMEDIO entre todos los grupos musculares con datos — se guarda en
+// TU MEJOR RANGO (05/11, pedido: "que no sea el promedio en general, que
+// agarre el mejor"; antes de eso había pasado de mejor a promedio, también a
+// pedido): el músculo más fuerte. Se guarda en
 // users/{uid}/public/basic (ver syncPublicProfile en social.js) para que la
 // lista de amigos pueda mostrar un badge de nivel sin tener que leer el
 // historial completo de cada persona sólo para pintar una fila.
@@ -451,9 +453,9 @@ function computeTopRank(profile) {
       if (rank.hasData) levelIdxs.push(rank.levelIdx);
     });
     if (!levelIdxs.length) return null;
-    const avgIdx = Math.round(levelIdxs.reduce((sum, v) => sum + v, 0) / levelIdxs.length);
-    const info = RANK_TIERS[avgIdx];
-    return { tier: info.tier, sub: info.sub, color: info.color, label: "Promedio", levelIdx: avgIdx };
+    const mejorIdx = Math.max(...levelIdxs);
+    const info = RANK_TIERS[mejorIdx];
+    return { tier: info.tier, sub: info.sub, color: info.color, label: "Tu mejor", levelIdx: mejorIdx };
   } catch { return null; }
 }
 
@@ -464,9 +466,9 @@ function computeTopRank(profile) {
 function computeTopRankFromRanks(ranks) {
   const withData = MUSCLE_GROUPS.map((g) => ranks?.[g.key]).filter((r) => r?.hasData);
   if (!withData.length) return null;
-  const avgIdx = Math.round(withData.reduce((sum, r) => sum + r.levelIdx, 0) / withData.length);
-  const info = RANK_TIERS[avgIdx];
-  return { tier: info.tier, sub: info.sub, color: info.color, levelIdx: avgIdx };
+  const mejorIdx = Math.max(...withData.map((r) => r.levelIdx));
+  const info = RANK_TIERS[mejorIdx];
+  return { tier: info.tier, sub: info.sub, color: info.color, levelIdx: mejorIdx };
 }
 
 // Descarga el perfil completo desde Firestore.
@@ -1854,8 +1856,12 @@ function metaDeHoy(setDef, history, weekInCycle, trainingMode = "planned", { hoy
     const m = ultima.meta;
     if (m.minutes != null) return { week: pasoUltima, minutes: Math.max(1, Math.round(m.minutes * 0.9)), paso: pasoUltima, ajuste: "baja" };
     const salto = saltoKg > 0 ? saltoKg : 2.5;
-    const kg = m.kg > 0 ? roundKg(Math.max(salto, Math.round((m.kg * 0.9) / salto) * salto)) : 0;
-    return { week: pasoUltima, kg, reps: m.reps, paso: pasoUltima, ajuste: "baja" };
+    // Hacia abajo, para que de verdad sea más liviana (con un salto de 5 kg,
+    // 20 × 0,9 = 18 redondeaba otra vez a 20), y si el salto la baja de más,
+    // las reps compensan hasta el mismo esfuerzo que el −10 % exacto.
+    if (!(m.kg > 0)) return { week: pasoUltima, kg: 0, reps: m.reps, paso: pasoUltima, ajuste: "baja" };
+    const r = redondearConReps(m.kg * 0.9, m.reps, salto, { hacia: "abajo" });
+    return { week: pasoUltima, kg: roundKg(Math.max(salto, r.kg)), reps: r.reps, paso: pasoUltima, ajuste: "baja" };
   }
   return { ...ultima.meta, week: pasoUltima, paso: pasoUltima, ajuste: "repite" };
 }
@@ -7016,6 +7022,32 @@ label.ajuste-rotulo { display: block; }
 
 .descarga-salto { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; font-size: 12px; color: var(--text-faint); }
 .descarga-saltos { margin: 0 0 10px; }
+
+/* EL INDICADOR DE COLOR (05/11, pedido: "cambiar el indicador de color en el
+   historial"): el agujero lleva un ojalillo de metal, neutro, y el color del
+   día tiñe el casillero entero, suave sobre el cartón (en diagonal si ese día
+   hubo dos); el que mirás, más fuerte. Antes era un aro de tinta del color. */
+.tarjeta-perforada.carton .hueco-dia.picado, .tarjeta-perforada.carton .hueco-dia.picado:not(.elegido), .light-mode .tarjeta-perforada.carton .hueco-dia.picado, .light-mode .tarjeta-perforada.carton .hueco-dia.picado:not(.elegido) {
+  background: linear-gradient(135deg, color-mix(in oklab, var(--dia) 34%, #ece7da) 0 50%, color-mix(in oklab, var(--dia2, var(--dia)) 34%, #ece7da) 50% 100%);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--dia) 40%, rgba(80,68,50,.3)); }
+.tarjeta-perforada.carton .hueco-dia.picado.elegido {
+  background: linear-gradient(135deg, color-mix(in oklab, var(--dia) 62%, #ece7da) 0 50%, color-mix(in oklab, var(--dia2, var(--dia)) 62%, #ece7da) 50% 100%); }
+.tarjeta-perforada.carton .hueco-dia.picado::before, .tarjeta-perforada.carton .hueco-dia.picado.elegido::before {
+  --anillo: none; background: radial-gradient(circle at 35% 30%, #f4f5f6, #a9acb1 55%, #7d8086); box-shadow: 0 1px 1px rgba(0,0,0,.35); width: 46%; }
+.tarjeta-perforada.carton .hueco-dia.picado::after { width: 26%; }
+
+/* La descarga explicada en la bienvenida: los cajones y la nota del profe. */
+.bienvenida-descarga { display: grid; justify-items: center; gap: 4px; width: 100%; }
+.bienvenida-descarga .nota-descarga { margin: -6px 0 0; rotate: -2deg; }
+
+/* Tengo un código (Perfil). */
+.codigo-regalo { display: grid; gap: 8px; }
+.codigo-regalo.abierto { padding: 4px 4px 12px; }
+.codigo-regalo-fila { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 6px 12px; border-radius: 18px; color: var(--text-faint); }
+.codigo-regalo:not(.abierto) .codigo-regalo-fila { background: var(--surface-1); box-shadow: var(--placa-canto); }
+.codigo-regalo-cuerpo { display: grid; gap: 6px; padding: 0 10px; }
+.codigo-regalo-campo { letter-spacing: .06em; font-weight: 650; }
+.codigo-regalo-campo::placeholder { color: var(--text-faint); font-weight: 500; opacity: .7; }
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -11421,7 +11453,7 @@ const WELCOME_SLIDES = [
   { key: "serie", color: "#14B8A6", title: "Te damos la bienvenida a Modus Fit", text: "Anotá reps y kilos en segundos: vienen con lo de la vez pasada. Cada serie carga un disco en la barra del día." },
   { key: "progreso", color: "#3B82F6", title: "Tu progreso, en gráficos", text: "Los récords se detectan solos. Cada ejercicio tiene su gráfica, y la semana, el mes y el año, su resumen." },
   { key: "ia", color: "#14B8A6", title: "Un entrenador con IA que te conoce", text: "Sabe tu rutina, tus marcas y tu progreso. Preguntale con cuánto arrancar o pedile una rutina nueva." },
-  { key: "descarga", color: "#A855F7", title: "Semanas de descarga", text: "Cada ciertas semanas te proponemos una con menos carga, para recuperarte antes de la próxima. ¿La activamos? Lo podés cambiar cuando quieras en tu perfil.", interactive: "deload" },
+  { key: "descarga", color: "#A855F7", title: "¿Sabés qué es una semana de descarga?", text: "Es parte de cómo se organiza tu entrenamiento en la app.", interactive: "deload" },
 ];
 
 // Seis sesiones de muestra de un ejercicio, una por semana hasta hoy, con
@@ -12632,7 +12664,7 @@ function SeccionPremium() {
   return (
     <section className="tarjeta-tonal premium-perfil" aria-label="Tu plan">
       <p className="ajuste-rotulo">Tu plan</p>
-      {estado.activo ? (
+      {estado.activo && estado.regalo ? null : estado.activo ? (
         <>
           <p className="premium-perfil-titulo">Premium activo</p>
           <p className="premium-perfil-texto">
@@ -12651,6 +12683,63 @@ function SeccionPremium() {
             <button onClick={() => prov?.restaurar().catch(() => {})} className="boton-tonal">Restaurar</button>
           </div>
         </>
+      )}
+    </section>
+  );
+}
+
+// TENGO UN CÓDIGO (05/11): Premium de regalo para amigos y familia. Con
+// cuenta de Google, un renglón en Perfil; tocarlo abre el campo. Con un
+// regalo vigente, dice hasta cuándo (o que es para siempre).
+const ERRORES_DE_CODIGO = {
+  formato: "Revisá el código: son ocho letras y números, como MODUS-AB12-CD34.",
+  sesion: "Para canjear un código, vinculá tu cuenta de Google arriba.",
+  no_existe: "Ese código no existe. Revisá que esté bien escrito.",
+  usado: "Ese código ya lo usó otra persona.",
+  red: "No pudimos conectarnos. Probá de nuevo con señal.",
+};
+function CodigoRegalo({ uid, regalo, onCanjeado }) {
+  const [abierto, setAbierto] = useState(false);
+  const [texto, setTexto] = useState("");
+  const [estado, setEstado] = useState({ cargando: false, error: null });
+  const vigente = regalo?.codigo && (!regalo.hasta || regalo.hasta >= todayStr());
+  if (vigente) {
+    return (
+      <section className="tarjeta-tonal codigo-regalo" aria-label="Premium de regalo">
+        <p className="ajuste-rotulo">Tu plan</p>
+        <p className="premium-perfil-titulo">Premium de regalo</p>
+        <p className="premium-perfil-texto">{regalo.hasta ? `Activo hasta el ${fechaCorta(`${regalo.hasta}T12:00:00`)}.` : "Activo, para siempre."} Código {regalo.codigo}.</p>
+      </section>
+    );
+  }
+  const canjear = async () => {
+    setEstado({ cargando: true, error: null });
+    const r = await canjearCodigo(uid, texto);
+    if (r.error) { setEstado({ cargando: false, error: ERRORES_DE_CODIGO[r.error] || ERRORES_DE_CODIGO.red }); return; }
+    haptic([0, 20, 40, 20]);
+    setEstado({ cargando: false, error: null });
+    onCanjeado(r.regalo);
+  };
+  return (
+    <section className={`codigo-regalo ${abierto ? "tarjeta-tonal abierto" : ""}`} aria-label="Código de regalo">
+      <button onClick={() => setAbierto((v) => !v)} aria-expanded={abierto} className="codigo-regalo-fila">
+        <span className="icono-suelto" aria-hidden="true"><Award size={17} /></span>
+        <span className="flex-1 min-w-0 text-left">
+          <span className="block text-[15px] font-semibold text-[color:var(--text-strong)]">Tengo un código</span>
+          <span className="block text-[13px] text-[color:var(--text-faint)]">Premium de regalo, de un amigo o de la familia</span>
+        </span>
+        <ChevronDown size={17} className={`shrink-0 transition-transform ${abierto ? "rotate-180" : ""}`} aria-hidden="true" />
+      </button>
+      {abierto && (
+        <div className="codigo-regalo-cuerpo bounce-in">
+          <div className="flex gap-2">
+            <input value={texto} onChange={(e) => setTexto(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === "Enter" && texto.trim() && canjear()} placeholder="MODUS-AB12-CD34"
+              aria-label="Código de regalo" autoCapitalize="characters" autoComplete="off" spellCheck={false} className="campo-profe !pl-4 codigo-regalo-campo" />
+            <button onClick={canjear} disabled={!texto.trim() || estado.cargando || !uid} className="boton-pildora shrink-0 disabled:opacity-40" style={{ minHeight: 44, width: "auto", paddingInline: 18 }}>{estado.cargando ? "…" : "Canjear"}</button>
+          </div>
+          {!uid && <p className="sumar-amigos-estado">Para canjear un código, vinculá tu cuenta de Google.</p>}
+          {estado.error && <p className="sumar-amigos-estado alerta" role="alert">{estado.error}</p>}
+        </div>
       )}
     </section>
   );
@@ -12821,33 +12910,74 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
   );
 }
 
+// LA DESCARGA, EXPLICADA (05/11, pedido: "que te pregunte si sabés lo que es
+// una descarga y, si no, introducir adecuadamente las descargas y los ciclos,
+// mostrando los cajones y lo que simbolizan"). Si decís que no, dos pasos más
+// antes de elegir: el ciclo en cajones y la descarga, con la nota del profe.
+// La evidencia: el consenso Delphi de Bell et al. (2023) define la descarga
+// como un período más liviano para reducir la fatiga y recuperarse.
+const BIENVENIDA_DESCARGA = {
+  ciclo: { title: "Entrenás por ciclos", text: "Un ciclo son varias semanas seguidas. Cada cajón es una semana, y cada uno es un poco más alto que el anterior: la carga sube de a poco. Arriba de cada cajón, en tiza, las veces que fuiste. El de esta semana tiene su color entero; los que vienen están dibujados con tiza." },
+  descarga: { title: "Y al final, la descarga", text: "Después de varias semanas subiendo, el cuerpo junta cansancio. La descarga es el cajón bajo, el de la D: una semana más liviana para recuperarte y volver a subir con más fuerza. Esa semana Rutina se transforma sola, y si venís bajando, la podés adelantar." },
+  elegir: { title: "¿Activamos las semanas de descarga?", text: "Te recomendamos dejarlas prendidas. Las podés cambiar cuando quieras en tu perfil." },
+};
+
 function WelcomeIntro({ onClose, onOpenTutorial, onUpdateSettings = null }) {
   useAndroidBack(onClose);
   const [i, setI] = useState(0);
-  const slide = WELCOME_SLIDES[i];
-  const isDeloadSlide = slide.interactive === "deload";
+  // En el paso de la descarga: null (la pregunta), "ciclo", "descarga" o "elegir".
+  const [fase, setFase] = useState(null);
+  const slide0 = WELCOME_SLIDES[i];
+  const isDeloadSlide = slide0.interactive === "deload";
+  const slide = isDeloadSlide && fase ? { ...slide0, ...BIENVENIDA_DESCARGA[fase] } : slide0;
   return (
     <div className="fixed inset-0 z-[110] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay">
       <div className="bienvenida modal-pop-in" role="dialog" aria-modal="true" aria-label="Bienvenida a Modus Fit" style={{ "--c": slide.color }}>
-        <div key={`paso-${i}`} className="bienvenida-cuerpo tab-fade-in">
-          <div className="guia-escenario">{dibujoBienvenida(slide.key, slide.color)}</div>
+        <div key={`paso-${i}-${fase || ""}`} className="bienvenida-cuerpo tab-fade-in">
+          <div className="guia-escenario">
+            {isDeloadSlide && fase === "descarga" ? (
+              <div className="bienvenida-descarga">
+                <div className="guia-cajones" style={{ "--tono": slide.color }}><CajonesCiclo semanas={CICLO_DE_MUESTRA} trainWeeks={5} alto={84} /></div>
+                <div className="nota-descarga" aria-hidden="true">
+                  <span className="nota-descarga-cinta" />
+                  <p className="nota-descarga-titulo a-mano">La descarga</p>
+                  <ul className="nota-descarga-lista a-mano">
+                    <li><b>½</b> de las series</li>
+                    <li><b>75 %</b> del peso</li>
+                    <li>las mismas reps</li>
+                    <li className="subrayado">sin buscar marcas</li>
+                  </ul>
+                </div>
+              </div>
+            ) : dibujoBienvenida(slide.key, slide.color)}
+          </div>
           <h2 className="guia-paso-titulo bienvenida-titulo">{slide.title}</h2>
           <p className="guia-paso-texto">{slide.text}</p>
         </div>
         <div className="guia-pie">
           <div className="guia-puntos" role="tablist" aria-label="Pasos de la bienvenida">
             {WELCOME_SLIDES.map((s, si) => (
-              <button key={s.key} role="tab" aria-selected={si === i} aria-label={`Paso ${si + 1} de ${WELCOME_SLIDES.length}`} onClick={() => setI(si)} className="bienvenida-punto">
+              <button key={s.key} role="tab" aria-selected={si === i} aria-label={`Paso ${si + 1} de ${WELCOME_SLIDES.length}`} onClick={() => { setI(si); setFase(null); }} className="bienvenida-punto">
                 <i className={si === i ? "actual" : si < i ? "visto" : ""} />
               </button>
             ))}
           </div>
-          {isDeloadSlide ? (
+          {isDeloadSlide && !fase ? (
+            // Primero, la pregunta: si la conocés, vas directo a elegir.
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => setFase("elegir")} className="boton-tonal" style={{ "--c": "#8a8c92" }}>Sí, la conozco</button>
+              <button onClick={() => setFase("ciclo")} className="boton-pildora">No, explicame</button>
+            </div>
+          ) : isDeloadSlide && fase === "ciclo" ? (
+            <button onClick={() => setFase("descarga")} className="boton-pildora w-full">Siguiente</button>
+          ) : isDeloadSlide && fase === "descarga" ? (
+            <button onClick={() => setFase("elegir")} className="boton-pildora w-full">Entendido</button>
+          ) : isDeloadSlide ? (
             // Elegir acá mismo si querés las semanas de descarga (el mismo
             // ajuste que Perfil › Descarga, deloadEnabled).
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => { onUpdateSettings?.({ deloadEnabled: true }); onClose(); }} className="boton-pildora">Sí, quiero</button>
-              <button onClick={() => { onUpdateSettings?.({ deloadEnabled: false }); onClose(); }} className="boton-tonal" style={{ "--c": "#8a8c92" }}>No, prefiero no</button>
+              <button onClick={() => { onUpdateSettings?.({ deloadEnabled: true }); onClose(); }} className="boton-pildora">Sí, activalas</button>
+              <button onClick={() => { onUpdateSettings?.({ deloadEnabled: false }); onClose(); }} className="boton-tonal" style={{ "--c": "#8a8c92" }}>No, por ahora</button>
             </div>
           ) : (
             <button onClick={() => setI((n) => n + 1)} className="boton-pildora w-full">Siguiente</button>
@@ -14232,7 +14362,9 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             <p className="foco-1rm-cabeza"><span>% de tu 1RM</span>{currentPct ? <span>ahora <b>{currentPct} %</b></span> : null}</p>
             <div className="foco-1rm-botones">
               {PORCENTAJES_1RM.map((pct) => {
-                const targetKg = kgToDisplay(Math.round(pr1RM * pct / 100 * 2) / 2, unit);
+                // Al salto de este ejercicio (antes, de a medio kilo: 64,5 kg
+                // en una barra con discos de 2,5).
+                const targetKg = Math.round(Math.max(pasoKg, Math.round(kgToDisplay(pr1RM * pct / 100, unit) / pasoKg) * pasoKg) * 100) / 100;
                 const elegido = currentPct != null && Math.abs(currentPct - pct) <= 1;
                 return (
                   <button key={pct} onClick={() => { haptic(8); updateDraft({ kg: String(targetKg) }); }} className={elegido ? "elegido" : ""} aria-pressed={elegido} aria-label={`${pct} %: ${conComa(targetKg)} ${weightLabel(unit)}`}>
@@ -15293,13 +15425,17 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
                   <Flame size={14} /> Aproximaciones <ChevronUp size={14} />
                 </button>
                 {WARMUP_STEPS.map((w, i) => {
-                  const paso = planUnit === "lbs" ? 5 : 2.5;
-                  const peso = Math.max(0, Math.round(kgToDisplay(bestWorkingKg * w.pct, planUnit) / paso) * paso);
+                  // Al salto del ejercicio, y con las reps parejas al redondeo
+                  // (05/11): si el peso quedó más pesado, una rep menos.
+                  const paso = saltoDe(settings, exercise.id, planUnit);
+                  const exacto = kgToDisplay(bestWorkingKg * w.pct, planUnit);
+                  const peso = Math.max(0, Math.round((Math.round(exacto / paso) * paso) * 100) / 100);
+                  const repsAprox = equilibrarReps(exacto, peso, w.reps, { soloBajar: true });
                   return (
                     <div key={i} className="aproximacion">
                       <span className="aproximacion-pct">{Math.round(w.pct * 100)} %</span>
                       <span className="aproximacion-barra" style={{ "--p": w.pct }} aria-hidden="true" />
-                      <span className="aproximacion-serie"><b className="num-display">{w.reps} × {conComa(peso)}</b> {weightLabel(planUnit)}</span>
+                      <span className="aproximacion-serie"><b className="num-display">{repsAprox} × {conComa(peso)}</b> {weightLabel(planUnit)}</span>
                     </div>
                   );
                 })}
@@ -19214,10 +19350,10 @@ function RankExplainModal({ profile, myTopRank, onClose }) {
               <RankBadgeIcon tier={myTopRank.tier} sub={null} color={myTopRank.color} size={44} />
               <div className="min-w-0">
                 <p className="text-base font-black leading-tight" style={{ color: myTopRank.color }}>{myTopRank.tier} {myTopRank.sub}</p>
-                <p className="text-[11px] text-slate-500 leading-snug">Promedio de {breakdown.withData.length} músculo{breakdown.withData.length === 1 ? "" : "s"} con marcas</p>
+                <p className="text-[11px] text-slate-500 leading-snug">{breakdown.withData[0] ? `Tu mejor músculo: ${breakdown.withData[0].label}` : "Tu mejor músculo"}</p>
               </div>
             </div>
-            <p className="text-xs text-slate-400 leading-relaxed">Este es el promedio entre tus rangos por músculo, no el mejor ni el peor — cuantos más grupos entrenes con marcas parejas, más representativo va a ser de todo tu cuerpo.</p>
+            <p className="text-xs text-slate-400 leading-relaxed">Es el rango de tu músculo más fuerte, con la mejor serie de cada ejercicio. Abajo, cómo vas en cada uno.</p>
             {breakdown.withData.length > 0 && (
               <div className="space-y-1.5">
                 <p className="ajuste-rotulo px-1">Rango por músculo</p>
@@ -21422,6 +21558,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
       <VitrinaMedallas logs={profile?.logs} trainingSessions={profile?.trainingSessions} />
 
       <SeccionPremium />
+      <CodigoRegalo uid={profile?.googleUid || null} regalo={profile?.premiumRegalo || null} onCanjeado={(regalo) => onUpdateProfile({ premiumRegalo: regalo })} />
 
       <SocialPreviewCard profile={profile} uid={profile?.googleUid} onGoToSocial={onGoToSocial} onUpdateProfile={onUpdateProfile} />
 
@@ -21731,6 +21868,11 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
             icon={<Users size={16} />} label="Avisos de Social"
             desc="Si un amigo te pasa en un músculo o te reta, te llega una notificación. Usa el mismo permiso que el recordatorio."
             on={settings.avisosSociales !== false} onToggle={() => updateSettings({ avisosSociales: settings.avisosSociales === false })}
+          />
+          <ToggleRow
+            icon={<Hand size={16} />} label="Cuando un amigo empieza a entrenar"
+            desc="Te avisa al toque, como en la planilla de asistencia de Social. Llega con la app abierta o al volver a ella."
+            on={settings.avisoAmigoEntrena !== false} onToggle={() => { if (settings.avisoAmigoEntrena === false) pedirPermisoDeAvisos(); updateSettings({ avisoAmigoEntrena: settings.avisoAmigoEntrena === false }); }}
           />
           <ToggleRow
             icon={<Share2 size={16} />} label="La imagen de cada récord"
@@ -27915,6 +28057,7 @@ Basá tus recomendaciones en los principios de entrenamiento con más consenso c
 
 Tenés acceso a los datos reales de esta persona en el siguiente JSON — usalos para responder con precisión (fechas, pesos, repeticiones, y la estructura real de sus rutinas día por día), nunca inventes datos que no estén ahí.
 
+Además, "resumenExtra" trae lo demás que sabe la app: sus medidas con su cambio en 4 y 12 semanas (peso corporal, cintura…), su rango por músculo, las series por semana de su rutina por músculo y cuáles quedan debajo de 10 (la referencia del ACSM 2026 para ganar músculo), qué porcentaje de las metas del plan cumplió en el último mes, su RPE promedio de las últimas dos semanas, cuánto duran sus sesiones, los ejercicios en los que viene bajando y en qué semana del ciclo está y cuánto falta para la descarga. Cruzalo con lo demás para dar un análisis concreto: por ejemplo, si baja de peso corporal y también bajan sus marcas, o si cumple pocas metas con un RPE alto, decíselo con los números.
 LEÉ SIEMPRE "analisisEntrenamiento" ANTES DE RESPONDER: es el análisis ya calculado de su entrenamiento real y es tu fuente principal para cualquier consejo. Trae, por ejercicio, su mejor marca con fecha, el 1RM estimado, hace cuántos días no lo hace y la TENDENCIA ("subiendo" / "estancado" / "bajando"); por músculo, las series y el volumen de los últimos 7 días comparados con la semana previa, y hace cuántos días no lo entrena; y su adherencia real (entrenamientos por semana, racha). Usalo así:
 - Si te preguntan por un estancamiento, mirá "tendencia" y "diasDesdeMejorMarca" de ESE ejercicio y el volumen de su músculo. Respondé con los números concretos, no con generalidades.
 - Si te piden armar o ajustar un entrenamiento, priorizá los músculos con más "diasSinEntrenarlo" o menos "seriesUltimos7dias", y evitá recargar lo que entrenó hace 1-2 días.
@@ -27964,6 +28107,81 @@ Datos: `;
 // conclusiones ya masticadas — con esto puede responder "¿por qué me estanqué
 // en press banca?" con TUS números reales, o "armame el día de mañana" sabiendo
 // qué músculos tenés frescos y cuáles reventados.
+// MÁS DATOS PARA LA IA (05/11, pedido: "mejorar la capacidad de análisis de
+// la IA en base a los datos del usuario; si hay alguno al que tenga acceso,
+// dárselo"). Lo que la app ya sabe y no le mandaba, en pocas líneas: las
+// medidas y su tendencia, el rango por músculo, las series por semana de la
+// rutina contra la referencia de 10, cuánto cumple las metas del plan, su
+// esfuerzo (RPE) y la duración de las sesiones de las últimas semanas, los
+// ejercicios en los que viene bajando y cuándo toca la descarga. Cada parte
+// en su try: si una falla, las demás llegan igual.
+function resumenParaIA({ profile, logs, settings, routineDef, weekInfo }) {
+  const out = {};
+  const hoy = todayStr();
+  const haceDias = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return localDateStr(d); };
+  try {
+    const m = profile?.measurements || {};
+    const medidas = {};
+    MEASUREMENT_TYPES.forEach((t) => {
+      const hist = (m[t.k] || []).filter((h) => h?.date && h.value > 0).sort((a, b) => (a.date < b.date ? -1 : 1));
+      if (!hist.length) return;
+      const ult = hist[hist.length - 1];
+      const hace4 = [...hist].reverse().find((h) => h.date <= haceDias(28));
+      const hace12 = [...hist].reverse().find((h) => h.date <= haceDias(84));
+      const unidad = t.k === "weight" ? "kg" : "cm";
+      medidas[t.l] = { ultimo: `${Math.round(ult.value * 10) / 10} ${unidad} (${ult.date})`, ...(hace4 ? { cambio4Semanas: Math.round((ult.value - hace4.value) * 10) / 10 } : {}), ...(hace12 ? { cambio12Semanas: Math.round((ult.value - hace12.value) * 10) / 10 } : {}) };
+    });
+    if (Object.keys(medidas).length) out.medidas = medidas;
+  } catch { /* sigue */ }
+  try {
+    const ranks = computeAllMuscleRanks(logs, settings, profile?.sex, edadDe(profile));
+    const porMusculo = {};
+    MUSCLE_GROUPS.forEach((g) => { const rk = ranks?.[g.key]; if (rk?.hasData) porMusculo[g.label] = `${rk.tier} ${rk.sub}`; });
+    if (Object.keys(porMusculo).length) out.rangoPorMusculo = porMusculo;
+  } catch { /* sigue */ }
+  try {
+    if (routineDef) {
+      const { musculos } = seriesSemanalesPorMusculo(routineDef);
+      const conSeries = musculos.filter((x) => x.series > 0);
+      if (conSeries.length) {
+        out.seriesPorSemanaDeLaRutina = Object.fromEntries(conSeries.map((x) => [x.musculo, x.series]));
+        const bajos = conSeries.filter((x) => x.series < 10).map((x) => x.musculo);
+        if (bajos.length) out.musculosDebajoDe10SeriesSemanales = bajos;
+      }
+    }
+  } catch { /* sigue */ }
+  try {
+    let conMeta = 0, cumplidas = 0, rpes = [];
+    const desde = haceDias(28);
+    Object.values(logs || {}).forEach((hist) => (Array.isArray(hist) ? hist : []).forEach((h) => {
+      if (!h?.date || h.date < desde || h.deload) return;
+      if (h.meta) { conMeta++; if (cumpleMeta(h, h.meta)) cumplidas++; }
+      if (h.rpe != null && h.date >= haceDias(14)) rpes.push(Number(h.rpe));
+    }));
+    if (conMeta) out.metasDelPlanUltimas4Semanas = { series: conMeta, cumplidas, porcentaje: Math.round((cumplidas / conMeta) * 100) };
+    if (rpes.length >= 3) out.esfuerzoUltimas2Semanas = { rpePromedio: Math.round((rpes.reduce((a, b) => a + b, 0) / rpes.length) * 10) / 10, seriesConRpe: rpes.length };
+  } catch { /* sigue */ }
+  try {
+    const desde = haceDias(28);
+    const ses = (profile?.trainingSessions || []).filter((x) => x?.date >= desde && x.startedAt && x.endedAt);
+    const minutos = ses.map((x) => (new Date(x.endedAt) - new Date(x.startedAt)) / 60000).filter((n) => n > 5 && n < 300);
+    if (minutos.length) out.sesionesUltimas4Semanas = { cantidad: ses.length, minutosPromedio: Math.round(minutos.reduce((a, b) => a + b, 0) / minutos.length) };
+  } catch { /* sigue */ }
+  try {
+    if (routineDef) {
+      const baja = ejerciciosEnBaja(logs, routineDef, hoy);
+      if (baja?.length) out.ejerciciosEnBaja = baja.map((x) => x.nombre || x.name || x.id || x).slice(0, 8);
+    }
+  } catch { /* sigue */ }
+  try {
+    if (weekInfo) {
+      const quedan = settings?.deloadEnabled === false ? null : Math.max(0, (weekInfo.trainWeeks || 0) - weekInfo.weekInCycle + 1);
+      out.ciclo = { numero: weekInfo.cycleNumber, semana: weekInfo.weekInCycle, de: weekInfo.cycleWeeks, esDescarga: !!weekInfo.isDeload, ...(quedan != null && !weekInfo.isDeload ? { semanasHastaLaDescarga: quedan } : {}) };
+    }
+  } catch { /* sigue */ }
+  return out;
+}
+
 function buildTrainingInsights(logs, sessions, weekSchedule, dumbbellDouble = null) {
   const today = todayStr();
   const daysAgo = (dateStr) => Math.round((new Date(today) - new Date(dateStr)) / 86400000);
@@ -28466,6 +28684,9 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
         analisisEntrenamiento: sinAnalisis
           ? "(no incluido en este pedido por tamaño — deducí lo que necesites de logs)"
           : buildTrainingInsights(logs, profile?.trainingSessions || [], profile?.weekSchedule || null, settings?.dumbbellDouble || null),
+        // Lo demás que la app sabe (medidas, rango por músculo, series por
+        // semana, metas cumplidas, RPE, duración, en baja, ciclo): pesa poco.
+        resumenExtra: resumenParaIA({ profile, logs, settings, routineDef: activeRoutineId ? resolveRoutineDef(profile?.routines?.[activeRoutineId], activeRoutineId) : null, weekInfo: weekInfoForAI }),
       });
       // BUG FIX (reporte: "cuando apretás el chatbot da error" + "la IA falla
       // a veces"). Esta red de seguridad existía pero su umbral era de 350.000
@@ -31574,6 +31795,66 @@ function useAvisosSociales(uid, logs, activo, unidad = "kg") {
   }, [uid, logs, activo, unidad]);
 }
 
+// UN AMIGO EMPEZÓ A ENTRENAR (05/11, pedido: "una notificación que avise
+// cuando un amigo inició su entrenamiento, conectada a la planilla de
+// asistencia"). Sale de lo mismo que la planilla: el `enCurso` del perfil
+// público de cada amigo (cuándo llegó y qué día hace). Mientras la app está
+// abierta, y al volver a ella, se fija cada tres minutos; avisa una sola vez
+// por entrada y sólo si llegó hace menos de dos horas. Con la app cerrada no
+// llega: para eso haría falta un servidor de avisos (Firebase Functions, que
+// pide el plan Blaze). Usa el mismo permiso que el recordatorio y su opción
+// en Perfil › Avisos.
+let avisoAmigoEnCurso = false;
+function useAvisoAmigoEntrena(uid, activo) {
+  useEffect(() => {
+    if (!uid || !activo || typeof document === "undefined") return;
+    const clave = `modusfit_amigo_entrena_${uid}`;
+    const revisar = async () => {
+      if (avisoAmigoEnCurso || document.visibilityState !== "visible") return;
+      avisoAmigoEnCurso = true;
+      try {
+        const permiso = await LocalNotifications.checkPermissions().catch(() => null);
+        if (permiso?.display !== "granted") return;
+        let avisados = [];
+        try { avisados = JSON.parse(localStorage.getItem(clave) || "[]") || []; } catch { /* sin almacenamiento */ }
+        const ya = new Set(avisados);
+        const amistades = await listMyFriendships(uid);
+        const amigos = amistades.filter((x) => x.status === "accepted").map((x) => x.users.find((u) => u !== uid));
+        const nuevas = [];
+        for (const otro of amigos) {
+          const full = await getPublicFull(otro);
+          const enCurso = full?.enCurso;
+          if (!enCurso?.startedAt) continue;
+          const desde = Date.now() - new Date(enCurso.startedAt).getTime();
+          if (!(desde >= 0 && desde < 2 * 3600 * 1000)) continue;
+          const id = `${otro}_${enCurso.startedAt}`;
+          if (ya.has(id)) continue;
+          ya.add(id);
+          const nombre = String((await getPublicBasic(otro))?.name || "Un amigo").split(" ")[0];
+          const dia = enCurso.dayKey && full?.activeRoutineSnapshot?.days?.[enCurso.dayKey]?.label;
+          const hora = new Date(enCurso.startedAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
+          nuevas.push({ id, title: `${nombre} empezó a entrenar`, body: `${dia ? `${dia}, ` : ""}entró a las ${hora}. Mandale un aplauso en la planilla.` });
+        }
+        if (nuevas.length) {
+          if (Capacitor.isNativePlatform()) await LocalNotifications.createChannel({ id: "modusfit-social-v1", name: "Avisos de Social", description: "Cuando un amigo te pasa en un músculo, te reta o empieza a entrenar", importance: 3 }).catch(() => {});
+          await LocalNotifications.schedule({
+            notifications: nuevas.slice(0, 3).map((n) => ({ id: numeroDeAviso(`entrena_${n.id}`), title: n.title, body: n.body, channelId: "modusfit-social-v1", smallIcon: "ic_stat_modusfit", iconColor: "#8B5CF6", group: "modusfit-social", extra: { ir: "social" } })),
+          });
+        }
+        try { localStorage.setItem(clave, JSON.stringify([...ya].slice(-100))); } catch { /* sin almacenamiento */ }
+      } catch (err) {
+        console.warn("[social] No se pudo revisar quién entrena:", err?.message || err);
+      } finally {
+        avisoAmigoEnCurso = false;
+      }
+    };
+    revisar();
+    const t = setInterval(revisar, 3 * 60 * 1000);
+    document.addEventListener("visibilitychange", revisar);
+    return () => { clearInterval(t); document.removeEventListener("visibilitychange", revisar); };
+  }, [uid, activo]);
+}
+
 // Mantener la pantalla encendida durante la sesión (opción, prendida de
 // fábrica). Con el teléfono apoyado en el banco, la pantalla se apagaba
 // entre serie y serie: había que desbloquearlo para ver el descanso o
@@ -32478,6 +32759,8 @@ export default function App() {
   // Si esta cuenta es Premium (con el cobro apagado, nadie lo es ni lo
   // necesita). La cuenta de RevenueCat es la de Google (googleUid).
   useEffect(() => { iniciarSuscripcion(profile?.googleUid || null); }, [profile?.googleUid]);
+  // El Premium de regalo (un código canjeado en Perfil) cuenta como Premium.
+  useEffect(() => { aplicarRegalo(profile?.premiumRegalo || null); }, [profile?.premiumRegalo]);
   const isDeloadWeek = !!(profile && cycleStart && getWeekInfo(cycleStart, getProfileSettings(profile))?.isDeload);
   // El ciclo en curso: con él se sella cada plan nuevo (ver metaDeHoy).
   const cicloEnCurso = profile && cycleStart ? getWeekInfo(cycleStart, getProfileSettings(profile))?.cycleNumber ?? null : null;
@@ -32869,6 +33152,7 @@ export default function App() {
   // Los avisos de Social en el teléfono (un amigo te pasó, un reto).
   const uidSocial = profile?.googleUid || (import.meta.env.DEV && typeof localStorage !== "undefined" && localStorage.getItem("modusfit_demo_social") === "1" ? "demo-yo" : null);
   useAvisosSociales(uidSocial, logs, getProfileSettings(profile).avisosSociales !== false, getProfileSettings(profile).weightUnit);
+  useAvisoAmigoEntrena(uidSocial, getProfileSettings(profile).avisoAmigoEntrena !== false);
   useMantenerPantalla(haySesionActiva && getProfileSettings(profile).keepScreenOn !== false);
   useEffect(() => {
     if (typeof document === "undefined") return;

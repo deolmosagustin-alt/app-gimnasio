@@ -109,7 +109,20 @@ export function ahorroContraMensual(oferta, mensual) {
 const VACIO = { activo: false, plan: null, enPrueba: false, vence: null, seRenueva: null, cargado: false };
 let ESTADO = VACIO;
 const OYENTES = new Set();
-function publicar(e) { ESTADO = { ...VACIO, ...e, cargado: true }; OYENTES.forEach((f) => f()); }
+// PREMIUM DE REGALO (05/11, pedido: "un lugar donde poner códigos especiales
+// para darle el plan pago a amigos y familia sin que paguen"): un código
+// canjeado (ver canjearCodigo en social.js) deja `premiumRegalo` en el perfil;
+// mientras esté vigente, cuenta como Premium aunque la tienda diga que no.
+let REGALO = null;
+let ULTIMO = {};
+const regaloVigente = () => !!REGALO && (!REGALO.hasta || REGALO.hasta >= new Date().toISOString().slice(0, 10));
+function publicar(e) {
+  ULTIMO = e || {};
+  const conRegalo = !ULTIMO.activo && regaloVigente() ? { activo: true, plan: "regalo", vence: REGALO.hasta || null, regalo: true, codigo: REGALO.codigo || null } : {};
+  ESTADO = { ...VACIO, ...ULTIMO, ...conRegalo, cargado: true };
+  OYENTES.forEach((f) => f());
+}
+export function aplicarRegalo(regalo) { REGALO = regalo && regalo.codigo ? regalo : null; publicar(ULTIMO); }
 export function suscribirPremium(f) { OYENTES.add(f); return () => OYENTES.delete(f); }
 export function estadoPremium() { return ESTADO; }
 export const esPremium = () => ESTADO.activo;

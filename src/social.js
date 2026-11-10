@@ -615,3 +615,32 @@ export async function cleanupSocialData(uid, usernameLower, phoneHash = null) {
     console.warn("[social] Limpieza al eliminar perfil incompleta:", err?.message || err);
   }
 }
+
+// ============================== CÓDIGOS DE REGALO ==============================
+// Premium gratis para amigos y familia (05/11). Cada código es un documento
+// `codigos/{CODIGO}` que crea el dueño de la app desde la consola (o Claude,
+// con la sesión de Firebase); la app sólo puede leer uno puntual y canjearlo
+// a su propio nombre si nadie lo usó (ver firestore.rules). `dias` null es
+// para siempre.
+export const normalizarCodigo = (texto) => String(texto || "").toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/^(MODUS)?(.{4})(.{4})$/, "MODUS-$2-$3");
+export async function canjearCodigo(uid, texto) {
+  const codigo = normalizarCodigo(texto);
+  if (!/^MODUS-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(codigo)) return { error: "formato" };
+  if (!uid) return { error: "sesion" };
+  try {
+    const ref = doc(db, "codigos", codigo);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return { error: "no_existe" };
+    const d = snap.data();
+    if (d.usadoPor && d.usadoPor !== uid) return { error: "usado" };
+    const usadoEn = d.usadoEn || new Date().toISOString();
+    if (!d.usadoPor) await updateDoc(ref, { usadoPor: uid, usadoEn });
+    const dias = Number.isFinite(d.dias) && d.dias > 0 ? d.dias : null;
+    const desde = usadoEn.slice(0, 10);
+    const hasta = dias ? new Date(new Date(`${desde}T12:00:00`).getTime() + dias * 86400000).toISOString().slice(0, 10) : null;
+    return { regalo: { codigo, desde, hasta } };
+  } catch (err) {
+    console.warn("[codigos] No se pudo canjear:", err?.message || err);
+    return { error: "red" };
+  }
+}
