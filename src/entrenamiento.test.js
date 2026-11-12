@@ -113,3 +113,31 @@ describe("redondeos coherentes", () => {
     expect(redondearConReps(66, 10, 7)).toEqual({ kg: 63, reps: 12 });
   });
 });
+
+import { resumenDeCiclo } from "./entrenamiento.js";
+describe("resumenDeCiclo", () => {
+  const logs = {
+    press_0: [{ date: "2026-08-01", kg: 70, reps: 8 }, { date: "2026-09-20", kg: 75, reps: 8 }],
+    press_1: [{ date: "2026-08-01", kg: 72.5, reps: 6 }, { date: "2026-09-25", kg: 60, reps: 8, deload: true }],
+    remo_0: [{ date: "2026-08-10", kg: 60, reps: 10 }, { date: "2026-09-18", kg: 55, reps: 10 }],
+    fondos_0: [{ date: "2026-09-19", kg: 0, reps: 12 }],
+    cinta_0: [{ date: "2026-09-19", minutes: 20 }],
+    viejo_0: [{ date: "2026-07-01", kg: 40, reps: 10 }],
+  };
+  const r = resumenDeCiclo(logs, "2026-09-14", "2026-11-02");
+  it("compara lo mejor de antes con lo mejor del ciclo, sin la descarga ni el cardio", () => {
+    const press = r.filas.find((f) => f.id === "press");
+    expect(press.antes).toMatchObject({ kg: 70, reps: 8 });
+    expect(press.ahora).toMatchObject({ kg: 75, reps: 8 });
+    expect(press.esRecord).toBe(true);
+    expect(press.cambio).toBeGreaterThan(6);
+    expect(r.filas.some((f) => f.id === "cinta")).toBe(false);
+    expect(r.filas.some((f) => f.id === "viejo")).toBe(false);
+  });
+  it("lo que bajó no es récord, y lo nuevo se marca como nuevo", () => {
+    expect(r.filas.find((f) => f.id === "remo").esRecord).toBe(false);
+    expect(r.filas.find((f) => f.id === "fondos")).toMatchObject({ nuevo: true, corporal: true });
+    expect(r.records).toBe(1);
+    expect(r.filas[0].id).toBe("press");
+  });
+});

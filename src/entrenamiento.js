@@ -159,3 +159,37 @@ export function redondearConReps(kg, reps, salto = 2.5, { hacia = "cerca", soloB
   r = Math.round(r * 100) / 100;
   return { kg: r, reps: equilibrarReps(kg, r, reps, { soloBajar }) };
 }
+
+// EL RESUMEN DEL CICLO (12/11, pedido: "que al final de cada ciclo te muestre
+// en comparación todos los ejercicios, con las mejores marcas antes de
+// empezar y con los récords nuevos"). Por ejercicio (todas sus series
+// juntas, sin las de descarga): la mejor serie de antes del ciclo y la mejor
+// del ciclo, por 1RM estimado (a peso corporal, por reps). `desde` y `hasta`
+// son fechas AAAA-MM-DD; `hasta` no entra.
+export function resumenDeCiclo(logs, desde, hasta) {
+  const porEjercicio = {};
+  const puntaje = (h) => (h.kg > 0 ? estimate1RM(h.kg, h.reps) : h.reps || 0);
+  Object.entries(logs || {}).forEach(([clave, historial]) => {
+    if (!Array.isArray(historial)) return;
+    const id = clave.replace(/_\d+$/, "");
+    historial.forEach((h) => {
+      if (!h?.date || h.deload || !(h.reps > 0) || h.minutes != null) return;
+      const e = porEjercicio[id] || (porEjercicio[id] = { id, antes: null, ahora: null, series: 0 });
+      if (h.date < desde) { if (!e.antes || puntaje(h) > puntaje(e.antes)) e.antes = h; }
+      else if (h.date < hasta) { e.series++; if (!e.ahora || puntaje(h) > puntaje(e.ahora)) e.ahora = h; }
+    });
+  });
+  const filas = Object.values(porEjercicio).filter((e) => e.ahora).map((e) => {
+    const a = e.antes ? puntaje(e.antes) : 0, b = puntaje(e.ahora);
+    const corporal = !(e.ahora.kg > 0);
+    return {
+      id: e.id, series: e.series, corporal,
+      antes: e.antes ? { kg: e.antes.kg || 0, reps: e.antes.reps, rm: corporal ? null : Math.round(a * 10) / 10 } : null,
+      ahora: { kg: e.ahora.kg || 0, reps: e.ahora.reps, rm: corporal ? null : Math.round(b * 10) / 10, date: e.ahora.date },
+      esRecord: !!e.antes && b > a + 1e-6,
+      nuevo: !e.antes,
+      cambio: e.antes && a > 0 ? Math.round(((b - a) / a) * 1000) / 10 : null,
+    };
+  }).sort((x, y) => (y.esRecord - x.esRecord) || ((y.cambio ?? -999) - (x.cambio ?? -999)));
+  return { filas, records: filas.filter((f) => f.esRecord).length, nuevos: filas.filter((f) => f.nuevo).length };
+}

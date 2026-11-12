@@ -160,7 +160,7 @@ try {
   console.log("Vista previa de la descarga (jueves 22/10, semana 6 de 8)");
   {
     const { page, context } = await abrir("progreso", { fecha: "2026-10-22" });
-    const enlace = page.getByRole("button", { name: /Ver mi semana de descarga/ });
+    const enlace = page.getByRole("button", { name: /Mi descarga/ });
     ok("Progreso ofrece ver la descarga", (await enlace.count()) > 0);
     if (await enlace.count()) {
       await enlace.first().click();

@@ -69,7 +69,7 @@ import {
 // Buscar ejercicios como los escribe la gente (sin tildes, en cualquier
 // orden, con errores de tipeo, en inglés o con el apodo del gimnasio).
 import { buscarEjercicios, mejorEjercicio, nombreCoincide, partesResaltadas, REGIONES_BUSCADOR, alternativasDe } from "./buscar-ejercicios.js";
-import { rangoDeReps, siguientePaso, seriesDeDescarga, cargaDeDescarga, ejerciciosEnBaja, planDeEntrenador, equilibrarReps, redondearConReps } from "./entrenamiento.js";
+import { rangoDeReps, siguientePaso, seriesDeDescarga, cargaDeDescarga, ejerciciosEnBaja, planDeEntrenador, equilibrarReps, redondearConReps, resumenDeCiclo } from "./entrenamiento.js";
 // Modus Fit Premium: preparada y con el cobro apagado por bandera (ver
 // src/suscripcion.js y docs/suscripcion.md).
 import {
@@ -1647,9 +1647,9 @@ function GeneralWarmupCard({ exercises, warmupKeys, accent }) {
     <div className="tarjeta-tonal overflow-hidden" style={{ "--c": accent }}>
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-3 px-3.5 py-3 text-left transition active:scale-[0.99]">
         <span className="galleta icono-galleta" aria-hidden="true"><Activity size={16} /></span>
-        <div className="flex-1 min-w-0">
-          <p className="text-[15px] font-bold text-white leading-tight">Calentamiento general</p>
-          <p className="text-[12px] text-slate-500 mt-0.5">{drills.length} ejercicios de movilidad{doneCount > 0 ? ` · ${doneCount}/${drills.length} hechos` : ""}</p>
+        <div className="flex-1 min-w-0 flex items-baseline gap-2">
+          <p className="text-[15px] font-semibold text-white leading-tight">Calentamiento</p>
+          <p className="text-[13px] text-slate-500">{doneCount > 0 ? `${doneCount} de ${drills.length}` : `${drills.length} de movilidad`}</p>
         </div>
         <ChevronDown size={16} className={`text-slate-500 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -7128,6 +7128,48 @@ label.ajuste-rotulo { display: block; }
 .light-mode .grupo-ajustes-placa .ajuste-renglon.peligro > .icono-suelto { color: #b0353b; }
 .grupo-ajustes-placa > .seccion-plegable > button:active, .grupo-ajustes-placa > button.seccion-plegable:active { background: var(--velo); }
 .grupo-ajustes .boton-tonal { background: var(--accion-fondo); color: var(--accion-tinta); }
+
+/* ── RUTINA, MÁS LIVIANA (12/11) ── */
+.serie-sello { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 650; white-space: nowrap; color: var(--text-muted); background: var(--velo); }
+.serie-sello.sube { color: color-mix(in oklab, oklch(72.3% 0.153 149.6) 78%, white); background: color-mix(in oklab, oklch(72.3% 0.153 149.6) 14%, transparent); }
+.light-mode .serie-sello.sube { color: oklch(45% 0.12 150); }
+.serie-sello.record { color: var(--record); background: color-mix(in oklab, var(--record) 14%, transparent); }
+.serie-mejora.sube { color: color-mix(in oklab, oklch(72.3% 0.153 149.6) 78%, white); }
+.light-mode .serie-mejora.sube { color: oklch(45% 0.12 150); }
+.serie-consejo { margin-top: 0; font-size: 12px; }
+.foco-pasada { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
+.foco-hoy { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 650; color: color-mix(in oklab, var(--c, var(--tono)) 72%, white); background: color-mix(in oklab, var(--c, var(--tono)) 14%, transparent); }
+.light-mode .foco-hoy { color: color-mix(in oklab, var(--c, var(--tono)) 75%, black); }
+
+/* ── EL RESUMEN DEL CICLO (12/11) ── */
+.ciclo-resumen-titular { display: grid; gap: 0; padding: 4px 2px 6px; }
+.ciclo-resumen-numero { display: flex; align-items: baseline; gap: 8px; }
+.ciclo-resumen-numero b { font-size: 44px; line-height: 1; font-weight: 850; color: var(--record); }
+.ciclo-resumen-numero span { font-size: 17px; font-weight: 700; color: var(--text-strong); }
+.ciclo-resumen-de { font-size: 13px; color: var(--text-faint); }
+.ciclo-resumen-cabeza, .ciclo-fila { display: grid; grid-template-columns: minmax(0, 1fr) 4.6em 6em; column-gap: 10px; align-items: baseline; }
+.ciclo-resumen-cabeza { padding: 8px 12px 4px; font-size: 12px; font-weight: 650; color: var(--text-faint); }
+.ciclo-resumen-cabeza span:nth-child(n+2), .ciclo-fila-antes, .ciclo-fila-ahora, .ciclo-fila-cambio { text-align: right; }
+.ciclo-resumen-lista { display: grid; border-radius: 20px; background: var(--surface-2); box-shadow: var(--placa-canto); overflow: hidden; }
+.ciclo-fila { padding: 10px 12px 9px; row-gap: 5px; }
+.ciclo-fila + .ciclo-fila { border-top: 1px solid var(--hairline); }
+.ciclo-fila-nombre { display: flex; align-items: center; gap: 5px; min-width: 0; font-size: 14px; font-weight: 600; line-height: 1.25; color: var(--text-strong); }
+.ciclo-fila-nombre svg { flex: none; color: var(--record); }
+.ciclo-fila-antes { font-size: 15px; font-weight: 600; color: var(--text-faint); white-space: nowrap; }
+.ciclo-fila-ahora { font-size: 17px; font-weight: 800; color: var(--text-strong); white-space: nowrap; }
+.ciclo-fila-ahora small { margin-left: 2px; font-size: 11px; font-weight: 600; color: var(--text-muted); }
+.ciclo-fila.record .ciclo-fila-ahora { color: var(--record); }
+.ciclo-fila-nombre { grid-column: 1 / -1; }
+.ciclo-fila-barras { grid-column: 1; grid-row: 2; display: grid; gap: 3px; align-self: center; }
+.ciclo-fila-cambio { grid-column: 1 / -1; }
+.ciclo-fila-barras span { display: block; height: 5px; border-radius: 999px; width: calc(var(--f) * 100%); background: var(--hairline-fuerte); transform-origin: left; animation: barraCiclo .5s var(--sale, ease-out) backwards; }
+.ciclo-fila-barras .ahora { background: color-mix(in oklab, var(--tono) 55%, #8a8c92); animation-delay: .12s; }
+.ciclo-fila.record .ciclo-fila-barras .ahora { background: var(--record); }
+.ciclo-fila-cambio { font-size: 12px; font-weight: 650; color: var(--text-faint); white-space: nowrap; }
+.ciclo-fila-cambio.sube { color: color-mix(in oklab, oklch(72.3% 0.153 149.6) 78%, white); }
+.light-mode .ciclo-fila-cambio.sube { color: oklch(45% 0.12 150); }
+@keyframes barraCiclo { from { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) { .ciclo-fila-barras span { animation: none; } }
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -13978,7 +14020,18 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     onUpdateSettings({ weightUnit: nueva });
     haptic(12);
   } : null;
-  const lineaFeedback = feedback?.msg && (
+  // MENOS TEXTO (12/11, pedido: "al haber mucho texto en el registro, satura"):
+  // una serie hecha es UN renglón. Lo que antes eran frases debajo ("Tu mejor
+  // marca en esta serie.", "A un 3 % de tu récord.", "Llegaste al tope del
+  // rango: la próxima…") ahora es un sello corto a la derecha; la frase
+  // entera queda para el lector de pantalla. Sólo el récord del ejercicio
+  // conserva su línea, con el botón de compartir. Hevy y Strong resuelven la
+  // serie hecha igual: la fila y una marca chica.
+  const SELLOS_DE_SERIE = { "pr-serie": "Mejor serie", first: "Primera marca", tie: "Igualaste" };
+  const selloFeedback = !feedback?.msg ? null
+    : feedback.type === "down" ? { texto: `−${(String(feedback.msg).match(/(\d+)\s*%/) || [])[1] || ""} %`.replace("− %", ""), tono: "baja" }
+      : SELLOS_DE_SERIE[feedback.type] ? { texto: SELLOS_DE_SERIE[feedback.type], tono: TONO_DEL_AVISO[feedback.type] || "neutro" } : null;
+  const lineaFeedback = feedback?.msg && !selloFeedback && (
     <p className={`serie-aviso ${TONO_DEL_AVISO[feedback.type] || "alerta"} ${feedback.type === "pr" ? "pr-pop" : ""}`}>
       {feedback.msg}
       {(feedback.type === "pr" || feedback.type === "pr-serie") && !cardio && <button onClick={() => setShowPRShare(true)} aria-label="Compartir esta marca" className="ml-1.5 inline-flex align-middle opacity-80 hover:opacity-100 active:scale-90 transition"><Share2 size={13} /></button>}
@@ -13986,7 +14039,9 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   );
   const avisosExtra = (
     <>
-      {feedback?.suggestUp && <p className="serie-aviso neutro"><TrendingUp size={12} className="inline -mt-0.5 mr-1" />Llegaste al tope del rango: la próxima, +{conComa(feedback.suggestUp.salto)} {weightLabel(unit)} y volvé a {feedback.suggestUp.piso} reps.</p>}
+      {/* La próxima vez la serie ya viene escrita con el salto: acá sobraba. */}
+      {feedback?.suggestUp && <p className="sr-only">Llegaste al tope del rango: la próxima, +{conComa(feedback.suggestUp.salto)} {weightLabel(unit)} y volvé a {feedback.suggestUp.piso} reps.</p>}
+      {selloFeedback && <p className="sr-only">{feedback.msg}</p>}
       {feedback?.noSession && !hasActiveSession && <p className="serie-aviso alerta"><AlertTriangle size={12} className="inline -mt-0.5 mr-1" />Tocá "Iniciar sesión" arriba para que este día cuente en tu historial</p>}
     </>
   );
@@ -14217,7 +14272,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     // ver que avanzás, serie por serie (Alpha Progression lo muestra igual).
     const mejora = hechaHoy && lastSession ? (
       yaRegistradaHoy.kg > lastSession.kg + 0.001
-        ? `+${Math.round(kgToDisplay(yaRegistradaHoy.kg - lastSession.kg, unit) * 100) / 100} ${u}`
+        ? `+${conComa(Math.round(kgToDisplay(yaRegistradaHoy.kg - lastSession.kg, unit) * 100) / 100)} ${u}`
         : Math.abs(yaRegistradaHoy.kg - lastSession.kg) < 0.001 && yaRegistradaHoy.reps > lastSession.reps
           ? `+${yaRegistradaHoy.reps - lastSession.reps} rep${yaRegistradaHoy.reps - lastSession.reps === 1 ? "" : "s"}`
           : null
@@ -14249,7 +14304,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           </span>
           {hechaHoy ? (
             <span className="serie-linea-valor">
-              <b>{hecho.reps}</b><i>×</i><b>{hecho.kg}</b><small>{u}</small>
+              <b>{hecho.reps}</b><i>×</i><b>{conComa(hecho.kg)}</b><small>{u}</small>
               {yaRegistradaHoy.rpe && <span className="serie-valor-rpe">{formatEffort(yaRegistradaHoy.rpe, fieldSettings.rpeDisplayMode)}</span>}
             </span>
           ) : (
@@ -14261,7 +14316,8 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             </span>
           )}
           <span className="serie-linea-fin">
-            {mejora && <span className="serie-mejora"><TrendingUp size={12} /> {mejora}</span>}
+            {mejora && <span className={`serie-mejora ${feedback?.type === "pr-serie" || feedback?.type === "pr" ? "sube" : ""}`}><TrendingUp size={12} /> {mejora}</span>}
+            {hechaHoy && selloFeedback?.texto && !(mejora && (feedback?.type === "pr-serie" || feedback?.type === "down")) && <span className={`serie-sello ${selloFeedback.tono}`}>{selloFeedback.texto}</span>}
             {referencia && <>{referencia.icono}{referencia.texto}</>}
           </span>
         </button>
@@ -14274,10 +14330,9 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           <p className="serie-aviso text-rose-400/90">Mini-series: {yaRegistradaHoy.clusters.map((c, i) => <span key={i}>{i > 0 && " · "}{c.reps} reps</span>)}</p>
         )}
         {coaching && (
-          <div className="serie-aviso flex items-start gap-1.5">
-            <span className="text-[13px] leading-none mt-0.5 shrink-0">{coaching.icon}</span>
-            <span className="min-w-0"><b style={{ color: coaching.color }}>{coaching.title}.</b> <span className="text-slate-400">{coaching.body}</span></span>
-          </div>
+          <p className="serie-aviso serie-consejo" title={coaching.body}>
+            <b style={{ color: coaching.color }}>{coaching.title}</b><span className="sr-only">. {coaching.body}</span>
+          </p>
         )}
         {panelCorreccion}
         {modales}
@@ -14289,7 +14344,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   // Si la vez pasada hiciste tu récord, arriba dice "récord 8 × 80" y abajo
   // "la vez pasada 8 × 80 kg": la misma marca dos veces. Abajo va "tu récord".
   const pasadaEsRecord = !!(currentPR && lastSession && !isPlannedMode && Number(lastSession.reps) === Number(currentPR.reps) && Math.abs((Number(lastSession.kg) || 0) - (Number(currentPR.kg) || 0)) < 0.01);
-  const laVezPasada = lastSession ? (pasadaEsRecord ? <>la vez pasada, <b>tu récord</b></> : <>la vez pasada <b>{lastSession.reps} × {conComa(kgToDisplay(lastSession.kg, unit))} {u}</b></>) : null;
+  const laVezPasada = lastSession ? (pasadaEsRecord ? <>antes, <b>tu récord</b></> : <>antes <b>{lastSession.reps} × {conComa(kgToDisplay(lastSession.kg, unit))} {u}</b></>) : null;
   return (
     <div className={`serie serie-foco ${liveBeats ? "va-record" : ""}`} style={{ "--c": accent }}>
       {campana && <CampanaRecord key={campana.n} campana={campana} />}
@@ -14326,11 +14381,11 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           en algún lado lo que hiciste la última vez cuando el ejercicio es
           planificado") y, si la meta se corrigió, por qué. */}
       {isPlannedMode && !cardio && lastSession && !draft.editing && (
-        <p className="foco-pasada">la vez pasada <b>{lastSession.reps} × {conComa(kgToDisplay(lastSession.kg, unit))} {u}</b>{AJUSTE_DE_META[plannedTarget.ajuste] || ""}</p>
+        <p className="foco-pasada" title={AJUSTE_DE_META[plannedTarget.ajuste] ? `La vez pasada${AJUSTE_DE_META[plannedTarget.ajuste]}` : undefined}>antes <b>{lastSession.reps} × {conComa(kgToDisplay(lastSession.kg, unit))} {u}</b>{NOTA_DE_AJUSTE[plannedTarget.ajuste] ? <span className="foco-hoy">{NOTA_DE_AJUSTE[plannedTarget.ajuste]}</span> : null}{AJUSTE_DE_META[plannedTarget.ajuste] ? <span className="sr-only">{AJUSTE_DE_META[plannedTarget.ajuste]}</span> : null}</p>
       )}
       {/* La serie viene con la progresión: arriba, de dónde sale. */}
       {escribeProgresion && !draft.editing && (
-        <p className="foco-pasada">{laVezPasada}{pasoProgresion.motivo === "peso" ? ": llegaste al tope, sube el peso" : pasoProgresion.motivo === "fallo" ? ": llegaste al fallo, hoy lo mismo" : ": hoy, una rep más"}</p>
+        <p className="foco-pasada">{laVezPasada}<span className="foco-hoy">{pasoProgresion.motivo === "peso" ? "sube el peso" : pasoProgresion.motivo === "fallo" ? "hoy lo mismo" : "+1 rep"}</span></p>
       )}
 
       {/* El visor: reps × kilos en grande y el ✓. Vienen propuestos con lo de
@@ -15575,7 +15630,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
         {exercise.video && (
           <div className="pt-3">
             <a href={exercise.video} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 h-11 rounded-full text-slate-400 hover:text-white transition text-[14px] font-semibold active:scale-[0.98]" style={{ backgroundColor: "var(--surface-2)" }}>
-              <SquarePlay size={17} /> Ver técnica en YouTube
+              <SquarePlay size={17} /> Técnica
             </a>
           </div>
         )}
@@ -15700,6 +15755,98 @@ function PisoGoma({ children = null }) {
   );
 }
 
+// EL RESUMEN DEL CICLO (12/11, pedido: "que al final de cada ciclo te muestre
+// en comparación todos los ejercicios, con las mejores marcas antes de
+// empezar y con los récords nuevos"). Se pide desde cualquier lado con un
+// evento (lo dibuja App, que tiene el perfil): sale solo al terminar las
+// semanas de entrenamiento de un ciclo, una vez, y desde "Tu ciclo" en
+// Progreso cuando quieras.
+const EVENTO_CICLO = "modusfit:ciclo";
+function pedirResumenDeCiclo(numero = null) {
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(EVENTO_CICLO, { detail: { numero } }));
+}
+// Las fechas del ciclo n (1 es el primero): desde su lunes hasta el inicio del siguiente.
+function fechasDeCiclo(cycleStart, settings, numero) {
+  const info = getWeekInfo(cycleStart, settings);
+  if (!info) return null;
+  const n = Math.max(1, Math.min(numero || info.cycleNumber, info.cycleNumber));
+  const desde = new Date(cycleStart); desde.setDate(desde.getDate() + (n - 1) * info.cycleWeeks * 7);
+  const hasta = new Date(desde); hasta.setDate(hasta.getDate() + info.cycleWeeks * 7);
+  return { numero: n, desde: localDateStr(desde), hasta: localDateStr(hasta), enCurso: n === info.cycleNumber && !info.isDeload, semanas: info.trainWeeks };
+}
+function ResumenDeCicloModal({ numero, logs, cycleStart, settings, nombres = {}, onClose }) {
+  useAndroidBack(onClose);
+  const unit = useWeightUnit();
+  const u = weightLabel(unit);
+  const [soloRecords, setSoloRecords] = useState(false);
+  const fechas = useMemo(() => fechasDeCiclo(cycleStart, settings, numero), [cycleStart, settings, numero]);
+  const datos = useMemo(() => (fechas ? resumenDeCiclo(logs, fechas.desde, fechas.hasta) : { filas: [], records: 0, nuevos: 0 }), [logs, fechas]);
+  if (typeof document === "undefined" || !fechas) return null;
+  const nombreDe = (id) => nombres[id] || EXERCISE_LIBRARY_BY_ID[id]?.name || null;
+  const filas = datos.filas.map((f) => ({ ...f, nombre: nombreDe(f.id) })).filter((f) => f.nombre);
+  const visibles = soloRecords ? filas.filter((f) => f.esRecord) : filas;
+  const records = filas.filter((f) => f.esRecord).length;
+  const fechaCortaDe = (iso) => `${Number(iso.slice(8, 10))}/${Number(iso.slice(5, 7))}`;
+  const marca = (m, corporal) => (corporal ? `${m.reps} reps` : `${m.reps} × ${conComa(kgToDisplay(m.kg, unit))}`);
+  return createPortal(
+    <div className="fixed inset-0 z-[150] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
+      <div className="modal-rutina modal-pop-in ciclo-resumen" role="dialog" aria-modal="true" aria-label={`Resumen del ciclo ${fechas.numero}`} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-rutina-cabeza">
+          <div className="min-w-0">
+            <h3 className="ficha-titulo">Ciclo {fechas.numero}{fechas.enCurso ? ", hasta hoy" : ""}</h3>
+            <p className="ficha-bajada">Del {fechaCortaDe(fechas.desde)} al {fechaCortaDe(localDateStr(new Date(new Date(`${fechas.hasta}T12:00:00`).getTime() - 86400000)))}: tu mejor serie de antes contra la mejor del ciclo.</p>
+          </div>
+          <button onClick={onClose} aria-label="Cerrar" className="boton-redondo shrink-0"><X size={17} /></button>
+        </div>
+        <div className="modal-rutina-cuerpo">
+          {filas.length === 0 ? (
+            <p className="armado-nota">Todavía no hay series anotadas en este ciclo.</p>
+          ) : (
+            <>
+              {/* El titular: cuántos récords, de cuántos ejercicios. */}
+              <div className="ciclo-resumen-titular">
+                <p className="ciclo-resumen-numero"><b className="num-display">{records}</b><span>{records === 1 ? "récord nuevo" : "récords nuevos"}</span></p>
+                <p className="ciclo-resumen-de">en {filas.length} {filas.length === 1 ? "ejercicio" : "ejercicios"}{datos.nuevos ? `, ${datos.nuevos} ${datos.nuevos === 1 ? "nuevo" : "nuevos"}` : ""}</p>
+              </div>
+              {records > 0 && records < filas.length && (
+                <div className="segmentado chico" role="tablist" aria-label="Qué ejercicios ver">
+                  <button role="tab" aria-selected={!soloRecords} onClick={() => setSoloRecords(false)} className={!soloRecords ? "activo" : ""}>Todos</button>
+                  <button role="tab" aria-selected={soloRecords} onClick={() => setSoloRecords(true)} className={soloRecords ? "activo" : ""}>Sólo los récords</button>
+                </div>
+              )}
+              <div className="ciclo-resumen-cabeza" aria-hidden="true"><span>Ejercicio</span><span>Antes</span><span>Este ciclo</span></div>
+              <ul className="ciclo-resumen-lista">
+                {visibles.map((f, i) => {
+                  const razon = f.antes && f.ahora.rm && f.antes.rm ? Math.max(0.08, Math.min(1, f.antes.rm / Math.max(f.antes.rm, f.ahora.rm))) : f.antes ? Math.min(1, f.antes.reps / Math.max(f.antes.reps, f.ahora.reps)) : 0;
+                  const razonAhora = f.antes && f.ahora.rm && f.antes.rm ? Math.max(0.08, Math.min(1, f.ahora.rm / Math.max(f.antes.rm, f.ahora.rm))) : f.antes ? Math.min(1, f.ahora.reps / Math.max(f.antes.reps, f.ahora.reps)) : 1;
+                  return (
+                    <li key={f.id} className={`ciclo-fila ${f.esRecord ? "record" : ""} stagger-item`} style={{ animationDelay: `${Math.min(i, 12) * 35}ms` }}
+                      aria-label={`${f.nombre}: ${f.antes ? `antes ${marca(f.antes, f.corporal)}${f.corporal ? "" : ` ${u}`}` : "sin marcas antes"}, este ciclo ${marca(f.ahora, f.corporal)}${f.corporal ? "" : ` ${u}`}${f.esRecord ? ", récord nuevo" : ""}`}>
+                      <p className="ciclo-fila-nombre" aria-hidden="true">{f.esRecord && <Trophy size={13} />}{f.nombre}</p>
+                      <p className="ciclo-fila-antes num-display" aria-hidden="true">{f.antes ? marca(f.antes, f.corporal) : "–"}</p>
+                      <p className="ciclo-fila-ahora num-display" aria-hidden="true">{marca(f.ahora, f.corporal)}{!f.corporal && <small>{u}</small>}</p>
+                      <div className="ciclo-fila-barras" aria-hidden="true">
+                        <span className="antes" style={{ "--f": razon }} />
+                        <span className="ahora" style={{ "--f": razonAhora }} />
+                      </div>
+                      <p className={`ciclo-fila-cambio ${f.esRecord ? "sube" : ""}`} aria-hidden="true">{f.nuevo ? "nuevo" : f.cambio == null ? "" : f.cambio > 0 ? `+${conComa(f.cambio)} %` : f.cambio === 0 ? "igual" : `${conComa(f.cambio)} %`}</p>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="armado-nota">Se compara el 1RM estimado de cada serie; a peso corporal, las repeticiones. Las series de descarga no cuentan.</p>
+            </>
+          )}
+        </div>
+        <div className="modal-rutina-pie">
+          <button onClick={onClose} className="boton-pildora w-full">{fechas.enCurso ? "Seguir entrenando" : "A por el próximo ciclo"}</button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS, onGoToDeload, metaSemanal = null }) {
   const weekInfo = getWeekInfo(cycleStart, settings);
   // BUG ARREGLADO: este useMemo estaba DESPUÉS del `return null` de abajo.
@@ -15735,7 +15882,10 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
         </div>
       </div>
       <CajonesCiclo semanas={semanas} trainWeeks={trainWeeks} meta={metaSemanal} animar={!yaAnimado && cajonesHoy} />
-      <PisoGoma><button onClick={onGoToDeload} className="enlace-suave escalera-enlace"><Zap size={13} /> Ver mi semana de descarga</button></PisoGoma>
+      <PisoGoma>
+        <button onClick={() => pedirResumenDeCiclo()} className="enlace-suave escalera-enlace"><Trophy size={13} /> Mis marcas del ciclo</button>
+        <button onClick={onGoToDeload} className="enlace-suave escalera-enlace"><Zap size={13} /> Mi descarga</button>
+      </PisoGoma>
     </section>
   );
 }
@@ -32458,7 +32608,7 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
                   <p className="foco-titulo"><span className="foco-rango">8-10 reps</span></p>
                   <span className="foco-ref">récord <b>8 × {k(80)}</b></span>
                 </div>
-                {escrita && on("showProgressionSuggestion") && <p className="foco-pasada bounce-in">la vez pasada <b>8 × {k(77.5)} {u}</b>: hoy, una rep más</p>}
+                {escrita && on("showProgressionSuggestion") && <p className="foco-pasada bounce-in">antes <b>8 × {k(77.5)} {u}</b><span className="foco-hoy">+1 rep</span></p>}
                 <div className="foco-visor">
                   <div className="foco-campo"><span className={`foco-input flex items-center justify-center ${escrita ? "" : "vacio"}`}>{escrita ? (on("showProgressionSuggestion") ? "9" : "8") : "–"}</span><span className="foco-campo-rotulo">reps</span></div>
                   <span className="foco-por">×</span>
@@ -32808,6 +32958,7 @@ export default function App() {
   // mes/año nuevo — así no dependen de que abras la app justo el 31 a la
   // noche. Ver el efecto checkPeriodRecaps más abajo.
   const [periodRecap, setPeriodRecap] = useState(null);
+  const [cicloResumen, setCicloResumen] = useState(null); // { numero } o null
   const [sessionStarted, setSessionStarted] = useState(false); // overlay "¡A entrenar!"
   const [salidaPendiente, setSalidaPendiente] = useState(null); // el molinete de salida, antes del ticket
   const [recoveredNotice, setRecoveredNotice] = useState(false);
@@ -33593,6 +33744,44 @@ export default function App() {
     });
   };
 
+  // EL RESUMEN DEL CICLO: se abre al pedirlo (el botón de "Tu ciclo") y solo,
+  // una vez, cuando terminan las semanas de entrenamiento de un ciclo (al
+  // entrar en la descarga o, sin descarga, al empezar el siguiente).
+  const nombresDeEjercicios = useMemo(() => {
+    const mapa = {};
+    Object.entries(profile?.routines || {}).forEach(([id, entrada]) => {
+      try {
+        const def = resolveRoutineDef(entrada, id);
+        if (!def) return;
+        Object.values(buildRoutineModel(def).exerciseById || {}).forEach((ex) => { if (ex?.id && ex.name) mapa[ex.id] = ex.name; });
+      } catch { /* una rutina rota no rompe el resumen */ }
+    });
+    return mapa;
+  }, [profile?.routines]);
+  useEffect(() => {
+    const abrir = (e) => setCicloResumen({ numero: e?.detail?.numero || null });
+    window.addEventListener(EVENTO_CICLO, abrir);
+    return () => window.removeEventListener(EVENTO_CICLO, abrir);
+  }, []);
+  const cicloTerminado = (() => {
+    if (!activeProfile || !cycleStart) return 0;
+    const info = getWeekInfo(cycleStart, getProfileSettings(profile));
+    return info ? (info.isDeload ? info.cycleNumber : info.cycleNumber - 1) : 0;
+  })();
+  useEffect(() => {
+    if (!cicloTerminado || !activeProfile || typeof navigator !== "undefined" && navigator.webdriver) return;
+    const clave = `modusfit_ciclo_resumen_${activeProfile}`;
+    let visto = 0;
+    try { visto = Number(localStorage.getItem(clave)) || 0; } catch { /* sin almacenamiento */ }
+    if (visto >= cicloTerminado) return;
+    try { localStorage.setItem(clave, String(cicloTerminado)); } catch { /* sin almacenamiento */ }
+    const f = fechasDeCiclo(cycleStart, getProfileSettings(profile), cicloTerminado);
+    if (!f || !resumenDeCiclo(logs, f.desde, f.hasta).filas.length) return;
+    const t = setTimeout(() => setCicloResumen({ numero: cicloTerminado }), 1200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cicloTerminado, activeProfile]);
+
   // Tu @usuario de adentro se crea solo (04/11, pedido: "olvidarnos del
   // arroba"): es el del QR y el link para sumarte; te encuentran por nombre.
   const usuarioPendiente = activeProfile && profiles[activeProfile]?.googleUid && !profiles[activeProfile]?.username ? profiles[activeProfile].googleUid : null;
@@ -34088,6 +34277,7 @@ export default function App() {
             color={sessionTintColor || "#14B8A6"}
             done={sessionProgress.done}
             total={sessionProgress.total}
+            conProgreso
             enRutina={tab === "rutina"}
             onGoToRoutine={() => { if (profile.activeSession.deload) setDeloadDismissed(false); setDescargaPrevia(false); setTab("rutina"); }}
             onEnd={() => (profile.activeSession.deload ? handleFinishDeloadSession(profile.activeSession.dayKey) : handleEndSession())}
@@ -34103,6 +34293,9 @@ export default function App() {
       {paywall && <Paywall motivo={paywall.motivo} claro={themeClass === "light-mode"} onClose={() => setPaywall(null)} />}
       {weeklyRecap && !sessionSummary && <WeeklyRecapModal data={weeklyRecap} onClose={() => setWeeklyRecap(null)} />}
       {periodRecap && <WeeklyRecapModal data={periodRecap.data} periodo={periodRecap.periodo} etiqueta={periodRecap.etiqueta} onClose={() => setPeriodRecap(null)} />}
+      {cicloResumen && cycleStart && !periodRecap && !weeklyRecap && !sessionSummary && (
+        <ResumenDeCicloModal numero={cicloResumen.numero} logs={logs} cycleStart={cycleStart} settings={getProfileSettings(profile)} nombres={nombresDeEjercicios} onClose={() => setCicloResumen(null)} />
+      )}
       {showWelcome && <WelcomeIntro onClose={() => setShowWelcome(false)} onOpenTutorial={() => { setHelpStartTab(null); setShowHelp(true); }} onUpdateSettings={handleUpdateSettings} />}
       {showHelp && <HelpModal startTab={helpStartTab} onClose={() => setShowHelp(false)} onRecorrido={(t) => { setShowHelp(false); setTab(t); setTimeout(() => setRecorrido(t), 450); }} />}
       {bienvenidaRecorrido && bienvenidaRecorrido === tab && <BienvenidaRecorrido tab={bienvenidaRecorrido} onCerrar={() => setBienvenidaRecorrido(null)} onEmpezar={() => { setRecorrido(bienvenidaRecorrido); setBienvenidaRecorrido(null); }} onGuia={() => { setBienvenidaRecorrido(null); setHelpStartTab(tab); setShowHelp(true); }} />}
