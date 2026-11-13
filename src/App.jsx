@@ -7264,6 +7264,21 @@ label.ajuste-rotulo { display: block; }
 .series-discos { gap: 3px; }
 .series-discos i { width: 5px; height: 16px; border-radius: 2.5px; }
 .ejercicio.completo:not(.abierto) .ejercicio-musculo { color: var(--text-faint); }
+
+/* ── 13/11: el salto en kilos o en libras, y tus rutinas creadas ── */
+.foco-saltos-unidad { align-self: center; font-size: 12px; font-weight: 650; color: var(--text-faint); }
+.foco-saltos-opciones + .foco-saltos-opciones { margin-top: 6px; }
+.foco-salto b i { font-style: normal; font-size: 10px; font-weight: 650; margin-left: 1px; color: var(--text-faint); }
+.seccion-cabeza-rutinas { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.seccion-cabeza-rutinas span { font-size: 12px; color: var(--text-faint); }
+.rutina-creada-uso { font-size: 12px; line-height: 1.3; color: var(--text-faint); }
+.rutina-creada-uso b { font-weight: 650; color: var(--text-muted); }
+/* La ficha de los días, como la tabla de la hoja del profe: papel con su broche. */
+.rutina-creada-dias { position: relative; background: #e6e2d8; box-shadow: inset 0 0 0 1px rgba(0,0,0,.12), 0 1px 0 rgba(0,0,0,.35); border-radius: 6px 6px 8px 8px; }
+.rutina-creada-dias b, .rutina-creada.activa .rutina-creada-dias b { color: #24252a; }
+.rutina-creada-dias small { color: #6b6a64; }
+.rutina-creada-broche { position: absolute; top: -4px; left: 50%; width: 20px; height: 8px; translate: -50% 0; border-radius: 3px 3px 2px 2px; background: linear-gradient(180deg, #b9bcc3, #7f838b); box-shadow: 0 1px 0 rgba(0,0,0,.35); }
+.rutina-creada.activa .rutina-creada-dias { box-shadow: inset 0 0 0 1px rgba(0,0,0,.12), 0 0 0 2px color-mix(in oklab, var(--c) 60%, transparent); }
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -13901,11 +13916,17 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   // De a cuánto sube el peso en este ejercicio: se elige al lado del ✓ y
   // vale para todas sus series.
   const [verSaltos, setVerSaltos] = useState(false);
-  const elegirSalto = (v) => {
+  // En kilos o en libras, sin importar la unidad de la app (13/11, pedido:
+  // "sacaste la opción de poner en libras la progresión de los pesos, que
+  // vuelva"): una máquina de 15 lb sube de a 15 lb aunque anotes en kilos.
+  const saltoGuardado = fieldSettings?.saltosDePeso?.[exerciseId];
+  const uSalto = saltoGuardado?.u === "lbs" || saltoGuardado?.u === "kg" ? saltoGuardado.u : unit;
+  const vSalto = saltoGuardado?.v > 0 ? saltoGuardado.v : (uSalto === "lbs" ? 5 : 2.5);
+  const elegirSalto = (v, un = unit) => {
     if (!(v > 0) || !onUpdateSettings) return;
     const saltos = { ...(fieldSettings?.saltosDePeso || {}) };
-    if (v === (unit === "lbs" ? 5 : 2.5)) delete saltos[exerciseId];
-    else saltos[exerciseId] = { v: Math.round(v * 100) / 100, u: unit };
+    if (un === unit && v === (unit === "lbs" ? 5 : 2.5)) delete saltos[exerciseId];
+    else saltos[exerciseId] = { v: Math.round(v * 100) / 100, u: un };
     onUpdateSettings({ saltosDePeso: saltos });
     setVerSaltos(false);
     haptic(10);
@@ -14573,11 +14594,17 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           {pesada && <Zap size={13} className="foco-fuerza" aria-label="Serie de fuerza" />}
           {setDef.type === "dropset" && <span className="foco-tipo">drop-set</span>}
           {setDef.type === "restpause" && <span className="foco-tipo">rest-pause</span>}
+          {isPlannedMode && !cardio && !draft.editing && <span className="foco-hoy" title={AJUSTE_DE_META[plannedTarget.ajuste] ? `La vez pasada${AJUSTE_DE_META[plannedTarget.ajuste]}` : "Lo que viene escrito es la meta de hoy"}>{NOTA_DE_AJUSTE[plannedTarget.ajuste] || "meta"}</span>}
         </p>
         {draft.editing ? (
           <button onClick={cancelarEdicion} className="foco-cancelar">Cancelar</button>
         ) : isPlannedMode ? (
-          <span className="foco-ref" aria-label={`Meta de hoy: ${plannedTarget.reps}×${kgToDisplay(plannedTarget.kg, unit)}${u}`}>meta <b>{plannedTarget.reps} × {conComa(kgToDisplay(plannedTarget.kg, unit))}</b></span>
+          // Menos texto (13/11, pedido): el visor ya trae escrita la meta de
+          // hoy (lo dice la ficha "meta" al lado del rango), así que acá va lo
+          // que hiciste la vez pasada, y se fue el renglón de abajo.
+          lastSession && !cardio
+            ? <span className="foco-ref" aria-label={`La vez pasada: ${lastSession.reps} por ${conComa(kgToDisplay(lastSession.kg, unit))} ${u}. Hoy, la meta: ${plannedTarget.reps} por ${conComa(kgToDisplay(plannedTarget.kg, unit))} ${u}`}>antes <b>{lastSession.reps} × {conComa(kgToDisplay(lastSession.kg, unit))}</b></span>
+            : <span className="foco-ref">primera vez</span>
         ) : currentPR ? (
           <button onClick={abrirCorreccion} className="foco-ref record" aria-label={`Tu récord: ${currentPR.reps}×${kgToDisplay(currentPR.kg, unit)}${u}. Tocá para corregirlo`}>
             récord <b>{currentPR.reps} × {conComa(kgToDisplay(currentPR.kg, unit))}</b>{override?.manual && <Edit3 size={11} className="opacity-60 self-center" />}
@@ -14594,9 +14621,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       {/* Siguiendo un plan, lo que hiciste la vez pasada (pedido: "que muestre
           en algún lado lo que hiciste la última vez cuando el ejercicio es
           planificado") y, si la meta se corrigió, por qué. */}
-      {isPlannedMode && !cardio && lastSession && !draft.editing && (
-        <p className="foco-pasada" title={AJUSTE_DE_META[plannedTarget.ajuste] ? `La vez pasada${AJUSTE_DE_META[plannedTarget.ajuste]}` : undefined}>antes <b>{lastSession.reps} × {conComa(kgToDisplay(lastSession.kg, unit))} {u}</b>{NOTA_DE_AJUSTE[plannedTarget.ajuste] ? <span className="foco-hoy">{NOTA_DE_AJUSTE[plannedTarget.ajuste]}</span> : null}{AJUSTE_DE_META[plannedTarget.ajuste] ? <span className="sr-only">{AJUSTE_DE_META[plannedTarget.ajuste]}</span> : null}</p>
-      )}
+{/* (el renglón "antes…" del plan pasó arriba a la derecha) */}
       {/* La serie viene con la progresión: arriba, de dónde sale. */}
       {escribeProgresion && !draft.editing && (
         <p className="foco-pasada">{laVezPasada}<span className="foco-hoy">{pasoProgresion.motivo === "peso" ? "sube el peso" : pasoProgresion.motivo === "fallo" ? "hoy lo mismo" : "+1 rep"}</span></p>
@@ -14637,7 +14662,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             <button onClick={() => ajustar("kg", -pasoKg)} aria-label={`Restar ${conComa(pasoKg)} ${u}`}><Minus size={17} /></button>
             {onUpdateSettings && (
               <button onClick={() => setVerSaltos((v) => !v)} aria-expanded={verSaltos} aria-label={`El peso sube de a ${conComa(pasoKg)} ${u}. Cambiarlo`} className={`foco-salto ${verSaltos ? "abierto" : ""}`}>
-                <small>de a</small><b className="num-display">{conComa(pasoKg)}</b>
+                <small>de a</small><b className="num-display">{conComa(uSalto === unit ? pasoKg : vSalto)}{uSalto !== unit && <i>{weightLabel(uSalto)}</i>}</b>
               </button>
             )}
             <button onClick={() => ajustar("kg", pasoKg)} aria-label={`Sumar ${conComa(pasoKg)} ${u}`}><Plus size={17} /></button>
@@ -14647,10 +14672,17 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       {verSaltos && (
         <div className="foco-saltos bounce-in" role="group" aria-label="De a cuánto sube el peso en este ejercicio">
           <p>{exerciseName ? `${exerciseName} sube de a` : "Sube de a"}</p>
-          <div className="foco-saltos-opciones">
-            {(unit === "lbs" ? SALTOS_LBS : SALTOS_KG).map((v) => (
-              <button key={v} onClick={() => elegirSalto(v)} aria-pressed={v === pasoKg} className={v === pasoKg ? "activo" : ""}>{conComa(v)}</button>
+          <div className="foco-saltos-opciones" role="group" aria-label="En kilos">
+            {SALTOS_KG.map((v) => (
+              <button key={`kg${v}`} onClick={() => elegirSalto(v, "kg")} aria-pressed={uSalto === "kg" && vSalto === v} className={uSalto === "kg" && vSalto === v ? "activo" : ""}>{conComa(v)}</button>
             ))}
+            <span className="foco-saltos-unidad">kg</span>
+          </div>
+          <div className="foco-saltos-opciones" role="group" aria-label="En libras">
+            {SALTOS_LBS.map((v) => (
+              <button key={`lb${v}`} onClick={() => elegirSalto(v, "lbs")} aria-pressed={uSalto === "lbs" && vSalto === v} className={uSalto === "lbs" && vSalto === v ? "activo" : ""}>{conComa(v)}</button>
+            ))}
+            <span className="foco-saltos-unidad">lb</span>
             <input type="number" inputMode="decimal" placeholder="Otro" aria-label={`Otro salto, en ${u}`}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); elegirSalto(parseFloat(String(e.currentTarget.value).replace(",", "."))); } }}
               onBlur={(e) => { const v = parseFloat(String(e.currentTarget.value).replace(",", ".")); if (v > 0 && v !== pasoKg) elegirSalto(v); }} />
@@ -15772,35 +15804,10 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
             plan queda guardado, sólo se deja de perseguir (plannedPaused).
             Un día que no llegás a la meta, una vuelta a récord tras una
             lesión, o probar cómo venís sin la referencia del plan. */}
-        {/* Todo el bloque de un vistazo, con la semana de hoy resaltada:
-            "sigo un plan" era una afirmación que no se podía verificar sin
-            salir a abrir el planificador. Es sólo información — el
-            interruptor plan/récord vive en el chip de la cabecera, que se
-            toca sin desplegar nada. */}
-        {planInfo && planInfo.semanas.length > 1 && !planOffByMode && !planInfo.paused && !planInfo.terminado && (() => {
-          // Tu plan, de un vistazo: un escalón por semana (su meta arriba), la
-          // de hoy encendida. Antes: fichas celestes "S1 75×8" en una tira.
-          const valor = (e) => (e.minutes != null ? e.minutes : kgToDisplay(e.kg, planUnit));
-          const altoDe = alturaDeEscalon(planInfo.semanas.map(valor));
-          return (
-            <div className="plan-en-tarjeta" role="group" aria-label="Tu plan, semana por semana">
-              <p className="plan-en-tarjeta-titulo"><ClipboardCheck size={14} aria-hidden="true" /> Tu plan</p>
-              <div className="plan-mini chico">
-                {planInfo.semanas.map((e) => {
-                  const hoy = e.week === (planInfo.pasoHoy ?? weekInCycle);
-                  const v = valor(e);
-                  return (
-                    <span key={e.week} className={`plan-mini-semana con ${hoy ? "elegida" : ""}`} aria-label={`Semana ${e.week}${hoy ? ", esta" : ""}: ${e.minutes != null ? `${e.minutes} min` : `${e.reps} × ${conComa(v)} ${weightLabel(planUnit)}`}${e.phase ? `, ${e.phase}` : ""}`}>
-                      <span className="plan-mini-valor" aria-hidden="true">{e.minutes != null ? `${e.minutes}'` : conComa(v)}</span>
-                      <span className="plan-mini-barra" style={{ "--f": altoDe(v) }} aria-hidden="true" />
-                      <span className="plan-mini-numero" aria-hidden="true">{e.week}</span>
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
+        {/* El plan del ejercicio, semana por semana, ya no va acá (13/11,
+            pedido: "ese resumen del plan arriba de la serie saquémoslo, ocupa
+            espacio al pedo; que esté en la planilla de Tu plan"): se ve desde
+            "Ver el plan", en la hoja de Tu plan. No lo vuelvas a poner. */}
         {/* El cronómetro ya no vive fijo acá: se posiciona entre las series
             según timerSlot (más abajo, junto a las series). */}
         {/* LAS APROXIMACIONES: las series de entrada al 50, 70 y 85 % de tu
@@ -16924,8 +16931,8 @@ function HojaDelPlan({ dia = null, semana = null, filas = [], hayPlan = false, e
             </button>
           )}
           {onPlanificar && (
-            <button onClick={onPlanificar} disabled={sinRutina} className={`plan-hoja-accion ${seguir ? "" : "principal"} ${invitar ? "invite-pulse" : ""}`}>
-              <Sliders size={14} /> <span>Planificar</span>
+            <button onClick={onPlanificar} disabled={sinRutina} data-ver-plan={hayPlan || undefined} className={`plan-hoja-accion ${seguir ? "" : "principal"} ${invitar ? "invite-pulse" : ""}`}>
+              <Sliders size={14} /> <span>{hayPlan ? "Ver el plan" : "Planificar"}</span>
             </button>
           )}
           {hayPlan && onPausa && !(seguir && !filas.length) && (
@@ -26522,9 +26529,10 @@ function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive,
       <div className={`rutina-creada ${isActive ? "activa" : ""}`} style={{ "--c": "#3B82F6" }}>
         {/* Tocar la rutina abre la vista previa (días, ejercicios, balance). */}
         <button onClick={onPreview} className="rutina-creada-cuerpo" aria-label={`${routine.name}: ${dayCount} ${dayCount === 1 ? "día" : "días"}, ${nombresDeDias(routine)}. ${usoTexto}. Ver la rutina`}>
-          <span className="rutina-creada-dias" aria-hidden="true"><b className="num-display">{dayCount}</b><small>{dayCount === 1 ? "día" : "días"}</small></span>
+          <span className="rutina-creada-dias" aria-hidden="true"><i className="rutina-creada-broche" /><b className="num-display">{dayCount}</b><small>{dayCount === 1 ? "día" : "días"}</small></span>
           <span className="rutina-creada-texto" aria-hidden="true">
             <span className="rutina-creada-nombre">{routine.name}</span>
+            <span className="rutina-creada-uso">{uso?.sesiones > 0 ? <><b>{uso.sesiones}</b> {uso.sesiones === 1 ? "sesión" : "sesiones"} · {haceCuanto(uso.diasDesde)}</> : "Sin usar todavía"}</span>
           </span>
         </button>
         <span className="rutina-creada-acciones">
@@ -31990,7 +31998,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
           hundida en vez de fundirse con ella. */}
       {customEntries.length > 0 && (
         <div className="space-y-2.5">
-          <h3 className="seccion-titulo">Tus rutinas creadas</h3>
+          <div className="seccion-cabeza-rutinas"><h3 className="seccion-titulo">Tus rutinas creadas</h3><span>{customEntries.length} {customEntries.length === 1 ? "rutina" : "rutinas"}</span></div>
           <div className="rutinas-creadas stagger-item">
             {customEntries.map(([id, r]) => (
               <SavedRoutineRow key={id} routine={r} isActive={id === activeId} onUse={() => handleUseClick(id, null)}
