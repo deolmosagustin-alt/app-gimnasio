@@ -140,6 +140,7 @@ service cloud.firestore {
       allow list: if false;
       allow create: if isSignedIn()
         && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid'])
         && usernameLower == usernameLower.lower()
         && usernameLower.matches('^[a-z0-9_]{3,20}$');
       allow update: if false;
@@ -180,10 +181,14 @@ service cloud.firestore {
         && request.resource.data.users[0] != request.resource.data.users[1]
         && pairId == friendshipId(request.resource.data.users[0], request.resource.data.users[1])
         && request.resource.data.requestedBy == request.auth.uid
-        && request.resource.data.status == 'pending';
+        && request.resource.data.status == 'pending'
+        // 12/11 (revision de seguridad): solo los campos que escribe la app.
+        // Sin esto, un documento aceptaba cualquier campo de hasta 1 MiB.
+        && request.resource.data.keys().hasOnly(['users', 'status', 'requestedBy', 'createdAt', 'respondedAt']);
       // Solo quien NO mandó la solicitud puede aceptarla (evita
       // auto-aceptarse la propia).
       allow update: if isSignedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'respondedAt'])
         && request.auth.uid in resource.data.users
         && request.auth.uid != resource.data.requestedBy
         && resource.data.status == 'pending'
@@ -206,8 +211,12 @@ service cloud.firestore {
         && request.resource.data.trainerUid != request.resource.data.studentUid
         && (request.auth.uid == request.resource.data.trainerUid || request.auth.uid == request.resource.data.studentUid)
         && request.resource.data.requestedBy == request.auth.uid
-        && request.resource.data.status == 'pending';
+        && request.resource.data.status == 'pending'
+        // 12/11 (revision de seguridad): solo los campos que escribe la app.
+        // Sin esto, un documento aceptaba cualquier campo de hasta 1 MiB.
+        && request.resource.data.keys().hasOnly(['trainerUid', 'studentUid', 'status', 'requestedBy', 'createdAt', 'respondedAt']);
       allow update: if isSignedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'respondedAt'])
         && (request.auth.uid == resource.data.trainerUid || request.auth.uid == resource.data.studentUid)
         && request.auth.uid != resource.data.requestedBy
         && resource.data.status == 'pending'
@@ -228,6 +237,10 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && request.auth.uid == request.resource.data.trainerUid
         && request.resource.data.status == 'pending'
+        // 12/11 (revision de seguridad): solo los campos que escribe la app.
+        // Sin esto, un documento aceptaba cualquier campo de hasta 1 MiB.
+        && request.resource.data.keys().hasOnly(['trainerUid', 'studentUid', 'proposedRoutine', 'progressionPlan', 'note', 'status', 'createdAt', 'respondedAt'])
+        && request.resource.data.get('note', '') is string && request.resource.data.get('note', '').size() <= 4000
         && exists(trainerLinkPath(request.resource.data.trainerUid, request.resource.data.studentUid))
         && get(trainerLinkPath(request.resource.data.trainerUid, request.resource.data.studentUid)).data.status == 'accepted';
       // BUG FIX (encontrado auditando): esto sólo fijaba proposedRoutine
@@ -245,6 +258,7 @@ service cloud.firestore {
       // a exigir el vínculo aceptado también al aceptar/rechazar.
       allow update: if isSignedIn()
         && request.auth.uid == resource.data.studentUid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'respondedAt'])
         && resource.data.status == 'pending'
         && (request.resource.data.status == 'accepted' || request.resource.data.status == 'rejected')
         && request.resource.data.trainerUid == resource.data.trainerUid
@@ -272,6 +286,11 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && request.auth.uid == request.resource.data.fromUid
         && request.resource.data.toUid != request.auth.uid
+        // 12/11 (revision de seguridad): solo los campos que escribe la app.
+        // Sin esto, un documento aceptaba cualquier campo de hasta 1 MiB.
+        && request.resource.data.keys().hasOnly(['toUid', 'fromUid', 'date', 'createdAt'])
+        && request.resource.data.date is string && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.get('createdAt', '') is string && request.resource.data.get('createdAt', '').size() <= 40
         && kudosId == (request.resource.data.toUid + '_' + request.resource.data.fromUid + '_' + request.resource.data.date)
         && isAcceptedFriend(request.resource.data.toUid);
       allow update, delete: if false;

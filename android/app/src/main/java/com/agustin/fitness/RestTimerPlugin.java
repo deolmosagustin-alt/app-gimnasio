@@ -50,7 +50,7 @@ public class RestTimerPlugin extends Plugin {
     // pasaste. Sin "id" (el cardio), todo sigue como en la v12.
     // v14: la notificación se expande (`detalle`, con la meta, el descanso y
     // a qué hora termina).
-    private static final int VERSION = 14;
+    private static final int VERSION = 15;
     // Canal v8: IMPORTANCE_DEFAULT — aparece en la barra SIN saltar el popup
     // (heads-up). El v7 usaba HIGH y por eso la notificación "saltaba".
     // DEFAULT sigue siendo válido para Live Updates (solo MIN está prohibido).

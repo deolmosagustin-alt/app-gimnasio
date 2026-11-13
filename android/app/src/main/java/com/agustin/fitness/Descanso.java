@@ -292,7 +292,10 @@ final class Descanso {
         // lo que la app manda en `detalle` (la meta o el récord, cuánto dura
         // el descanso y a qué hora termina).
         String detalle = e.optString(esFin ? "detalleFin" : "detalle", "");
-        String largo = detalle.isEmpty() ? null : cuerpo + "\n" + detalle;
+        // v15 (12/11, pedido: "que recien cuando expandas la notif aparezca
+        // todo ese texto, si no el timer"): la app puede mandar el cuerpo
+        // vacio; cerrada queda el reloj y que sigue, y el resto al expandir.
+        String largo = detalle.isEmpty() ? null : cuerpo.isEmpty() ? detalle : cuerpo + "\n" + detalle;
 
         // Los botones: corriendo, Pausar, +15 s y Cerrar; en pausa, Seguir,
         // +15 s y Cerrar; terminado, Reiniciar y Cerrar.

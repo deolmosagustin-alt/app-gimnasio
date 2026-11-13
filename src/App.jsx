@@ -10883,6 +10883,10 @@ function datosDescansoNativo(timerId, v) {
     titulo: enCurso.titulo, cuerpo: enCurso.cuerpo, subtitulo: "Descanso", color: v?.color || "#14B8A6",
     tituloFin: alFinal.titulo, cuerpoFin: alFinal.cuerpo, alerta: ALERTA_DESCANSO,
     ...detalleDelDescanso(v, duracion),
+    // Con el plugin v15 (APK 1.0.27), cerrada es el reloj y qué sigue: la
+    // meta o el récord y el resto aparecen recién al expandirla (pedido del
+    // 12/11). Con un APK anterior queda como antes.
+    ...((VERSION_PLUGIN_DESCANSO || 0) >= 15 ? { cuerpo: "", detalle: [enCurso.cuerpo, detalleDelDescanso(v, duracion).detalle].filter(Boolean).join("\n") } : {}),
   };
 }
 // Lo que se ve al expandir la notificación del descanso (plugin v14; un APK
