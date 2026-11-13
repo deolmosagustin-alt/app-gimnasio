@@ -7233,6 +7233,20 @@ label.ajuste-rotulo { display: block; }
 .resumen-periodo .resumen-kpi { border-radius: 0; background: transparent; box-shadow: none; }
 .resumen-periodo .resumen-kpi:nth-child(odd) { box-shadow: inset -1px 0 0 var(--hairline); }
 .resumen-periodo .resumen-kpi:nth-child(n+3) { border-top: 1px solid var(--hairline); }
+
+/* ── LA CONSOLA DE LA SERIE (13/11, pedido: "pulí la tarjeta del ejercicio"):
+   el visor y sus teclas son una sola pieza hundida. Arriba, los dos números y
+   el ✓; abajo, en una tira, las teclas de − y + de cada número, llenas y
+   anchas (antes eran aros de contorno sueltos debajo del visor). El récord de
+   arriba va en dorado, como en el resto de la app. */
+.foco-visor:has(+ .foco-ajustes-fila) { border-radius: 18px 18px 0 0; }
+.foco-ajustes-fila { margin-top: 0; padding: 8px; border-radius: 0 0 18px 18px; background: var(--panel-sunken); box-shadow: inset 1px 0 0 var(--hairline), inset -1px 0 0 var(--hairline), inset 0 -1px 0 var(--hairline); }
+.foco-ajustes { gap: 6px; }
+.foco-ajustes button { flex: 1 1 0; width: auto; min-width: 0; height: 40px; border-radius: 12px; color: var(--text-strong); background: var(--surface-2); box-shadow: inset 0 1px 0 var(--brillo), inset 0 0 0 1px var(--hairline); }
+.foco-ajustes button:active { transform: scale(.95); background: var(--surface-3); }
+.foco-ajustes.con-salto .foco-salto { flex: none; width: 46px; background: transparent; box-shadow: none; }
+.foco-ajustes.con-salto .foco-salto.abierto { background: var(--velo); }
+.foco-ref.record b { color: var(--record); }
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -14548,7 +14562,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         ) : isPlannedMode ? (
           <span className="foco-ref" aria-label={`Meta de hoy: ${plannedTarget.reps}×${kgToDisplay(plannedTarget.kg, unit)}${u}`}>meta <b>{plannedTarget.reps} × {conComa(kgToDisplay(plannedTarget.kg, unit))}</b></span>
         ) : currentPR ? (
-          <button onClick={abrirCorreccion} className="foco-ref" aria-label={`Tu récord: ${currentPR.reps}×${kgToDisplay(currentPR.kg, unit)}${u}. Tocá para corregirlo`}>
+          <button onClick={abrirCorreccion} className="foco-ref record" aria-label={`Tu récord: ${currentPR.reps}×${kgToDisplay(currentPR.kg, unit)}${u}. Tocá para corregirlo`}>
             récord <b>{currentPR.reps} × {conComa(kgToDisplay(currentPR.kg, unit))}</b>{override?.manual && <Edit3 size={11} className="opacity-60 self-center" />}
           </button>
         ) : (
@@ -32834,7 +32848,7 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
               <div className="serie serie-foco">
                 <div className="foco-cabecera">
                   <p className="foco-titulo"><span className="foco-rango">8-10 reps</span></p>
-                  <span className="foco-ref">récord <b>8 × {k(80)}</b></span>
+                  <span className="foco-ref record">récord <b>8 × {k(80)}</b></span>
                 </div>
                 {escrita && on("showProgressionSuggestion") && <p className="foco-pasada bounce-in">antes <b>8 × {k(77.5)} {u}</b><span className="foco-hoy">+1 rep</span></p>}
                 <div className="foco-visor">
