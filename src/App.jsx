@@ -622,24 +622,26 @@ function mergeLogs(a = {}, b = {}) {
   return out;
 }
 
-// Une las sesiones de entrenamiento por fecha+día sin duplicados.
+// Une las sesiones de entrenamiento por fecha+día sin duplicados. Si la
+// misma sesión (fecha y día) está en los dos lados con horas distintas, queda
+// la más larga (13/11: una sesión de prueba de un minuto, hecha a la tarde,
+// le ganaba a la de la mañana de 44 minutos sólo por estar en el teléfono, y
+// al subir pisaba la de la nube).
 function mergeSessions(a = [], b = []) {
-  const seen = new Set(a.map((s) => `${s.date}|${s.dayKey ?? s.day ?? ""}`));
+  const firma = (x) => `${x.date}|${x.dayKey ?? x.day ?? ""}`;
+  const dura = (x) => (x?.startedAt && x?.endedAt ? Math.max(0, new Date(x.endedAt) - new Date(x.startedAt)) : 0);
   const out = [...a];
-  b.forEach((s) => {
-    const sig = `${s.date}|${s.dayKey ?? s.day ?? ""}`;
-    if (!seen.has(sig)) { seen.add(sig); out.push(s); }
+  b.forEach((x) => {
+    const iguales = out.map((y, i) => (firma(y) === firma(x) ? i : -1)).filter((i) => i >= 0);
+    if (!iguales.length) { out.push(x); return; }
+    if (iguales.some((i) => out[i].startedAt === x.startedAt)) return;
+    const masCorta = iguales.reduce((m, i) => (dura(out[i]) < dura(out[m]) ? i : m), iguales[0]);
+    if (dura(x) > dura(out[masCorta])) out[masCorta] = x;
   });
   out.sort((x, y) => (x.date < y.date ? -1 : 1));
   return out;
 }
 
-// Si `base` ya existe como perfil local, devuelve una variante libre
-// ("Juan (2)", "Juan (3)", ...) en vez de pisarlo. Se usa al vincular una
-// cuenta de Google cuyo nombre coincide con un perfil local que en
-// realidad no tiene nada que ver (otra cuenta, u otro perfil local) —
-// sin esto, iniciar sesión con Google podía sobreescribir de un saque un
-// perfil local no relacionado que casualmente tenía el mismo nombre.
 function uniqueProfileName(base, profiles) {
   if (!profiles[base]) return base;
   let i = 2;
