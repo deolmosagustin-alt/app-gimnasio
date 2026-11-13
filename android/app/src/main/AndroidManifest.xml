@@ -72,6 +72,18 @@
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/today_widget_info"/>
         </receiver>
+        <receiver android:name=".WeekWidgetProvider" android:exported="true" android:label="@string/week_widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/week_widget_info"/>
+        </receiver>
+        <receiver android:name=".CycleWidgetProvider" android:exported="true" android:label="@string/cycle_widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/cycle_widget_info"/>
+        </receiver>
         <!--  Los botones de la notificación del descanso (Pausar, Seguir,
                      +15 s, Reiniciar, Cerrar) y la alarma del final (plugin v13,
                      ver Descanso.java). Sólo la propia app le manda intents.  -->

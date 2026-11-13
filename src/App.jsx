@@ -21293,6 +21293,64 @@ function tramosDeAnio(porFecha) {
   return out;
 }
 
+// LO QUE VEN LOS WIDGETS DE ANDROID (13/11; TodayWidgetPlugin v2, APK 1.0.27):
+// "Hoy te toca" (el día, la barra con sus series y el botón), "La semana" (la
+// tarjeta de fichar) y "El ciclo" (los cajones). La app manda todo resuelto:
+// el teléfono sólo dibuja (WidgetDibujo.java). Si cambiás un texto de acá,
+// cambia en la pantalla de inicio de la gente la próxima vez que abra la app.
+function estadoDeWidgets({ profile, logs, cycleStart }) {
+  const hoy = new Date();
+  const hoyStr = todayStr();
+  const sched = profile.weekSchedule || {};
+  const idx = buildSessionsIndex(logs || {}, profile.trainingSessions || []);
+  const porFecha = {};
+  idx.forEach((x) => { porFecha[x.date] = x; });
+  const seriesDe = (d) => (d?.exercises || []).reduce((t, e) => t + (e.cardio ? 0 : (e.sets || []).length), 0);
+  const nombreDia = DIAS_DE_LA_SEMANA[(hoy.getDay() + 6) % 7];
+  // Lo agendado para hoy o, si entrenaste un día que no tocaba, lo que hiciste.
+  const dayKey = sched[todayWeekdayKey()] || porFecha[hoyStr]?.dayKeys?.[0] || null;
+  const dia = dayKey ? ROUTINE[dayKey] : null;
+  const hechas = porFecha[hoyStr] ? (porFecha[hoyStr].items || []).length : 0;
+  let hoyW;
+  if (dia) {
+    const total = seriesDe(dia);
+    const listo = total > 0 && hechas >= total;
+    hoyW = { estado: listo ? "hecho" : "toca", sub: `Hoy, ${nombreDia}`, titulo: String(dia.label || dayKey), color: dia.color || "", series: total, hechas: Math.min(hechas, total),
+      pie: listo ? "Listo por hoy" : `${hechas} de ${total} series`, boton: listo ? "" : hechas ? "Seguir" : "Iniciar sesión" };
+  } else {
+    const man = new Date(hoy); man.setDate(man.getDate() + 1);
+    const deManiana = ROUTINE[sched[todayWeekdayKey(man)]];
+    hoyW = { estado: "descansa", sub: `Hoy, ${nombreDia}`, titulo: "Descanso", color: "", series: 0, hechas: 0, pie: deManiana ? `Mañana, ${deManiana.label}` : "", boton: "" };
+  }
+  const lunes = lunesDe(hoy);
+  const dias = WEEKDAY_KEYS.map((_, i) => {
+    const d = new Date(lunes); d.setDate(d.getDate() + i);
+    const f = localDateStr(d);
+    const x = porFecha[f];
+    return { series: x ? (x.items || []).length : 0, color: x ? (ROUTINE[x.dayKeys?.[0]]?.color || "") : "", hoy: f === hoyStr };
+  });
+  const hechos = dias.filter((x) => x.series).length;
+  const planeados = WEEKDAY_KEYS.filter((k) => sched[k]).length;
+  let racha = 0;
+  for (let k = 0; k < 52; k++) {
+    const l = new Date(lunes); l.setDate(l.getDate() - 7 * k);
+    const fin = new Date(l); fin.setDate(fin.getDate() + 6);
+    const a = localDateStr(l), b = localDateStr(fin);
+    if (idx.some((x) => x.date >= a && x.date <= b)) racha++;
+    else if (k > 0) break;
+  }
+  const info = cycleStart ? getWeekInfo(cycleStart, getProfileSettings(profile)) : null;
+  const faltan = info ? info.trainWeeks + 1 - info.weekInCycle : 0;
+  return {
+    hoy: hoyW,
+    semana: { dias, cuenta: planeados ? `${hechos} de ${planeados}` : String(hechos), pie: racha >= 2 ? `${racha} semanas seguidas` : "" },
+    ciclo: info ? {
+      titulo: `Ciclo ${info.cycleNumber}`, cuenta: `${info.weekInCycle} / ${info.cycleWeeks}`, total: info.cycleWeeks, entreno: info.trainWeeks, semana: info.weekInCycle,
+      pie: info.isDeload ? "Semana de descarga" : info.cycleWeeks > info.trainWeeks ? (faltan <= 1 ? "La semana que viene, descarga" : `Faltan ${faltan} semanas para la descarga`) : `Semana ${info.weekInCycle} de ${info.cycleWeeks}`,
+    } : null,
+  };
+}
+
 function computeWeekRecap(logs, trainingSessions) {
   const idx = buildSessionsIndex(logs, trainingSessions);
   const data = resumirSesiones(getSessionsForPeriod(idx, "week"), tramosDeSemana);
@@ -33611,17 +33669,22 @@ export default function App() {
   // muestra lo último que le mandamos (ver TodayWidgetPlugin). Se reenvía
   // cada vez que cambia la agenda semanal o cuando terminás la sesión de hoy.
   useEffect(() => {
-    if (!Capacitor.isNativePlatform() || !profile) return;
-    const sched = profile.weekSchedule || null;
-    const dayKey = sched ? sched[todayWeekdayKey()] : null;
-    let label;
-    if (!dayKey) label = "Hoy descansás";
-    else {
-      const yaEntrenoHoy = (profile.trainingSessions || []).some((s) => s.date === todayStr());
-      label = yaEntrenoHoy ? "Ya entrenaste hoy" : `Hoy toca ${ROUTINE[dayKey]?.label || dayKey}`;
-    }
-    TodayWidget.updateToday({ label }).catch(() => {});
-  }, [profile?.weekSchedule, profile?.trainingSessions, activeProfile]);
+    // Sólo en desarrollo: para probar en el navegador lo que se le manda al teléfono.
+    if (import.meta.env.DEV && profile) window.__estadoDeWidgets = () => estadoDeWidgets({ profile, logs, cycleStart });
+    if (!Capacitor.isNativePlatform() || !profile) return undefined;
+    // Un momento después del último cambio: anotar una serie cambia `logs`, y
+    // no hace falta redibujar los widgets en cada toque.
+    const t = setTimeout(() => {
+      try {
+        const estado = estadoDeWidgets({ profile, logs, cycleStart });
+        const h = estado.hoy;
+        const label = h.estado === "descansa" ? "Hoy descansás" : h.estado === "hecho" ? "Ya entrenaste hoy" : `Hoy toca ${h.titulo}`;
+        TodayWidget.updateToday({ label, estado }).catch(() => {});
+      } catch (e) { console.warn("[widgets]", e?.message || e); }
+    }, 1500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.weekSchedule, profile?.trainingSessions, activeProfile, logs, cycleStart]);
 
   // MIGRACIÓN AUTOMÁTICA DE LA FOTO DE PERFIL: las fotos puestas con
   // versiones anteriores quedaron SOLO en IndexedDB del dispositivo (nunca

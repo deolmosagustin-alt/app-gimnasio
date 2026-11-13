@@ -1,35 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Layout del widget "Hoy toca" — RemoteViews solo soporta un subconjunto
-     chico de vistas (FrameLayout/LinearLayout/TextView/ImageView/Button
-     entre otras); nada de vistas custom. Un ícono + una línea de texto,
-     todo el widget es tocable y abre la app. -->
+<!-- Los tres widgets de Modus Fit usan este mismo molde: una imagen que
+     dibuja WidgetDibujo (la barra, la tarjeta de la semana, los cajones).
+     Todo el widget se toca y abre la app. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/today_widget_root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@drawable/widget_background"
-    android:padding="14dp">
+    android:layout_height="match_parent">
 
-    <LinearLayout
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center_vertical"
-        android:orientation="horizontal">
-
-        <ImageView
-            android:layout_width="20dp"
-            android:layout_height="20dp"
-            android:layout_marginEnd="8dp"
-            android:src="@mipmap/ic_launcher_round"/>
-
-        <TextView
-            android:id="@+id/today_widget_label"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Abrí Modus Fit para ver tu rutina de hoy"
-            android:textColor="#FFFFFF"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            android:maxLines="2"/>
-    </LinearLayout>
+    <ImageView
+        android:id="@+id/modus_widget_imagen"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:contentDescription="@string/app_name"
+        android:src="@drawable/widget_background"/>
 </FrameLayout>
