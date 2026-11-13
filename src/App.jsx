@@ -3352,7 +3352,7 @@ input, textarea, [contenteditable="true"] {
   /* El único color propio: el de los récords, dorado viejo y en poco lugar. */
   --record: #e2c47f;
   --bar-bg: rgba(11,11,13,0.8);
-  --tabbar-bg: rgba(28,28,31,0.76);
+  --tabbar-bg: rgba(28,28,31,0.88);
   --tabbar-h: 64px;
   /* Alto del dock de abajo (descanso en curso + sesión). Lo escribe el
      propio dock al cambiar de tamaño, y lo leen el aire de abajo de la
@@ -7177,16 +7177,14 @@ label.ajuste-rotulo { display: block; }
 .semana-tarjeta-rotulo { display: flex; align-items: baseline; justify-content: space-between; font-size: 12px; font-weight: 750; letter-spacing: .02em; color: #6f6553; border-bottom: 1.5px solid rgba(80,68,50,.3); padding-bottom: 6px; }
 .semana-tarjeta-rotulo .a-mano { font-size: 20px; line-height: 1; color: #2f4b8f; }
 .semana-tarjeta-dias { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
-.semana-tarjeta-dia { position: relative; display: grid; justify-items: center; gap: 3px; min-height: 78px; padding: 5px 0 3px; border-radius: 7px; box-shadow: inset 0 0 0 1px rgba(80,68,50,.22); color: #8a7f6a; transition: transform var(--dur-toque) var(--resorte); }
-.semana-tarjeta-dia.picado { color: #3a352c; background: rgba(255,255,255,.2); }
+.semana-tarjeta-dia { position: relative; display: grid; justify-items: center; align-content: space-between; gap: 3px; min-height: 72px; padding: 7px 0 6px; border-radius: 7px; box-shadow: inset 0 0 0 1px rgba(80,68,50,.22); color: #8a7f6a; transition: transform var(--dur-toque) var(--resorte); }
+.semana-tarjeta-dia.picado { color: #2c2924; background: color-mix(in oklab, var(--dia, #6f6553) 34%, #ece3cf); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--dia, #6f6553) 50%, #8a7f6a); }
+.semana-tarjeta-dia.picado.elegido { background: color-mix(in oklab, var(--dia, #6f6553) 58%, #ece3cf); }
 .semana-tarjeta-dia.picado:active { transform: scale(.95); }
 .semana-tarjeta-dia.elegido { outline: 2px solid #2c2924; outline-offset: 1px; }
 .semana-tarjeta-letra { display: grid; justify-items: center; font-size: 12px; font-weight: 750; line-height: 1.1; }
 .semana-tarjeta-letra i { font-style: normal; font-size: 11px; font-weight: 600; opacity: .7; }
-.semana-tarjeta-hueco { width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px rgba(80,68,50,.25); border: 0 dashed transparent; }
-.semana-tarjeta-dia.picado .semana-tarjeta-hueco { background: radial-gradient(circle, #16171a 0 42%, transparent 44%), color-mix(in oklab, var(--dia, #6f6553) 62%, #a7a08f); box-shadow: inset 0 1px 2px rgba(0,0,0,.35), 0 1px 0 rgba(255,255,255,.5); }
-.semana-tarjeta-dia.elegido .semana-tarjeta-hueco { background: radial-gradient(circle, #16171a 0 42%, transparent 44%), var(--dia, #6f6553); }
-.semana-tarjeta-n { font-size: 19px; line-height: 1; color: #2f4b8f; }
+.semana-tarjeta-n { font-size: 24px; line-height: 1; color: #22386e; }
 .semana-tarjeta-dia:not(.picado) .semana-tarjeta-n { color: #a59b86; }
 .semana-tarjeta-detalle { display: grid; gap: 0; padding-top: 2px; font-size: 19px; line-height: 1.15; color: #2f4b8f; }
 .semana-tarjeta-detalle b { font-weight: 700; color: #2c2924; }
@@ -7223,6 +7221,18 @@ label.ajuste-rotulo { display: block; }
 .ciclo-resumen-pizarra { display: grid; gap: 4px; margin-bottom: 6px; }
 .ciclo-resumen-pizarra .cajones-pizarra { border-radius: 18px; }
 .ciclo-resumen-tiza { text-align: center; font-size: 19px; line-height: 1.1; color: var(--text-muted); }
+
+/* ── SIN EL CÍRCULO (13/11, pedido: "deshacete de esa marquita que le ponés a
+   los días del resumen semanal y del historial, el círculo ese"): el día que
+   fuiste es el casillero teñido con su color, sin perforación. No lo vuelvas a poner. */
+.tarjeta-perforada.carton .hueco-dia.picado::before, .tarjeta-perforada.carton .hueco-dia.picado.elegido::before, .tarjeta-perforada.carton .hueco-dia.picado::after, .light-mode .tarjeta-perforada.carton .hueco-dia.picado::after { content: none; }
+.tarjeta-perforada.carton .hueco-dia, .light-mode .tarjeta-perforada.carton .hueco-dia { align-items: center; justify-content: center; padding: 0; font-size: 13px; }
+.tarjeta-perforada.carton .hueco-dia.picado, .light-mode .tarjeta-perforada.carton .hueco-dia.picado { font-weight: 750; }
+/* Los cuatro números del resumen, en una sola placa con sus rayas (antes, cuatro cajas). */
+.resumen-kpis { gap: 0; border-radius: 22px; background: var(--surface-2); overflow: hidden; }
+.resumen-periodo .resumen-kpi { border-radius: 0; background: transparent; box-shadow: none; }
+.resumen-periodo .resumen-kpi:nth-child(odd) { box-shadow: inset -1px 0 0 var(--hairline); }
+.resumen-periodo .resumen-kpi:nth-child(n+3) { border-top: 1px solid var(--hairline); }
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -12950,7 +12960,6 @@ function TarjetaSemana({ data }) {
             aria-label={d.series ? `${d.nombre} ${d.n}: ${d.etiqueta || "entrenaste"}, ${d.series} series` : `${d.nombre} ${d.n}: sin entrenar`}
             className={`semana-tarjeta-dia ${d.series ? "picado" : ""} ${elegido === i ? "elegido" : ""}`} style={d.color ? { "--dia": d.color } : undefined}>
             <span className="semana-tarjeta-letra" aria-hidden="true">{d.letra}<i>{d.n}</i></span>
-            <span className="semana-tarjeta-hueco" aria-hidden="true" />
             <span className="semana-tarjeta-n a-mano" aria-hidden="true">{d.series || "–"}</span>
           </button>
         ))}
