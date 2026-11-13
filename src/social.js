@@ -247,8 +247,31 @@ export async function getPublicBasic(uid) {
   if (import.meta.env.DEV && demoSocialMarcado()) return (await import("./social-demo.js")).getPublicBasic(uid);
   try {
     const snap = await getDoc(doc(db, "users", uid, "public", "basic"));
-    return snap.exists() ? snap.data() : null;
+    return snap.exists() ? basicoSeguro(snap.data()) : null;
   } catch { return null; }
+}
+
+// La ficha chica de otra persona (nombre, foto, rango) la escribe SU app y
+// la ve cualquiera que la busque: se rearma antes de usarla (12/11, revisión
+// de seguridad). Sin esto, una foto podía ser la dirección de un servidor
+// ajeno (que se enteraba de quién la miraba y desde dónde), y un nombre que
+// no fuera texto rompía la lista de quien lo encontraba. La foto es siempre
+// una imagen empaquetada (data:), que es lo único que guarda la app.
+export function basicoSeguro(d) {
+  if (!d || typeof d !== "object" || Array.isArray(d)) return null;
+  const texto = (v, largo) => (typeof v === "string" && v.trim() ? v.slice(0, largo) : null);
+  const foto = typeof d.avatarData === "string" && d.avatarData.length <= 600000
+    && /^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/=]+$/.test(d.avatarData) ? d.avatarData : null;
+  const r = d.topRank && typeof d.topRank === "object" ? d.topRank : null;
+  const nivel = r && Number.isInteger(r.levelIdx) && r.levelIdx >= 0 && r.levelIdx <= 17 ? r.levelIdx : null;
+  const color = r && typeof r.color === "string" && /^#[0-9a-fA-F]{3,8}$/.test(r.color) ? r.color : null;
+  return {
+    username: typeof d.username === "string" && /^[A-Za-z0-9_]{3,20}$/.test(d.username) ? d.username : null,
+    name: texto(d.name, 80),
+    avatarData: foto,
+    topRank: nivel == null ? null : { tier: texto(r.tier, 30), sub: texto(String(r.sub ?? ""), 10), color, levelIdx: nivel },
+    updatedAt: texto(d.updatedAt, 40),
+  };
 }
 
 // Lo que llega del perfil público de otra persona se revisa antes de

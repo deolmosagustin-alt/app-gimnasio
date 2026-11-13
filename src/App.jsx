@@ -7170,6 +7170,59 @@ label.ajuste-rotulo { display: block; }
 .light-mode .ciclo-fila-cambio.sube { color: oklch(45% 0.12 150); }
 @keyframes barraCiclo { from { transform: scaleX(0); } }
 @media (prefers-reduced-motion: reduce) { .ciclo-fila-barras span { animation: none; } }
+
+/* ── CADA RESUMEN CON LO SUYO (12/11) ── */
+/* La semana: la tarjeta de fichar, de cartón (papel claro también en oscuro). */
+.semana-tarjeta { display: grid; gap: 10px; padding: 12px 12px 12px; border-radius: 14px; color: #2c2924; background: linear-gradient(180deg, #e9dfc8, #e0d5bb); box-shadow: inset 0 0 0 1px rgba(80,68,50,.25), 0 1px 0 rgba(255,255,255,.08); }
+.semana-tarjeta-rotulo { display: flex; align-items: baseline; justify-content: space-between; font-size: 12px; font-weight: 750; letter-spacing: .02em; color: #6f6553; border-bottom: 1.5px solid rgba(80,68,50,.3); padding-bottom: 6px; }
+.semana-tarjeta-rotulo .a-mano { font-size: 20px; line-height: 1; color: #2f4b8f; }
+.semana-tarjeta-dias { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.semana-tarjeta-dia { position: relative; display: grid; justify-items: center; gap: 3px; min-height: 78px; padding: 5px 0 3px; border-radius: 7px; box-shadow: inset 0 0 0 1px rgba(80,68,50,.22); color: #8a7f6a; transition: transform var(--dur-toque) var(--resorte); }
+.semana-tarjeta-dia.picado { color: #3a352c; background: rgba(255,255,255,.2); }
+.semana-tarjeta-dia.picado:active { transform: scale(.95); }
+.semana-tarjeta-dia.elegido { outline: 2px solid #2c2924; outline-offset: 1px; }
+.semana-tarjeta-letra { display: grid; justify-items: center; font-size: 12px; font-weight: 750; line-height: 1.1; }
+.semana-tarjeta-letra i { font-style: normal; font-size: 11px; font-weight: 600; opacity: .7; }
+.semana-tarjeta-hueco { width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px rgba(80,68,50,.25); border: 0 dashed transparent; }
+.semana-tarjeta-dia.picado .semana-tarjeta-hueco { background: radial-gradient(circle, #16171a 0 42%, transparent 44%), color-mix(in oklab, var(--dia, #6f6553) 62%, #a7a08f); box-shadow: inset 0 1px 2px rgba(0,0,0,.35), 0 1px 0 rgba(255,255,255,.5); }
+.semana-tarjeta-dia.elegido .semana-tarjeta-hueco { background: radial-gradient(circle, #16171a 0 42%, transparent 44%), var(--dia, #6f6553); }
+.semana-tarjeta-n { font-size: 19px; line-height: 1; color: #2f4b8f; }
+.semana-tarjeta-dia:not(.picado) .semana-tarjeta-n { color: #a59b86; }
+.semana-tarjeta-detalle { display: grid; gap: 0; padding-top: 2px; font-size: 19px; line-height: 1.15; color: #2f4b8f; }
+.semana-tarjeta-detalle b { font-weight: 700; color: #2c2924; }
+.resumen-racha { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--text-muted); }
+.resumen-racha b { font-weight: 800; color: var(--text-strong); }
+/* El mes: la costumbre, una columna por día de la semana. */
+.costumbre { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; align-items: end; height: 96px; }
+.costumbre-dia { display: grid; grid-template-rows: 16px 1fr 16px; justify-items: center; gap: 3px; height: 100%; }
+.costumbre-dia b { font-size: 13px; font-weight: 750; line-height: 16px; color: var(--text-muted); }
+.costumbre-dia i { align-self: end; width: 100%; max-width: 26px; height: max(4px, calc(var(--f) * 100%)); border-radius: 7px 7px 3px 3px; background: color-mix(in oklab, var(--text-faint) 45%, transparent); }
+.costumbre-dia.mas i { background: var(--accion-fondo); }
+.costumbre-dia.mas b { color: var(--text-strong); }
+.costumbre-dia.cero i { background: var(--velo); }
+.costumbre-dia small { font-size: 12px; font-weight: 650; color: var(--text-faint); }
+/* El año: el anuario. */
+.resumen-periodo.de-anio { padding-top: 14px; }
+.anuario-numero { margin: 0 0 -14px; font-size: 92px; line-height: .86; font-weight: 850; letter-spacing: -0.04em; color: transparent; -webkit-text-stroke: 1.5px color-mix(in oklab, var(--record) 70%, var(--text-faint)); background: linear-gradient(180deg, color-mix(in oklab, var(--record) 34%, transparent), transparent 92%); -webkit-background-clip: text; background-clip: text; font-size: calc(92px * 1); }
+.anuario-medallas { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px 6px; padding: 12px 8px 8px; border-radius: 18px; background: var(--panel-sunken, var(--surface-2)); box-shadow: inset 0 1px 0 rgba(0,0,0,.25); }
+.anuario-medalla { display: grid; justify-items: center; gap: 2px; }
+.anuario-medalla .medalla { width: 100%; max-width: 40px; }
+.anuario-medalla small { font-size: 11px; font-weight: 650; color: var(--text-faint); }
+.anuario-medalla.vacia small { opacity: .6; }
+.anuario-hueco { width: 60%; max-width: 26px; aspect-ratio: 1; margin: 24% 0 22%; border-radius: 50%; border: 1.5px dashed var(--hairline-fuerte); }
+.anuario-progresos { display: grid; border-radius: 18px; background: var(--surface-2); overflow: hidden; }
+.anuario-progresos li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; align-items: baseline; padding: 10px 12px; }
+.anuario-progresos li + li { box-shadow: inset 0 1px 0 var(--hairline); }
+.anuario-progreso-nombre { font-size: 14px; font-weight: 700; color: var(--text-strong); overflow-wrap: anywhere; }
+.anuario-progreso-cambio { grid-row: span 2; align-self: center; font-size: 15px; font-weight: 800; color: color-mix(in oklab, oklch(72.3% 0.153 149.6) 78%, white); }
+.light-mode .anuario-progreso-cambio { color: oklch(45% 0.12 150); }
+.anuario-progreso-marcas { grid-column: 1; font-size: 13px; color: var(--text-faint); }
+.anuario-progreso-marcas b { font-weight: 700; color: var(--text-muted); }
+.anuario-progreso-marcas i { font-style: normal; opacity: .7; }
+/* El ciclo: sus cajones en la pizarra, arriba de las marcas. */
+.ciclo-resumen-pizarra { display: grid; gap: 4px; margin-bottom: 6px; }
+.ciclo-resumen-pizarra .cajones-pizarra { border-radius: 18px; }
+.ciclo-resumen-tiza { text-align: center; font-size: 19px; line-height: 1.1; color: var(--text-muted); }
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -12867,10 +12920,88 @@ function CodigoRegalo({ uid, regalo, onCanjeado }) {
   );
 }
 
+// CADA RESUMEN, CON LO SUYO (12/11, pedido: "que cada resumen tenga su propio
+// estilo y funcionalidad, con cosas propias cada uno"). El del día es el
+// ticket de la caja. El de la semana, la tarjeta de fichar: un casillero por
+// día, perforado con el color de lo que tocó; tocás uno y dice qué hiciste.
+// El del mes, la medalla, su calendario, tu costumbre (qué días de la semana
+// vas) y las historias. El del ciclo, los cajones en la pizarra con cada
+// marca contra la de antes. El del año, el anuario: el año en grande, las
+// doce medallas, el mapa de las semanas y lo que más subiste.
+function TarjetaSemana({ data }) {
+  const unit = useWeightUnit();
+  const u = weightLabel(unit);
+  const lunes = data.lunes ? new Date(`${data.lunes}T12:00:00`) : lunesDe(new Date());
+  const dias = LETRAS_SEMANA.map((letra, i) => {
+    const d = new Date(lunes); d.setDate(d.getDate() + i);
+    const fecha = localDateStr(d);
+    return { letra, fecha, n: d.getDate(), nombre: DIAS_DE_LA_SEMANA[i], ...((data.diasDetalle || []).find((x) => x.date === fecha) || {}) };
+  });
+  const mejor = dias.reduce((m, d, i) => ((d.volumen || 0) > (dias[m]?.volumen || 0) ? i : m), dias.findIndex((d) => d.series));
+  const [elegido, setElegido] = useState(mejor);
+  const sel = dias[elegido] || null;
+  const hechos = dias.filter((d) => d.series).length;
+  return (
+    <section className="semana-tarjeta" aria-label="Los días de la semana">
+      <p className="semana-tarjeta-rotulo">Tarjeta de la semana<span className="a-mano">{hechos} de 7</span></p>
+      <div className="semana-tarjeta-dias">
+        {dias.map((d, i) => (
+          <button key={d.fecha} disabled={!d.series} onClick={() => { haptic(8); setElegido(i); }} aria-pressed={elegido === i}
+            aria-label={d.series ? `${d.nombre} ${d.n}: ${d.etiqueta || "entrenaste"}, ${d.series} series` : `${d.nombre} ${d.n}: sin entrenar`}
+            className={`semana-tarjeta-dia ${d.series ? "picado" : ""} ${elegido === i ? "elegido" : ""}`} style={d.color ? { "--dia": d.color } : undefined}>
+            <span className="semana-tarjeta-letra" aria-hidden="true">{d.letra}<i>{d.n}</i></span>
+            <span className="semana-tarjeta-hueco" aria-hidden="true" />
+            <span className="semana-tarjeta-n a-mano" aria-hidden="true">{d.series || "–"}</span>
+          </button>
+        ))}
+      </div>
+      {sel?.series ? (
+        <p key={sel.fecha} className="semana-tarjeta-detalle a-mano tab-fade-in" aria-live="polite">
+          <b>{sel.nombre}{sel.etiqueta ? `, ${sel.etiqueta}` : ""}</b>
+          <span>{sel.series} series · {numeroAR(Math.round(kgToDisplay(sel.volumen, unit)))} {u}{sel.minutos ? ` · ${sel.minutos} min` : ""}</span>
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+// LA COSTUMBRE DEL MES: cuántas veces fuiste cada día de la semana.
+function CostumbreDelMes({ porDia = [] }) {
+  const max = Math.max(1, ...porDia);
+  const mas = porDia.indexOf(Math.max(...porDia));
+  return (
+    <div className="costumbre" role="img" aria-label={`Veces por día de la semana: ${porDia.map((n, i) => `${DIAS_DE_LA_SEMANA[i]} ${n}`).join(", ")}`}>
+      {porDia.map((n, i) => (
+        <span key={i} className={`costumbre-dia ${n && i === mas ? "mas" : ""} ${n ? "" : "cero"}`}>
+          <b className="num-display">{n || ""}</b>
+          <i style={{ "--f": n / max }} />
+          <small>{LETRAS_SEMANA[i]}</small>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// LAS DOCE MEDALLAS DEL AÑO, en dos estantes.
+function MedallasDelAnio({ meses = [] }) {
+  const ganadas = meses.filter((m) => m.dias > 0).length;
+  return (
+    <div className="anuario-medallas" role="img" aria-label={`${ganadas} de 12 meses con medalla: ${meses.filter((m) => m.dias > 0).map((m) => `${NOMBRES_MES[m.mes]} ${m.dias} días`).join(", ")}`}>
+      {meses.map((m) => (
+        <span key={m.prefijo} className={`anuario-medalla ${m.dias > 0 ? "" : "vacia"}`}>
+          {m.dias > 0 ? <MedallaMes chica numero={m.dias} /> : <span className="anuario-hueco" />}
+          <small>{MESES_CORTOS[m.mes]}</small>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, enCurso = false }) {
   useAndroidBack(onClose);
   const unit = useWeightUnit();
   const [verTodasMarcas, setVerTodasMarcas] = useState(false);
+  const [historias, setHistorias] = useState(false);
   // Los números arrancan en cero y suben al abrirse.
   const [encendido, setEncendido] = useState(false);
   useEffect(() => { const t = setTimeout(() => setEncendido(true), 200); return () => clearTimeout(t); }, []);
@@ -12922,7 +13053,9 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
   const nombrePeriodo = periodo === "anio" ? "este año" : periodo === "mes" ? "este mes" : "esta semana";
   return (
     <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
-      <div className="resumen-periodo modal-pop-in" style={{ "--c": "var(--tono)" }} role="dialog" aria-modal="true" aria-label={est.titulo} onClick={(e) => e.stopPropagation()}>
+      <div className={`resumen-periodo de-${periodo} modal-pop-in`} style={{ "--c": "var(--tono)" }} role="dialog" aria-modal="true" aria-label={est.titulo} onClick={(e) => e.stopPropagation()}>
+        {/* El año, en grande, como la tapa de un anuario. */}
+        {periodo === "anio" && data.prefijo && <p className="anuario-numero num-display" aria-hidden="true">{data.prefijo}</p>}
         {/* Un mes cerrado trae su medalla, colgada arriba. */}
         {periodo === "mes" && !enCurso && data.prefijo && <div className="resumen-medalla"><MedallaMes prefijo={data.prefijo} numero={data.dias} /></div>}
         <header className="resumen-cabeza">
@@ -12935,6 +13068,17 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
             </p>
           )}
         </header>
+
+        {periodo === "semana" && data.diasDetalle?.length > 0 && <TarjetaSemana data={data} />}
+        {periodo === "semana" && data.rachaSemanas >= 2 && (
+          <p className="resumen-racha"><MarcasTiza dias={data.rachaSemanas} max={8} alto={15} decorativa /><span><b>{data.rachaSemanas}</b> semanas seguidas</span></p>
+        )}
+        {periodo === "anio" && data.meses && (
+          <section className="resumen-bloque" aria-label="Las medallas del año">
+            <h3>Tus medallas</h3>
+            <MedallasDelAnio meses={data.meses} />
+          </section>
+        )}
 
         <div className="resumen-kpis">
           {kpis.map((x) => {
@@ -12953,7 +13097,7 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
           })}
         </div>
 
-        {maxTramo > 0 && (
+        {maxTramo > 0 && !(periodo === "semana" && data.diasDetalle?.length > 0) && (
           <section className="resumen-bloque" aria-label="Cuándo entrenaste">
             <h3>Cuándo entrenaste</h3>
             {periodo === "mes" && data.prefijo ? (
@@ -12965,6 +13109,28 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
               />
             )}
             {periodo === "anio" && data.prefijo && <CalorDelAnio anio={Number(data.prefijo)} dias={data.diasVolumen} />}
+          </section>
+        )}
+
+        {periodo === "mes" && data.dias >= 3 && data.porDiaSemana && (
+          <section className="resumen-bloque" aria-label="Tu costumbre">
+            <h3>Tu costumbre</h3>
+            <CostumbreDelMes porDia={data.porDiaSemana} />
+          </section>
+        )}
+
+        {periodo === "anio" && data.progresos?.length > 0 && (
+          <section className="resumen-bloque" aria-label="Lo que más subiste">
+            <h3>Lo que más subiste</h3>
+            <ul className="anuario-progresos">
+              {data.progresos.map((f) => (
+                <li key={f.id}>
+                  <span className="anuario-progreso-nombre">{f.nombre}</span>
+                  <span className="anuario-progreso-marcas num-display">{f.corporal ? `${f.antes.reps} → ${f.ahora.reps} reps` : <>{f.antes.reps} × {numeroAR(kgToDisplay(f.antes.kg, unit))} <i>→</i> <b>{f.ahora.reps} × {numeroAR(kgToDisplay(f.ahora.kg, unit))}</b> {u}</>}</span>
+                  <b className="anuario-progreso-cambio">+{conComa(f.cambio)} %</b>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
 
@@ -13026,8 +13192,12 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
           {data.minutos > 0 && <li><span>Por sesión</span><b>{data.promedioSeries} series</b></li>}
         </ul>
 
+        {periodo === "mes" && !enCurso && data.prefijo && (
+          <button onClick={() => setHistorias(true)} className="boton-tonal w-full">Verlo en historias</button>
+        )}
         <button onClick={onClose} className="boton-pildora w-full">{est.cta}</button>
       </div>
+      {historias && <HistoriasDelMes data={data} prefijo={data.prefijo} onClose={() => setHistorias(false)} onResumen={() => setHistorias(false)} />}
     </div>
   );
 }
@@ -15791,6 +15961,23 @@ function ResumenDeCicloModal({ numero, logs, cycleStart, settings, nombres = {},
   const visibles = soloRecords ? filas.filter((f) => f.esRecord) : filas;
   const records = filas.filter((f) => f.esRecord).length;
   const fechaCortaDe = (iso) => `${Number(iso.slice(8, 10))}/${Number(iso.slice(5, 7))}`;
+  // Los cajones del ciclo, con las veces que fuiste cada semana en tiza.
+  const semanasDelCiclo = (() => {
+    const fechasConSeries = new Set();
+    Object.values(logs || {}).forEach((h) => { if (Array.isArray(h)) h.forEach((x) => { if (x?.date) fechasConSeries.add(String(x.date).slice(0, 10)); }); });
+    const info = getWeekInfo(cycleStart, settings);
+    const total = info?.cycleWeeks || fechas.semanas;
+    const hoy = todayStr();
+    return Array.from({ length: total }, (_, wi) => {
+      const d0 = new Date(`${fechas.desde}T12:00:00`); d0.setDate(d0.getDate() + wi * 7);
+      let sesiones = 0;
+      for (let k = 0; k < 7; k++) { const d = new Date(d0); d.setDate(d.getDate() + k); if (fechasConSeries.has(localDateStr(d))) sesiones++; }
+      const fin = new Date(d0); fin.setDate(fin.getDate() + 6);
+      const estado = localDateStr(fin) < hoy ? "pasada" : localDateStr(d0) <= hoy ? "actual" : "futura";
+      return { n: wi + 1, sesiones: estado === "futura" ? null : sesiones, descarga: wi + 1 > fechas.semanas, estado };
+    });
+  })();
+  const sesionesDelCiclo = semanasDelCiclo.reduce((t, x) => t + (x.sesiones || 0), 0);
   const marca = (m, corporal) => (corporal ? `${m.reps} reps` : `${m.reps} × ${conComa(kgToDisplay(m.kg, unit))}`);
   return createPortal(
     <div className="fixed inset-0 z-[150] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
@@ -15807,6 +15994,10 @@ function ResumenDeCicloModal({ numero, logs, cycleStart, settings, nombres = {},
             <p className="armado-nota">Todavía no hay series anotadas en este ciclo.</p>
           ) : (
             <>
+              <div className="ciclo-resumen-pizarra" aria-hidden="true">
+                <CajonesCiclo semanas={semanasDelCiclo} trainWeeks={fechas.semanas} alto={88} />
+                <p className="ciclo-resumen-tiza a-mano">{sesionesDelCiclo} {sesionesDelCiclo === 1 ? "sesión" : "sesiones"} en {semanasDelCiclo.filter((x) => x.estado !== "futura").length} semanas</p>
+              </div>
               {/* El titular: cuántos récords, de cuántos ejercicios. */}
               <div className="ciclo-resumen-titular">
                 <p className="ciclo-resumen-numero"><b className="num-display">{records}</b><span>{records === 1 ? "récord nuevo" : "récords nuevos"}</span></p>
@@ -20989,6 +21180,13 @@ function resumirSesiones(filtered, tramos = null) {
     tramos: tramos ? tramos(porFecha) : null,
     regiones: REGIONES.map((nombre) => ({ nombre, series: porRegion[nombre] })),
     diasVolumen: porFecha.map((g) => ({ date: g.date, volumen: Math.round(g.rows.reduce((acc, r) => acc + vol(r.kg, r.reps), 0)) })),
+    // Cada día con lo que hiciste (la tarjeta de la semana) y cuántas veces
+    // fuiste cada día de la semana (la costumbre del mes).
+    diasDetalle: porFecha.map((g) => {
+      const sesion = filtered.find((x) => x.date === g.date);
+      return { date: g.date, etiqueta: g.dayLabel || "", series: g.rows.length, minutos: g.durationMin || 0, color: ROUTINE[sesion?.dayKeys?.[0]]?.color || null, volumen: Math.round(g.rows.reduce((acc, r) => acc + vol(r.kg, r.reps), 0)) };
+    }),
+    porDiaSemana: porFecha.reduce((n, g) => { n[(new Date(`${g.date}T00:00:00`).getDay() + 6) % 7]++; return n; }, [0, 0, 0, 0, 0, 0, 0]),
   };
 }
 
@@ -21057,6 +21255,10 @@ function computeWeekRecap(logs, trainingSessions) {
     const lunes = new Date(esta); lunes.setDate(lunes.getDate() - 7 * (7 - k));
     return { etiqueta: `${lunes.getDate()}/${lunes.getMonth() + 1}`, volumen: volumenDeSesiones(deLaSemana(lunes)), actual: k === 7 };
   });
+  // Cuántas semanas seguidas venís entrenando (contando ésta).
+  data.lunes = localDateStr(esta);
+  data.rachaSemanas = 0;
+  for (let k = data.historia.length - 1; k >= 0 && data.historia[k].volumen > 0; k--) data.rachaSemanas++;
   return data;
 }
 
@@ -21084,6 +21286,19 @@ function computePrefixRecap(logs, trainingSessions, prefijo) {
       const p = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       return { etiqueta: MESES_CORTOS[d.getMonth()], volumen: volumenDeSesiones(getSessionsForPrefix(idx, p)), actual: k === 5 };
     });
+  } else {
+    // DEL AÑO: los días de cada mes (sus doce medallas) y lo que más subiste,
+    // tu mejor serie de antes del año contra la mejor del año.
+    data.meses = Array.from({ length: 12 }, (_, m) => {
+      const p = `${prefijo}-${String(m + 1).padStart(2, "0")}`;
+      return { prefijo: p, mes: m, dias: new Set(getSessionsForPrefix(idx, p).map((x) => x.date)).size };
+    });
+    const nombres = {};
+    getSessionsForPrefix(idx, prefijo).forEach((x) => (x.items || []).forEach((it) => { if (it.exerciseId && it.exerciseName) nombres[it.exerciseId] = it.exerciseName; }));
+    data.progresos = resumenDeCiclo(logs, `${prefijo}-01-01`, `${Number(prefijo) + 1}-01-01`).filas
+      .filter((f) => f.esRecord && f.antes && f.cambio > 0 && nombres[f.id])
+      .sort((a, b) => b.cambio - a.cambio).slice(0, 5)
+      .map((f) => ({ ...f, nombre: nombres[f.id] }));
   }
   return data;
 }
@@ -33285,6 +33500,20 @@ export default function App() {
   // El botón "Iniciar sesión" del recordatorio: la función se fija más abajo,
   // donde se declara handleStartSession.
   const iniciarSesionRef = useRef(null);
+  // Sólo en desarrollo: abrir un resumen a pedido, para las fotos
+  // (.taste-skill/resumenes-fotos.mjs). No viaja en la versión publicada.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return undefined;
+    const ver = (e) => {
+      const ctx = notifCtxRef.current || {};
+      const { periodo, prefijo } = e.detail || {};
+      if (periodo === "semana") { setWeeklyRecap(computeWeekRecap(ctx.logs || {}, ctx.profile?.trainingSessions || [])); return; }
+      const data = computePrefixRecap(ctx.logs || {}, ctx.profile?.trainingSessions || [], prefijo);
+      if (data) setPeriodRecap({ periodo, etiqueta: etiquetaPeriodo(prefijo), data });
+    };
+    window.addEventListener("modusfit-ver-resumen", ver);
+    return () => window.removeEventListener("modusfit-ver-resumen", ver);
+  }, []);
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     let handle = null;
