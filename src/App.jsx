@@ -1647,7 +1647,7 @@ function GeneralWarmupCard({ exercises, warmupKeys, accent }) {
     <div className="tarjeta-tonal overflow-hidden" style={{ "--c": accent }}>
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-3 px-3.5 py-3 text-left transition active:scale-[0.99]">
         <span className="galleta icono-galleta" aria-hidden="true"><Activity size={16} /></span>
-        <div className="flex-1 min-w-0 flex items-baseline gap-2">
+        <div className="flex-1 min-w-0 flex flex-wrap items-baseline gap-x-2">
           <p className="text-[15px] font-semibold text-white leading-tight">Calentamiento</p>
           <p className="text-[13px] text-slate-500">{doneCount > 0 ? `${doneCount} de ${drills.length}` : `${drills.length} de movilidad`}</p>
         </div>
@@ -7247,6 +7247,23 @@ label.ajuste-rotulo { display: block; }
 .foco-ajustes.con-salto .foco-salto { flex: none; width: 46px; background: transparent; box-shadow: none; }
 .foco-ajustes.con-salto .foco-salto.abierto { background: var(--velo); }
 .foco-ref.record b { color: var(--record); }
+
+/* ── LA LISTA DE EJERCICIOS (13/11): a la derecha, qué cargar; las rayitas de
+   las series un poco más grandes y la flecha más callada. El ejercicio
+   completo se apaga entero, no sólo el nombre. */
+.ejercicio-carga { display: inline-flex; align-items: baseline; gap: 2px; font-size: 17px; font-weight: 700; line-height: 1; color: var(--text-muted); white-space: nowrap; }
+.ejercicio-carga small { font-size: 11px; font-weight: 600; color: var(--text-faint); }
+.ejercicio.completo .ejercicio-carga { color: var(--text-faint); }
+.ejercicio-flecha { color: var(--text-faint); opacity: .7; }
+/* A la derecha: el peso arriba de las rayitas y la flecha al costado. En un
+   teléfono muy angosto el peso se esconde, para no partir el nombre. */
+.ejercicio-derecha { display: grid; grid-template-columns: auto auto; align-items: center; justify-items: end; column-gap: 10px; row-gap: 5px; }
+.ejercicio-derecha .ejercicio-flecha { grid-column: 2; grid-row: 1 / span 2; }
+.ejercicio-derecha .ejercicio-carga, .ejercicio-derecha .series-discos { grid-column: 1; }
+@media (max-width: 359px) { .ejercicio-carga { display: none; } }
+.series-discos { gap: 3px; }
+.series-discos i { width: 5px; height: 16px; border-radius: 2.5px; }
+.ejercicio.completo:not(.abierto) .ejercicio-musculo { color: var(--text-faint); }
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -15620,6 +15637,16 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
   // Misma unidad que muestra cada serie (ver SetRow): el plan se guarda
   // siempre en kg, pero quien entrena en libras tiene que leerlo en libras.
   const planUnit = useWeightUnit();
+  // El peso más alto entre lo último anotado en cada serie (sin descargas).
+  const cargaCerrada = (() => {
+    if (exercise.cardio || descarga) return null;
+    let kg = 0;
+    setsToShow.forEach((_, i) => {
+      const h = (logs[`${exercise.id}_${i}`] || []).filter((x) => !x.deload && x.kg > 0);
+      if (h.length) kg = Math.max(kg, h[h.length - 1].kg);
+    });
+    return kg > 0 ? Math.round(kgToDisplay(kg, planUnit) * 100) / 100 : null;
+  })();
   // BUG FIX (encontrado auditando el modo planificado): el aviso de
   // "ESTANCADO" mira si hace STAGNATION_DAYS que no superás tu récord en
   // este ejercicio y sugiere "cambiá reps, descanso o variante". Bajo un
@@ -15701,9 +15728,15 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
             {exercise.nota && settings.showExerciseNote !== false && <p className="ejercicio-consejo">{exercise.nota}</p>}
           </div>
         </div>
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="ejercicio-derecha shrink-0">
           {/* Un disquito por serie, con los colores de la barra cargada:
               lleno = hecha hoy. Con la tarjeta cerrada sabés por dónde ibas. */}
+          {/* QUÉ CARGAR, sin abrir (13/11, pedido: "pulí la lista"): el peso
+              más alto de la última vez (o el de hoy, si ya anotaste). Es lo
+              que querés saber antes de ir a buscar los discos. */}
+          {!open && cargaCerrada != null && (
+            <span className="ejercicio-carga num-display" aria-label={`La última vez, ${conComa(cargaCerrada)} ${weightLabel(planUnit)}`}>{conComa(cargaCerrada)}<small>{weightLabel(planUnit)}</small></span>
+          )}
           {!exercise.cardio && seriesHechas.length > 0 && (descarga ? (
             <span className="series-discos" role="img" aria-label={allSetsDoneToday ? "Completaste las series de descarga" : `${hechasEnDescarga.filter(Boolean).length} de ${quedanEnDescarga} series de descarga`}>
               {hechasEnDescarga.map((hecha, i) => <i key={i} className={i >= quedanEnDescarga ? "afuera" : hecha ? "hecha" : ""} />)}
@@ -15713,7 +15746,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
               {seriesHechas.map((hecha, i) => <i key={i} className={hecha ? "hecha" : ""} />)}
             </span>
           ))}
-          <ChevronDown size={18} className={`text-slate-500 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+          <ChevronDown size={16} className={`ejercicio-flecha shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
         </div>
       </button>
       {/* El cuerpo se abre y se cierra deslizándose (ver .ejercicio-cuerpo).
