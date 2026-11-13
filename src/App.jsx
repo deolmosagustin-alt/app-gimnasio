@@ -3352,7 +3352,7 @@ input, textarea, [contenteditable="true"] {
   /* El único color propio: el de los récords, dorado viejo y en poco lugar. */
   --record: #e2c47f;
   --bar-bg: rgba(11,11,13,0.8);
-  --tabbar-bg: rgba(28,28,31,0.88);
+  --tabbar-bg: rgba(24,24,27,0.95);
   --tabbar-h: 64px;
   /* Alto del dock de abajo (descanso en curso + sesión). Lo escribe el
      propio dock al cambiar de tamaño, y lo leen el aire de abajo de la
@@ -3395,7 +3395,7 @@ input, textarea, [contenteditable="true"] {
   --sombra-placa: 0 1px 2px rgba(0,0,0,0.06);
   --record: #93701f;
   --bar-bg: rgba(239,239,237,0.84);
-  --tabbar-bg: rgba(255,255,255,0.8);
+  --tabbar-bg: rgba(255,255,255,0.94);
   --disco-fantasma: rgba(0,0,0,0.12);
 }
 
@@ -3584,11 +3584,11 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 
 /* ── DOCK DE ABAJO (descanso en curso + sesión) ────────────────────────── */
 :root {
-  --dock-bg: rgba(28,28,31,0.84);
+  --dock-bg: rgba(24,24,27,0.95);
   --dock-sombra: inset 0 1px 0 var(--brillo), 0 22px 44px -18px rgba(0,0,0,0.9);
 }
 .light-mode {
-  --dock-bg: rgba(255,255,255,0.88);
+  --dock-bg: rgba(255,255,255,0.95);
   --dock-sombra: 0 18px 36px -20px rgba(0,0,0,0.3);
 }
 .dock-tarjeta {
@@ -14499,7 +14499,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             </span>
           )}
           <span className="serie-linea-fin">
-            {mejora && <span className={`serie-mejora ${feedback?.type === "pr-serie" || feedback?.type === "pr" ? "sube" : ""}`}><TrendingUp size={12} /> {mejora}</span>}
+            {mejora && <span className="serie-mejora sube"><TrendingUp size={12} /> {mejora}</span>}
             {hechaHoy && selloFeedback?.texto && !(mejora && (feedback?.type === "pr-serie" || feedback?.type === "down")) && <span className={`serie-sello ${selloFeedback.tono}`}>{selloFeedback.texto}</span>}
             {referencia && <>{referencia.icono}{referencia.texto}</>}
           </span>
@@ -14581,7 +14581,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         </div>
         <span className="foco-por" aria-hidden="true">×</span>
         <div className="foco-campo">
-          <input ref={kgInputRef} type="number" inputMode="decimal" enterKeyHint="done" aria-label={`Peso en ${u}`} placeholder="–" value={kg} onFocus={seleccionarAlEnfocar} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); saveBtnRef.current?.click(); } }} onChange={(e) => updateDraft({ kg: e.target.value })} className="foco-input" />
+          <input ref={kgInputRef} type="text" inputMode="decimal" autoComplete="off" enterKeyHint="done" aria-label={`Peso en ${u}`} placeholder="–" value={String(kg).replace(".", ",")} onFocus={seleccionarAlEnfocar} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); saveBtnRef.current?.click(); } }} onChange={(e) => { const v = e.target.value.replace(",", ".").replace(/[^0-9.]/g, ""); const [a, ...b] = v.split("."); updateDraft({ kg: b.length ? `${a}.${b.join("").slice(0, 2)}` : a }); }} className="foco-input" />
           {cambiarUnidad
             ? <button onClick={cambiarUnidad} aria-label={`Pasar a ${unit === "kg" ? "libras" : "kilos"} en toda la app`} className="foco-campo-rotulo">{u}<ArrowUpDown size={10} className="rotate-90" /></button>
             : <span className="foco-campo-rotulo" aria-hidden="true">{u}</span>}
@@ -15811,7 +15811,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
         </div>
         )}
         {exercise.video && (
-          <div className="pt-3">
+          <div className="pt-1 -mb-2">
             <a href={exercise.video} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 h-11 rounded-full text-slate-400 hover:text-white transition text-[14px] font-semibold active:scale-[0.98]" style={{ backgroundColor: "var(--surface-2)" }}>
               <SquarePlay size={17} /> Técnica
             </a>
