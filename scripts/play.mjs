@@ -143,6 +143,23 @@ const ordenes = {
     }, { confirmar: true });
   },
 
+  // `promover <versionCode> --pista internal`: una versión ya subida, en otra
+  // pista, sin volver a subir el archivo (Play no deja repetir un versionCode).
+  // La prueba interna no pasa por revisión: llega en minutos a sus testers.
+  async promover() {
+    const codigo = sueltos[0];
+    if (!/^\d+$/.test(codigo || "")) throw new Error("Decime el versionCode: `npm run play -- promover 28 --pista internal`.");
+    const pista = opcion("pista", "internal");
+    const notas = opcion("notas");
+    const H = await token("https://www.googleapis.com/auth/androidpublisher");
+    await enEdicion(H, async (E) => {
+      const gv = readFileSync(join(RAIZ, "android", "app", "build.gradle"), "utf8");
+      const nombre = opcion("nombre", gv.match(/versionName "([^"]+)"/)?.[1] || codigo);
+      await pedir(H, "pista", `${E}/tracks/${pista}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ track: pista, releases: [{ name: nombre, versionCodes: [codigo], status: "completed", ...(notas ? { releaseNotes: [{ language: "es-419", text: notas }] } : {}) }] }) });
+      console.log(`${nombre} (${codigo}) en ${pista}`);
+    }, { confirmar: true });
+  },
+
   async resenas() {
     const H = await token("https://www.googleapis.com/auth/androidpublisher");
     const r = await pedir(H, "reseñas", `${API}/reviews?maxResults=50`);
