@@ -69,6 +69,7 @@ import {
 // Buscar ejercicios como los escribe la gente (sin tildes, en cualquier
 // orden, con errores de tipeo, en inglés o con el apodo del gimnasio).
 import { buscarEjercicios, mejorEjercicio, nombreCoincide, partesResaltadas, REGIONES_BUSCADOR, alternativasDe } from "./buscar-ejercicios.js";
+import { FORMAS, NOMBRE_DE_FORMA, COLORES_SUPLEMENTO, SUGERIDOS, MAX_SUPLEMENTOS, MAX_DOSIS, listaDeSuplementos, nuevoSuplemento, sanearSuplemento, tomadas, tomar, unirTomas, rachaDe, ultimosDias, recortarTomas, suplementosParaWidget } from "./suplementos.js";
 import { rangoDeReps, siguientePaso, seriesDeDescarga, cargaDeDescarga, ejerciciosEnBaja, planDeEntrenador, equilibrarReps, redondearConReps, resumenDeCiclo } from "./entrenamiento.js";
 // Modus Fit Premium: preparada y con el cobro apagado por bandera (ver
 // src/suscripcion.js y docs/suscripcion.md).
@@ -7311,6 +7312,63 @@ label.ajuste-rotulo { display: block; }
 .rutina-creada-dias small { color: #6b6a64; }
 .rutina-creada-broche { position: absolute; top: -4px; left: 50%; width: 20px; height: 8px; translate: -50% 0; border-radius: 3px 3px 2px 2px; background: linear-gradient(180deg, #b9bcc3, #7f838b); box-shadow: 0 1px 0 rgba(0,0,0,.35); }
 .rutina-creada.activa .rutina-creada-dias { box-shadow: inset 0 0 0 1px rgba(0,0,0,.12), 0 0 0 2px color-mix(in oklab, var(--c) 60%, transparent); }
+
+/* ── 14/11: LOS SUPLEMENTOS (Perfil) ── */
+.sup { display: grid; gap: 14px; }
+.sup-hoy { display: grid; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); gap: 12px 6px; }
+.sup-toma { display: grid; justify-items: center; align-content: start; gap: 5px; min-height: 44px; min-width: 0; transition: transform var(--dur-toque) var(--resorte); }
+.sup-toma:active { transform: scale(.94); }
+.sup-aro { position: relative; flex: none; display: grid; place-items: center; border-radius: 50%; color: var(--text-muted); background: var(--panel-sunken); box-shadow: inset 0 0 0 1.5px var(--hairline-fuerte); transition: background var(--dur-chico) var(--sale), color var(--dur-chico) var(--sale); }
+.sup-aro.tomada { color: #14161a; background: color-mix(in oklab, var(--c) 72%, white); box-shadow: none; }
+.light-mode .sup-aro.tomada { background: color-mix(in oklab, var(--c) 78%, #6d6f75); color: #fff; }
+.sup-aro-parte { position: absolute; inset: 0; width: 100%; height: 100%; rotate: -90deg; }
+.sup-aro-parte circle { fill: none; stroke: color-mix(in oklab, var(--c) 72%, white); stroke-width: 3; stroke-linecap: round; }
+.light-mode .sup-aro-parte circle { stroke: color-mix(in oklab, var(--c) 78%, #6d6f75); }
+.sup-toma-nombre { max-width: 100%; font-size: 12px; font-weight: 600; line-height: 1.2; text-align: center; color: var(--text-muted); overflow-wrap: anywhere; }
+.sup-toma[aria-pressed="true"] .sup-toma-nombre { color: var(--text-strong); }
+.sup-toma-cuenta { font-size: 12px; font-weight: 700; color: var(--text-faint); margin-top: -3px; }
+.sup-vacio, .sup-nota { font-size: 13px; line-height: 1.4; color: var(--text-faint); }
+.sup-lista { display: grid; border-radius: 18px; background: var(--panel-sunken); overflow: hidden; }
+.sup-lista > * + * { box-shadow: inset 0 1px 0 var(--hairline); }
+.sup-renglon { display: flex; align-items: stretch; min-height: 56px; }
+.sup-renglon-datos { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 14px; text-align: left; }
+.sup-renglon-datos:active { background: var(--velo); }
+.sup-renglon-nombre { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; color: var(--text-strong); }
+.sup-renglon-nombre small { display: block; font-size: 12px; font-weight: 500; color: var(--text-faint); }
+.sup-dias { flex: none; display: grid; grid-template-columns: repeat(7, 7px); gap: 3px; }
+.sup-dias i { width: 7px; height: 7px; border-radius: 2px; background: var(--surface-3); }
+.sup-dias i.parte { background: color-mix(in oklab, var(--c) 30%, var(--surface-3)); }
+.sup-dias i.si { background: color-mix(in oklab, var(--c) 60%, #8a8c92); }
+.sup-subir { flex: none; width: 44px; display: grid; place-items: center; color: var(--text-faint); }
+.sup-subir:active { background: var(--velo); color: var(--text-strong); }
+.sup-al-inicio { justify-self: start; }
+.widgets-lista { display: grid; border-radius: 18px; background: var(--panel-sunken); overflow: hidden; }
+.widgets-renglon { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 6px 8px 6px 14px; }
+.widgets-renglon + .widgets-renglon { box-shadow: inset 0 1px 0 var(--hairline); }
+.widgets-nombre { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; color: var(--text-strong); }
+.widgets-nombre small { display: block; font-size: 12px; font-weight: 600; color: var(--text-faint); }
+.widgets-renglon .boton-tonal { flex: none; min-height: 44px; }
+.sup-agregar { justify-self: start; min-height: 44px; display: inline-flex; align-items: center; gap: 6px; }
+.sup-editor { display: grid; gap: 12px; padding: 14px; }
+.sup > .sup-editor { border-radius: 18px; background: var(--panel-sunken); }
+.sup-sugeridos { display: flex; flex-wrap: wrap; gap: 6px; }
+.sup-sugeridos button { min-height: 36px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--text-muted); box-shadow: inset 0 0 0 1px var(--hairline-fuerte); }
+.sup-sugeridos button.activo { color: var(--accion-tinta); background: var(--accion-fondo); box-shadow: none; }
+.sup-nombre-campo { width: 100%; height: 46px; padding: 0 14px; border-radius: 14px; font-size: 15px; font-weight: 600; color: var(--text-strong); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--hairline-fuerte); outline: none; }
+.sup-nombre-campo:focus { box-shadow: inset 0 0 0 1.5px var(--accion-fondo); }
+.sup-formas { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.sup-formas button { display: grid; justify-items: center; gap: 3px; min-height: 56px; padding: 8px 2px 6px; border-radius: 14px; font-size: 11px; font-weight: 600; color: var(--text-muted); box-shadow: inset 0 0 0 1px var(--hairline-fuerte); }
+.sup-formas button.activo { color: #14161a; background: color-mix(in oklab, var(--c) 72%, white); box-shadow: none; }
+.light-mode .sup-formas button.activo { color: #fff; background: color-mix(in oklab, var(--c) 78%, #6d6f75); }
+.sup-colores { display: flex; gap: 4px; }
+.sup-colores button { position: relative; width: 44px; height: 44px; border-radius: 50%; }
+.sup-colores button::before { content: ""; position: absolute; inset: 9px; border-radius: 50%; background: color-mix(in oklab, var(--c) 72%, white); }
+.light-mode .sup-colores button::before { background: color-mix(in oklab, var(--c) 78%, #6d6f75); }
+.sup-colores button.activo::after { content: ""; position: absolute; inset: 4px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--text-strong); }
+.sup-editor-pie { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.sup-editor-pie .sup-borrar { margin-right: auto; color: #e06a6f; }
+.light-mode .sup-editor-pie .sup-borrar { color: #b0353b; }
+.sup-editor-pie .boton-pildora:disabled { opacity: .45; }
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -11068,9 +11126,19 @@ function aplicarEventoNativo(ev) {
     try { localStorage.setItem("modusfit_descanso_evento", String(seq)); } catch { /* sin almacenamiento */ }
   }
   const id = ev?.id;
+  const ahora = Date.now();
+  // Arrancó en el widget de Descanso rápido (plugin v16): la app no lo
+  // conocía, así que lo suma a los suyos y aparece en el dock.
+  if (id && ev.accion === "iniciar" && !ACTIVE_REST_TIMERS[id] && Number(ev.fin) > 0) {
+    const d = Math.max(1, Math.round(Number(ev.duracion) || (Number(ev.fin) - ahora) / 1000));
+    ACTIVE_REST_TIMERS[id] = { endTime: Number(ev.fin), total: d, duracion: d, inicio: Number(ev.fin) - d * 1000, ejercicio: null, siguiente: null, color: null, serie: null, series: null, objetivo: null };
+    ACTIVE_REST_TIMERS.__notifOwner = id;
+    persistActiveRestTimers();
+    avisarCambioDescansos();
+    return;
+  }
   const v = id ? ACTIVE_REST_TIMERS[id] : null;
   if (!v) return;
-  const ahora = Date.now();
   if (ev.accion === "cerrar") {
     delete ACTIVE_REST_TIMERS[id];
     if (ACTIVE_REST_TIMERS.__notifOwner === id) delete ACTIVE_REST_TIMERS.__notifOwner;
@@ -21380,7 +21448,33 @@ function estadoDeWidgets({ profile, logs, cycleStart }) {
   }
   const info = cycleStart ? getWeekInfo(cycleStart, getProfileSettings(profile)) : null;
   const faltan = info ? info.trainWeeks + 1 - info.weekInCycle : 0;
+  // LOS WIDGETS QUE SE TOCAN (14/11; TodayWidgetPlugin v3, APK 1.0.28):
+  // Suplementos, Empezar a entrenar, Descanso rápido y La semana en una tira.
+  // El teléfono elige qué mostrar por la fecha, así que va una agenda de ocho
+  // días: aunque no abras la app, mañana el widget dice lo de mañana.
+  const st = getProfileSettings(profile);
+  const descansos = { largo: st.restLong || REST_LONG, corto: st.restShort || REST_SHORT };
+  const sesion = profile.activeSession || null;
+  const agenda = Array.from({ length: 8 }, (_, i) => {
+    const d = new Date(hoy); d.setDate(d.getDate() + i);
+    const f = localDateStr(d);
+    const key = i === 0 ? (sesion?.dayKey && ROUTINE[sesion.dayKey] ? sesion.dayKey : dayKey) : sched[todayWeekdayKey(d)];
+    const dd = key ? ROUTINE[key] : null;
+    const nombre = DIAS_DE_LA_SEMANA[(d.getDay() + 6) % 7];
+    if (!dd) return { f, dia: nombre };
+    const ej = (dd.exercises || []).length;
+    return { f, dia: nombre, key, titulo: String(dd.label || key), color: dd.color || "", ej, min: ej ? minutosDelDia(dd.exercises, descansos) : 0, series: seriesDe(dd) };
+  });
+  const tiempos = [...new Set([descansos.corto, descansos.largo, 60, 90, 120, 180, 240])].filter((x) => x > 0).slice(0, 4).sort((a, b) => a - b);
   return {
+    v: 3,
+    fecha: hoyStr,
+    agenda,
+    ahora: { hechas, listo: hoyW.estado === "hecho", sesion: !!sesion },
+    tira: { lunes: localDateStr(lunes), dias: dias.map((x) => ({ s: x.series, c: x.color })), racha, hechos, planeados },
+    sup: suplementosParaWidget(profile.suplementos, profile.suplementosTomas, hoyStr),
+    descanso: { tiempos, tuyos: [descansos.corto, descansos.largo], alerta: ALERTA_DESCANSO },
+    // Lo de abajo es para el APK 1.0.27 (los tres widgets de antes).
     hoy: hoyW,
     semana: { dias, cuenta: planeados ? `${hechos} de ${planeados}` : String(hechos), pie: racha >= 2 ? `${racha} semanas seguidas` : "" },
     ciclo: info ? {
@@ -21945,6 +22039,181 @@ function AvatarCropModal({ src, onCancel, onConfirm }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// LOS SUPLEMENTOS (14/11, pedido: "un widget de suplementación: tocás el scoop
+// de creatina y queda tomada"). Se cargan acá, en Perfil, y se anotan con un
+// toque acá o desde los widgets de la pantalla de inicio (WidgetDibujo.java
+// dibuja estas mismas formas: si cambiás una, cambiala allá). La lógica está
+// en src/suplementos.js. Quedan en el teléfono: no suben a la nube (no están
+// en CLOUD_PROFILE_FIELDS), así no cambia la declaración de datos de Play.
+// ═══════════════════════════════════════════════════════════════════
+// LOS WIDGETS, DESDE LA APP (plugin v3): Android muestra su cartel con
+// "Agregar" y el widget queda en la pantalla de inicio, sin buscarlo en el
+// menú del lanzador (el usuario no los encontraba). `cual` es el lugar en
+// ModusWidget.TABLA (Java).
+const WIDGETS_DE_INICIO = [
+  { cual: 1, nombre: "Suplementos", tam: "4 × 1" },
+  { cual: 0, nombre: "Un suplemento", tam: "1 × 1" },
+  { cual: 2, nombre: "Suplementos, cuadrado", tam: "2 × 2" },
+  { cual: 4, nombre: "Empezar a entrenar", tam: "4 × 1" },
+  { cual: 3, nombre: "Empezar, chico", tam: "2 × 1" },
+  { cual: 5, nombre: "Descanso rápido", tam: "4 × 1" },
+  { cual: 6, nombre: "Descanso, con el reloj", tam: "2 × 2" },
+  { cual: 7, nombre: "La semana", tam: "4 × 1" },
+];
+const A_MANO_AL_INICIO = "Tu teléfono no deja agregarlo desde acá. Mantené apretado un lugar vacío de la pantalla de inicio, Widgets, Modus Fit.";
+async function fijarWidget(cual) {
+  try { return !!(await TodayWidget.fijar({ cual }))?.pedido; } catch { return false; }
+}
+function WidgetsDeInicio() {
+  const [version, setVersion] = useState(0);
+  const [aviso, setAviso] = useState(null);
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    TodayWidget.info().then((x) => setVersion(Number(x?.version) || 0)).catch(() => {});
+  }, []);
+  if (version < 3) return null;
+  return (
+    <CollapsibleSection title="Widgets" subtitle="Para la pantalla de inicio" icon={<LayoutGrid size={16} />}>
+      <div className="widgets-lista">
+        {WIDGETS_DE_INICIO.map((w) => (
+          <div key={w.cual} className="widgets-renglon">
+            <span className="widgets-nombre">{w.nombre}<small className="num-display">{w.tam}</small></span>
+            <button onClick={async () => setAviso((await fijarWidget(w.cual)) ? null : A_MANO_AL_INICIO)} className="boton-tonal" aria-label={`Agregar ${w.nombre} a la pantalla de inicio`}>Agregar</button>
+          </div>
+        ))}
+      </div>
+      {aviso && <p className="sup-nota mt-3" role="status">{aviso}</p>}
+    </CollapsibleSection>
+  );
+}
+
+function IconoSuplemento({ forma, size = 22 }) {
+  const comun = { width: size, height: size, viewBox: "0 0 24 24", "aria-hidden": true };
+  if (forma === "scoop") return <svg {...comun}><path d="M3 9h11v3.5a5.5 5.5 0 0 1-11 0z" fill="currentColor" /><path d="M14 10.5h7" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" /></svg>;
+  if (forma === "pastilla") return <svg {...comun} fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="8" /><path d="M6.5 17.5 17.5 6.5" /></svg>;
+  if (forma === "shaker") return <svg {...comun} fill="currentColor"><path d="M7 8h10l-1 13H8z" /><rect x="6" y="4.5" width="12" height="3" rx="1" /><rect x="10" y="2" width="4" height="2.5" rx="1" /></svg>;
+  if (forma === "gota") return <svg {...comun}><path d="M12 3c3.5 4.3 6 7.4 6 10.6a6 6 0 0 1-12 0c0-3.2 2.5-6.3 6-10.6z" fill="currentColor" /></svg>;
+  return <svg {...comun}><g transform="rotate(-35 12 12)"><path d="M6.5 8H12v8H6.500a4 4 0 0 1 0-8z" fill="currentColor" /><rect x="2.5" y="8" width="19" height="8" rx="4" fill="none" stroke="currentColor" strokeWidth="2" /></g></svg>;
+}
+// El aro de un suplemento: vacío, con la parte tomada (si son varias por día)
+// o lleno con su color.
+function AroSuplemento({ sup, n, size = 46 }) {
+  const lleno = n >= sup.dosis;
+  return (
+    <span className={`sup-aro ${lleno ? "tomada" : ""}`} style={{ "--c": sup.color, width: size, height: size }}>
+      {!lleno && n > 0 && <svg className="sup-aro-parte" viewBox="0 0 46 46" aria-hidden="true"><circle cx="23" cy="23" r="21.5" pathLength="1" strokeDasharray={`${n / sup.dosis} 1`} /></svg>}
+      <IconoSuplemento forma={sup.forma} size={Math.round(size * 0.5)} />
+    </span>
+  );
+}
+function SuplementoEditor({ inicial, esNuevo, onGuardar, onEliminar, onCancelar }) {
+  const [d, setD] = useState(inicial);
+  const [borrar, setBorrar] = useState(false);
+  const listo = d.nombre.trim().length > 0;
+  return (
+    <div className="sup-editor bounce-in">
+      {esNuevo && (
+        <div className="sup-sugeridos" role="group" aria-label="Los más comunes">
+          {SUGERIDOS.map((x) => (
+            <button key={x.nombre} onClick={() => setD((v) => ({ ...v, ...x }))} className={d.nombre === x.nombre ? "activo" : ""}>{x.nombre}</button>
+          ))}
+        </div>
+      )}
+      <input value={d.nombre} onChange={(e) => setD((v) => ({ ...v, nombre: e.target.value.slice(0, 24) }))} placeholder="Nombre" aria-label="Nombre del suplemento" className="sup-nombre-campo" />
+      <div className="sup-formas" role="group" aria-label="Forma">
+        {FORMAS.map((f) => (
+          <button key={f} onClick={() => setD((v) => ({ ...v, forma: f }))} aria-pressed={d.forma === f} className={d.forma === f ? "activo" : ""} style={{ "--c": d.color }}>
+            <IconoSuplemento forma={f} size={20} /><span>{NOMBRE_DE_FORMA[f]}</span>
+          </button>
+        ))}
+      </div>
+      <div className="sup-colores" role="group" aria-label="Color">
+        {COLORES_SUPLEMENTO.map((c) => (
+          <button key={c} onClick={() => setD((v) => ({ ...v, color: c }))} aria-pressed={d.color === c} aria-label={`Color ${COLORES_SUPLEMENTO.indexOf(c) + 1}`} className={d.color === c ? "activo" : ""} style={{ "--c": c }} />
+        ))}
+      </div>
+      <AjustePasos rotulo="Tomas por día" valor={d.dosis} menos="Una toma menos" mas="Una toma más"
+        onMenos={() => setD((v) => ({ ...v, dosis: Math.max(1, v.dosis - 1) }))} onMas={() => setD((v) => ({ ...v, dosis: Math.min(MAX_DOSIS, v.dosis + 1) }))} />
+      <div className="sup-editor-pie">
+        {!esNuevo && (borrar
+          ? <button onClick={onEliminar} className="enlace-suave sup-borrar confirmar">Tocá de nuevo para borrarlo</button>
+          : <button onClick={() => setBorrar(true)} className="enlace-suave sup-borrar">Borrar</button>)}
+        <button onClick={onCancelar} className="enlace-suave">Cancelar</button>
+        <button onClick={() => listo && onGuardar({ ...d, nombre: d.nombre.trim() })} disabled={!listo} className="boton-pildora">{esNuevo ? "Agregar" : "Guardar"}</button>
+      </div>
+    </div>
+  );
+}
+function Suplementos({ profile, onUpdateProfile }) {
+  const lista = useMemo(() => listaDeSuplementos(profile?.suplementos), [profile?.suplementos]);
+  const tomas = profile?.suplementosTomas || {};
+  const hoy = todayStr();
+  const [editando, setEditando] = useState(null); // un id, "nuevo" o null
+  const [aMano, setAMano] = useState(false);
+  const tomarUno = (sup) => {
+    haptic(tomadas(tomas, hoy, sup.id) + 1 >= sup.dosis ? [0, 18, 40, 18] : 12);
+    onUpdateProfile({ suplementosTomas: recortarTomas(tomar(tomas, hoy, sup), hoy) });
+  };
+  const guardar = (datos) => {
+    const limpio = editando === "nuevo" ? nuevoSuplemento(datos, lista) : sanearSuplemento({ ...datos, id: editando });
+    if (!limpio) return;
+    onUpdateProfile({ suplementos: editando === "nuevo" ? [...lista, limpio] : lista.map((x) => (x.id === editando ? limpio : x)) });
+    setEditando(null);
+  };
+  const subir = (i) => {
+    if (i <= 0) return;
+    const l = lista.slice();
+    [l[i - 1], l[i]] = [l[i], l[i - 1]];
+    onUpdateProfile({ suplementos: l });
+  };
+  return (
+    <div className="sup">
+      {lista.length > 0 && (
+        <div className="sup-hoy" role="group" aria-label="Los de hoy">
+          {lista.map((sup) => {
+            const n = tomadas(tomas, hoy, sup.id);
+            return (
+              <button key={sup.id} onClick={() => tomarUno(sup)} className="sup-toma" aria-pressed={n >= sup.dosis} aria-label={`${sup.nombre}: ${n} de ${sup.dosis} ${sup.dosis === 1 ? "toma" : "tomas"} hoy`}>
+                <AroSuplemento sup={sup} n={n} />
+                <span className="sup-toma-nombre">{sup.nombre}</span>
+                {sup.dosis > 1 && <span className="sup-toma-cuenta num-display">{n}/{sup.dosis}</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {lista.length === 0 && editando !== "nuevo" && <p className="sup-vacio">Cargá lo que tomás y anotalo con un toque, acá o desde la pantalla de inicio.</p>}
+      {lista.length > 0 && (
+        <div className="sup-lista">
+          {lista.map((sup, i) => {
+            const racha = rachaDe(tomas, sup, hoy);
+            return editando === sup.id ? (
+              <SuplementoEditor key={sup.id} inicial={sup} onGuardar={guardar} onCancelar={() => setEditando(null)}
+                onEliminar={() => { onUpdateProfile({ suplementos: lista.filter((x) => x.id !== sup.id) }); setEditando(null); }} />
+            ) : (
+              <div key={sup.id} className="sup-renglon" style={{ "--c": sup.color }}>
+                <button onClick={() => setEditando(sup.id)} className="sup-renglon-datos" aria-label={`Editar ${sup.nombre}`}>
+                  <span className="sup-renglon-nombre">{sup.nombre}<small>{sup.dosis === 1 ? "1 por día" : `${sup.dosis} por día`}{racha >= 2 ? ` · ${racha} días seguidos` : ""}</small></span>
+                  <span className="sup-dias" aria-hidden="true">{ultimosDias(tomas, sup, hoy).map((x) => <i key={x.fecha} className={x.parte >= 1 ? "si" : x.parte > 0 ? "parte" : ""} />)}</span>
+                </button>
+                {i > 0 && <button onClick={() => subir(i)} className="sup-subir" aria-label={`Subir ${sup.nombre} un lugar`}><ChevronUp size={16} /></button>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {editando === "nuevo"
+        ? <SuplementoEditor esNuevo inicial={{ nombre: "", forma: "capsula", color: COLORES_SUPLEMENTO.find((c) => !lista.some((x) => x.color === c)) || COLORES_SUPLEMENTO[0], dosis: 1 }} onGuardar={guardar} onCancelar={() => setEditando(null)} />
+        : lista.length < MAX_SUPLEMENTOS && <button onClick={() => setEditando("nuevo")} className="boton-tonal sup-agregar"><Plus size={15} /> Agregar suplemento</button>}
+      {Capacitor.isNativePlatform() && lista.length > 0 && editando == null && (
+        <button onClick={async () => setAMano(!(await fijarWidget(1)))} className="enlace-suave sup-al-inicio">Poner el widget en la pantalla de inicio</button>
+      )}
+      {aMano && <p className="sup-nota" role="status">{A_MANO_AL_INICIO}</p>}
+    </div>
+  );
+}
+
 function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfile, cycleStart, onSetCycleStart, onGoToRoutines, onGoToSocial = null, openSectionSignal = { id: null, n: 0 }, onOpenFieldPreview = null, onSignalConsumed = null }) {
   const profile = profiles[profileName];
   const [showDeletePin, setShowDeletePin] = useState(false); const [deleteError, setDeleteError] = useState("");
@@ -22409,6 +22678,11 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
         />
       )}
 
+      <CollapsibleSection title="Suplementos" sectionId="suplementos" forceOpenSignal={openSectionSignal.id === "suplementos" ? openSectionSignal.n : 0} icon={<IconoSuplemento forma="capsula" size={17} />}
+        subtitle={(() => { const l = listaDeSuplementos(profile?.suplementos); if (!l.length) return "Creatina, proteína, lo que tomes"; const h = l.filter((x) => tomadas(profile?.suplementosTomas, todayStr(), x.id) >= x.dosis).length; return `${h} de ${l.length} hoy`; })()}>
+        <Suplementos profile={profile} onUpdateProfile={onUpdateProfile} />
+      </CollapsibleSection>
+
       <CollapsibleSection title="Descansos" subtitle={`${formatTime(settings.restShort)} – ${formatTime(settings.restLong)}`} icon={<Timer size={16} />} accent="#14B8A6">
         <EstadoAvisosDescanso />
         <div><p className="ajuste-rotulo mb-2">Aviso al terminar</p><div className="segmentado">{[{ k: "sound", l: "Sonido" }, { k: "vibration", l: "Vibración" }, { k: "both", l: "Ambos" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ alertType: opt.k })} aria-pressed={settings.alertType === opt.k} className={settings.alertType === opt.k ? "activo" : ""}>{opt.l}</button>)}</div></div>
@@ -22487,6 +22761,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
       <section className="grupo-ajustes" aria-label="La app">
       <p className="grupo-ajustes-titulo">La app</p>
       <div className="grupo-ajustes-placa">
+      <WidgetsDeInicio />
       <CollapsibleSection title="Avisos" subtitle={settings.reminderEnabled ? `Recordatorio a las ${settings.reminderTime}` : "Recordatorio apagado"} icon={<Bell size={16} />} accent="#F59E0B">
         <div className="space-y-3">
           <ToggleRow
@@ -33724,7 +33999,49 @@ export default function App() {
     }, 1500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.weekSchedule, profile?.trainingSessions, activeProfile, logs, cycleStart]);
+  }, [profile?.weekSchedule, profile?.trainingSessions, profile?.suplementos, profile?.suplementosTomas, profile?.activeSession, profile?.settings?.restShort, profile?.settings?.restLong, activeProfile, logs, cycleStart]);
+
+  // LO QUE SE TOCÓ EN UN WIDGET (plugin v3). "Empezar" abre la app y arranca
+  // la sesión del día; un suplemento se anota en el teléfono con la app
+  // cerrada, y acá se junta con lo anotado en la app (gana el toque más
+  // nuevo de cada uno: unirTomas).
+  const unirTomasRef = useRef(null);
+  useEffect(() => {
+    unirTomasRef.current = (nativas) => {
+      if (!activeProfile || !nativas) return;
+      setProfiles((prev) => {
+        const cur = prev[activeProfile];
+        if (!cur) return prev;
+        const unidas = unirTomas(cur.suplementosTomas || {}, nativas);
+        if (unidas === (cur.suplementosTomas || unidas) && cur.suplementosTomas) return prev;
+        if (!cur.suplementosTomas && !Object.keys(unidas).length) return prev;
+        const np = { ...prev, [activeProfile]: { ...cur, suplementosTomas: unidas } };
+        saveProfiles(np);
+        return np;
+      });
+    };
+  });
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return undefined;
+    let handle = null;
+    let vivo = true;
+    const traerTomas = () => { try { TodayWidget.tomas().then((r) => unirTomasRef.current?.(r?.tomas)).catch(() => {}); } catch { /* APK anterior */ } };
+    try {
+      TodayWidget.addListener("accion", (ev) => {
+        if (ev?.accion === "tomas") { traerTomas(); return; }
+        if (ev?.accion === "suplementos") { goToSection("perfil", "suplementos"); return; }
+        if (ev?.accion === "iniciar" || ev?.accion === "rutina") {
+          setTab("rutina");
+          const ctx = notifCtxRef.current || {};
+          if (ev.accion === "iniciar" && ev.dayKey && ev.fecha === todayStr() && !ctx.profile?.activeSession) iniciarSesionRef.current?.(ev.dayKey);
+        }
+      }).then((h) => { if (vivo) handle = h; else h.remove(); }).catch(() => {});
+    } catch { /* APK sin el evento */ }
+    const alVolver = () => { if (document.visibilityState === "visible") traerTomas(); };
+    document.addEventListener("visibilitychange", alVolver);
+    const t = setTimeout(traerTomas, 1200);
+    return () => { vivo = false; handle?.remove(); document.removeEventListener("visibilitychange", alVolver); clearTimeout(t); };
+  }, []);
 
   // MIGRACIÓN AUTOMÁTICA DE LA FOTO DE PERFIL: las fotos puestas con
   // versiones anteriores quedaron SOLO en IndexedDB del dispositivo (nunca

@@ -5,12 +5,12 @@
     android:targetCellWidth="2"
     android:targetCellHeight="2"
     android:minResizeWidth="110dp"
-    android:minResizeHeight="60dp"
-    android:updatePeriodMillis="10800000"
-    android:initialLayout="@layout/today_widget"
+    android:minResizeHeight="110dp"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/widget_zonas"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"
-    android:previewImage="@mipmap/ic_launcher"
-    android:label="@string/cycle_widget_label"
-    android:description="@string/cycle_widget_description">
+    android:previewImage="@drawable/vista_sup_cuadro"
+    android:label="@string/w_sup_cuadro"
+    android:description="@string/w_sup_cuadro_d">
 </appwidget-provider>

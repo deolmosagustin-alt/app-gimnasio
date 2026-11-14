@@ -79,7 +79,41 @@ final class Descanso {
     }
 
     static void guardar(Context c, JSONObject e) {
-        prefs(c).edit().putString("estado", e != null ? e.toString() : null).apply();
+        // commit y no apply: el widget del descanso se repinta acá mismo y
+        // tiene que leer lo recién guardado.
+        prefs(c).edit().putString("estado", e != null ? e.toString() : null).commit();
+        ModusWidget.pintarLos(c.getApplicationContext(), "descanso");
+    }
+
+    // EL DESCANSO RÁPIDO (v16): arranca desde el widget, sin la app. Es un
+    // descanso como cualquiera (la misma notificación, la misma alarma); la
+    // app lo adopta por el evento "iniciar" (aplicarEventoNativo en App.jsx).
+    static void iniciarRapido(Context c, int segundos) {
+        long ahora = System.currentTimeMillis();
+        try {
+            JSONObject cfg = ModusWidget.estado(c).optJSONObject("descanso");
+            JSONObject e = new JSONObject();
+            e.put("id", "widget-" + ahora);
+            e.put("titulo", "Descanso");
+            e.put("cuerpo", "");
+            e.put("subtitulo", "Descanso");
+            e.put("tituloFin", "Terminó el descanso");
+            e.put("cuerpoFin", "Te toca la próxima serie.");
+            e.put("detalle", "Descanso de " + reloj(segundos));
+            e.put("detalleFin", "Descansaste " + reloj(segundos));
+            e.put("alerta", cfg != null ? cfg.optString("alerta", "sound") : "sound");
+            e.put("color", ACENTO);
+            e.put("duracion", segundos);
+            e.put("estado", "corre");
+            e.put("fin", ahora + segundos * 1000L);
+            e.put("avisado", false);
+            guardar(c, e);
+            programarFin(c, e.optLong("fin"));
+            publicar(c, e, false);
+            anotar(c, e, "iniciar");
+        } catch (Exception ex) {
+            Log.w(TAG, "No se pudo iniciar el descanso rápido: " + ex);
+        }
     }
 
     private static SharedPreferences prefs(Context c) {

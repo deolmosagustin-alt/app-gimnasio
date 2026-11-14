@@ -1,6 +1,4 @@
 package com.agustin.fitness;
 
-/** El widget "Hoy te toca": el día, la barra con sus series y el botón. */
-public class TodayWidgetProvider extends ModusWidget {
-    @Override protected String tipo() { return "hoy"; }
-}
+/** Empezar a entrenar: lo de hoy y el botón que arranca la sesión (antes, Hoy te toca). */
+public class TodayWidgetProvider extends ModusWidget { }

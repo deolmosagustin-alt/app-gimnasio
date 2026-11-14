@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- La onda al tocar una zona de un widget: suave y con las puntas redondas. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#2EFFFFFF">
+    <item android:id="@android:id/mask">
+        <shape android:shape="rectangle">
+            <corners android:radius="18dp"/>
+            <solid android:color="#FFFFFFFF"/>
+        </shape>
+    </item>
+</ripple>

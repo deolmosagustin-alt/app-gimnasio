@@ -63,14 +63,53 @@
         <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.fileprovider" android:exported="false" android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths"/>
         </provider>
-        <!--  Widget de pantalla de inicio "Hoy toca" — ver TodayWidgetProvider
-                     y TodayWidgetPlugin (el puente que la app JS usa para mandarle
-                     el texto del día).  -->
-        <receiver android:name=".TodayWidgetProvider" android:exported="true">
+        <!--  Los widgets de la pantalla de inicio (14/11/2026): Suplementos,
+                     Empezar a entrenar, Descanso rápido y La semana, cada uno en
+                     sus tamaños. Los dibuja WidgetDibujo; qué es cada proveedor
+                     está en ModusWidget.TABLA. TodayWidgetProvider y
+                     WeekWidgetProvider conservan su nombre para que los que ya
+                     estaban puestos pasen solos al diseño nuevo.  -->
+        <receiver android:name=".TodayWidgetProvider" android:exported="true" android:label="@string/today_widget_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/today_widget_info"/>
+        </receiver>
+        <receiver android:name=".EmpezarChicoWidget" android:exported="true" android:label="@string/w_empezar_chico">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/empezar_chico_info"/>
+        </receiver>
+        <receiver android:name=".SupFilaWidget" android:exported="true" android:label="@string/w_sup_fila">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/sup_fila_info"/>
+        </receiver>
+        <receiver android:name=".SupUnoWidget" android:exported="true" android:label="@string/w_sup_uno">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/sup_uno_info"/>
+        </receiver>
+        <receiver android:name=".SupCuadroWidget" android:exported="true" android:label="@string/w_sup_cuadro">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/sup_cuadro_info"/>
+        </receiver>
+        <receiver android:name=".DescansoFilaWidget" android:exported="true" android:label="@string/w_descanso_fila">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/descanso_fila_info"/>
+        </receiver>
+        <receiver android:name=".DescansoCuadroWidget" android:exported="true" android:label="@string/w_descanso_cuadro">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/descanso_cuadro_info"/>
         </receiver>
         <receiver android:name=".WeekWidgetProvider" android:exported="true" android:label="@string/week_widget_label">
             <intent-filter>
@@ -78,12 +117,9 @@
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/week_widget_info"/>
         </receiver>
-        <receiver android:name=".CycleWidgetProvider" android:exported="true" android:label="@string/cycle_widget_label">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
-            </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/cycle_widget_info"/>
-        </receiver>
+        <!--  Lo que se toca en un widget y no abre la app: anotar un
+                     suplemento y arrancar un descanso. Sólo la propia app le manda intents.  -->
+        <receiver android:name=".WidgetAcciones" android:exported="false"/>
         <!--  Los botones de la notificación del descanso (Pausar, Seguir,
                      +15 s, Reiniciar, Cerrar) y la alarma del final (plugin v13,
                      ver Descanso.java). Sólo la propia app le manda intents.  -->

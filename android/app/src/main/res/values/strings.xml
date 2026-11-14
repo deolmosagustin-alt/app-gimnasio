@@ -3,10 +3,20 @@
     <string name="app_name">Modus Fit</string>
     <string name="title_activity_main">Modus Fit</string>
     <string name="server_client_id">1027242959052-b9i0hq3fc2rbfoqr48chkpkkir2qu4e6.apps.googleusercontent.com</string>
-    <string name="today_widget_label">Hoy te toca</string>
-    <string name="today_widget_description">El día que te toca hoy, la barra con tus series y un toque para empezar.</string>
+    <string name="today_widget_label">Empezar a entrenar</string>
+    <string name="today_widget_description">Lo que toca hoy y el botón que arranca la sesión.</string>
+    <string name="w_empezar_chico">Empezar (chico)</string>
+    <string name="w_empezar_chico_d">Lo de hoy y el botón de empezar, en media fila.</string>
+    <string name="w_sup_uno">Un suplemento</string>
+    <string name="w_sup_uno_d">Un bloque por suplemento: lo tocás y queda tomado.</string>
+    <string name="w_sup_fila">Suplementos</string>
+    <string name="w_sup_fila_d">Tus suplementos en una fila. Tocás uno y queda tomado.</string>
+    <string name="w_sup_cuadro">Suplementos (cuadrado)</string>
+    <string name="w_sup_cuadro_d">Tus suplementos de a dos filas, con cuántos llevás hoy.</string>
+    <string name="w_descanso_fila">Descanso rápido</string>
+    <string name="w_descanso_fila_d">Tocás un tiempo y arranca el reloj del descanso.</string>
+    <string name="w_descanso_cuadro">Descanso (cuadrado)</string>
+    <string name="w_descanso_cuadro_d">El reloj del descanso, con pausa y cerrar.</string>
     <string name="week_widget_label">La semana</string>
-    <string name="week_widget_description">La tarjeta de la semana: los días que fuiste y tu racha.</string>
-    <string name="cycle_widget_label">El ciclo</string>
-    <string name="cycle_widget_description">Los cajones del ciclo: en qué semana estás y cuánto falta para la descarga.</string>
+    <string name="week_widget_description">Los días que fuiste esta semana y tu racha.</string>
 </resources>
