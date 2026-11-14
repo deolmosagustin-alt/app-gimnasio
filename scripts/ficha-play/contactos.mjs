@@ -9,7 +9,7 @@ const ANCHO = process.argv[5] || "300";
 const req = createRequire(join(RAIZ, "package.json"));
 const pw = await import(pathToFileURL(req.resolve("playwright")).href);
 const chromium = pw.chromium || pw.default.chromium;
-const n = ["01-serie", "02-grafica", "03-plan", "04-musculos", "05-ia", "06-ticket", "07-amigos", "08-rutinas"];
+const n = ["01-serie", "02-grafica", "03-plan", "04-musculos", "05-ia", "06-widgets", "07-amigos", "08-rutinas"];
 const w = Number(ANCHO), h = Math.round(w * 1920 / 1080);
 const html = `<!doctype html><html><body style="margin:0;background:#888;display:grid;grid-template-columns:repeat(4,${w}px);gap:8px;padding:8px;width:${4 * w + 40}px">
 ${n.map((x) => `<img src="${pathToFileURL(join(CARPETA, x + ".png")).href}" style="width:${w}px;height:${h}px;display:block">`).join("")}

@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { TITULO, FICHAS, revisar } from "./textos.mjs";
 const [CLAVE, FICHA] = process.argv.slice(2);
 const PROBAR = process.argv.includes("--probar");
-const CAPTURAS = ["01-serie", "02-grafica", "03-plan", "04-musculos", "05-ia", "06-ticket", "07-amigos", "08-rutinas"];
+const CAPTURAS = ["01-serie", "02-grafica", "03-plan", "04-musculos", "05-ia", "06-widgets", "07-amigos", "08-rutinas"];
 
 const fallas = revisar();
 for (const f of Object.values(FICHAS)) {
