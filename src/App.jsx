@@ -519,6 +519,28 @@ function tamanoEnNube(cuerpo) { return new Blob([cuerpo]).size; }
 // salían todas juntas al volver. Ahora, mientras una está en camino, las
 // siguientes se juntan en una sola, con lo último.
 const SUBIENDO = new Map(); // uid → { siguiente: perfil | null }
+// AL ABRIR, ANTES DE LA PRIMERA SUBIDA (13/11): la subida es un setDoc del
+// perfil del teléfono, que pisa la nube entera. Si en la nube hay una sesión
+// del mismo día y la misma fecha pero más larga que la del teléfono (una
+// sesión de prueba de un minuto le había ganado a la de la mañana, de 44), se
+// queda la más larga, acá y en el teléfono. Sólo REEMPLAZA sesiones que ya
+// están en los dos lados: no agrega ni revive nada que hayas borrado.
+const REVISADO_AL_ABRIR = new Set();
+let alCorregirSesiones = null;
+function registrarCorreccionDeSesiones(fn) { alCorregirSesiones = fn; }
+function sesionesMasLargas(local = [], nube = []) {
+  if (!Array.isArray(local) || !Array.isArray(nube)) return null;
+  const firma = (x) => `${x.date}|${x.dayKey ?? x.day ?? ""}`;
+  const dura = (x) => (x?.startedAt && x?.endedAt ? Math.max(0, new Date(x.endedAt) - new Date(x.startedAt)) : 0);
+  let cambio = false;
+  const out = local.map((x) => {
+    if (local.filter((y) => firma(y) === firma(x)).length !== 1) return x;
+    const mejor = nube.filter((y) => y && firma(y) === firma(x) && y.startedAt !== x.startedAt).sort((a, b) => dura(b) - dura(a))[0];
+    if (mejor && dura(mejor) > dura(x)) { cambio = true; return mejor; }
+    return x;
+  });
+  return cambio ? out : null;
+}
 async function syncProfileToCloud(uid, profile, requireAuth = false) {
   const enCurso = SUBIENDO.get(uid);
   if (enCurso && !requireAuth) { enCurso.siguiente = profile; return; }
@@ -543,6 +565,14 @@ async function subirPerfil(uid, profile, requireAuth) {
     if (!firebaseUser || firebaseUser.uid !== uid) {
       if (requireAuth) throw new Error("NO_AUTH");
       return; // sync automático: fallar silenciosamente, reintentar después
+    }
+    if (!ULTIMA_SUBIDA.has(uid) && !REVISADO_AL_ABRIR.has(uid)) {
+      REVISADO_AL_ABRIR.add(uid);
+      try {
+        const snap = await getDoc(doc(db, "users", uid));
+        const corregidas = snap.exists() ? sesionesMasLargas(profile.trainingSessions, snap.data().trainingSessions) : null;
+        if (corregidas) { profile = { ...profile, trainingSessions: corregidas }; alCorregirSesiones?.(uid, corregidas); }
+      } catch (e) { console.warn("[sync] no se pudo comparar con la nube al abrir:", e?.message || e); }
     }
     const data = profileToCloud(profile);
     const cuerpo = JSON.stringify(data);
@@ -34086,6 +34116,20 @@ export default function App() {
     setProfiles((prev) => { const np = { ...prev }; delete np[activeProfile]; saveProfiles(np); return np; });
     saveActive(null); setActiveProfile(null); setJustLoggedOut(true); setShowHelp(false); setHelpStartTab(null);
   };
+  // Lo que la primera subida corrigió contra la nube (ver sesionesMasLargas)
+  // también queda en el teléfono.
+  useEffect(() => {
+    registrarCorreccionDeSesiones((uid, sesiones) => {
+      setProfiles((prev) => {
+        const nombre = Object.keys(prev).find((k) => prev[k]?.googleUid === uid);
+        if (!nombre) return prev;
+        const np = { ...prev, [nombre]: { ...prev[nombre], trainingSessions: sesiones } };
+        saveProfiles(np);
+        return np;
+      });
+    });
+    return () => registrarCorreccionDeSesiones(null);
+  }, []);
   const handleUpdateProfile = (updates) => {
     // Si el cambio toca el LARGO del ciclo (semanas de entrenamiento o de
     // descarga), se corre la fecha de inicio para que hoy sigas en la misma
