@@ -24,6 +24,7 @@ const LARGA_VOS = `Modus Fit es tu registro de entrenamiento para el gimnasio: a
 • Reps y kilos se ajustan con − y +, sin abrir el teclado. En kilos o en libras, y con el salto de peso de cada máquina.
 • El cronómetro de descanso arranca solo al guardar la serie, te avisa al terminar y queda siempre a la vista.
 • La barra del día se carga con un disco por serie: cuando está llena, terminaste.
+• Widgets para la pantalla de inicio: anotá tus suplementos, empezá la sesión o arrancá el descanso con un toque.
 
 <b>Un plan que progresa como el de un entrenador</b>
 • Sobrecarga progresiva con doble progresión: primero suben las reps y, al llegar al tope del rango, el peso, de a poco.
@@ -60,6 +61,7 @@ const LARGA_TU = `Modus Fit es tu registro de entrenamiento para el gimnasio: an
 • Reps y kilos se ajustan con − y +, sin abrir el teclado. En kilos o en libras, y con el salto de peso de cada máquina.
 • El cronómetro de descanso arranca solo al guardar la serie, te avisa al terminar y queda siempre a la vista.
 • La barra del día se carga con un disco por serie: cuando está llena, terminaste.
+• Widgets para la pantalla de inicio: anota tus suplementos, empieza la sesión o inicia el descanso con un toque.
 
 <b>Un plan que progresa como el de un entrenador</b>
 • Sobrecarga progresiva con doble progresión: primero suben las reps y, al llegar al tope del rango, el peso, poco a poco.

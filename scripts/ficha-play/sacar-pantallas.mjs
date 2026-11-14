@@ -152,7 +152,7 @@ try {
   // El planificador, lleno como un entrenador.
   {
     const p = await nueva("rutina");
-    await clic(p.locator('section[aria-label="Tu plan"]').getByRole("button", { name: /Planificar/ }).first());
+    await clic(p.locator('section[aria-label="Tu plan"]').getByRole("button", { name: /Planificar|Ver el plan/ }).first());
     await p.waitForTimeout(1200);
     await clic(p.getByRole("button", { name: /Llenar el ciclo/ }).first());
     await p.waitForTimeout(800);
@@ -165,7 +165,7 @@ try {
     const p = await nueva(demo, fecha);
     await foto(p, n);
     if (n === "social") {
-      const carrera = p.locator(".carrera").first();
+      const carrera = p.locator(".cesped, .carrera").first();
       if (await carrera.count()) { await subirA(p, carrera, 220); await recorte(p, "recorte-carrera", carrera, carrera, 3); }
     }
     await p.context().close();
