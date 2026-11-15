@@ -119,6 +119,42 @@
         </receiver>
         <!--  Lo que se toca en un widget y no abre la app: anotar un
                      suplemento y arrancar un descanso. Sólo la propia app le manda intents.  -->
+        <receiver android:name=".RutinaHoyWidget" android:exported="true" android:label="@string/w_rutina_hoy">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/rutina_hoy_info"/>
+        </receiver>
+        <receiver android:name=".MesWidget" android:exported="true" android:label="@string/w_mes">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/mes_info"/>
+        </receiver>
+        <receiver android:name=".SemanasWidget" android:exported="true" android:label="@string/w_semanas">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/semanas_info"/>
+        </receiver>
+        <receiver android:name=".RecordWidget" android:exported="true" android:label="@string/w_record">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/record_info"/>
+        </receiver>
+        <receiver android:name=".RachaWidget" android:exported="true" android:label="@string/w_racha">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/racha_info"/>
+        </receiver>
+        <receiver android:name=".SupSemanaWidget" android:exported="true" android:label="@string/w_sup_semana">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/sup_semana_info"/>
+        </receiver>
         <receiver android:name=".WidgetAcciones" android:exported="false"/>
         <!--  Los botones de la notificación del descanso (Pausar, Seguir,
                      +15 s, Reiniciar, Cerrar) y la alarma del final (plugin v13,

@@ -35,13 +35,22 @@ public abstract class ModusWidget extends AppWidgetProvider {
         {DescansoFilaWidget.class, "descanso", 320, 84},
         {DescansoCuadroWidget.class, "descanso", 160, 170},
         {WeekWidgetProvider.class, "tira", 320, 84},
+        // La tercera tanda (15/11): seis conceptos más. Van al final: "fijar" los pide por su lugar.
+        {RutinaHoyWidget.class, "lista", 320, 170},
+        {MesWidget.class, "mes", 160, 170},
+        {SemanasWidget.class, "columnas", 160, 170},
+        {RecordWidget.class, "record", 160, 84},
+        {RachaWidget.class, "racha", 76, 84},
+        {SupSemanaWidget.class, "sup7", 320, 170},
     };
 
     private static final int[][] ZONAS = {
         {R.id.wz00, R.id.wz01, R.id.wz02, R.id.wz03, R.id.wz04},
         {R.id.wz10, R.id.wz11, R.id.wz12, R.id.wz13, R.id.wz14},
+        {R.id.wz20, R.id.wz21, R.id.wz22, R.id.wz23, R.id.wz24},
+        {R.id.wz30, R.id.wz31, R.id.wz32, R.id.wz33, R.id.wz34},
     };
-    private static final int[] FILAS = {R.id.wzf0, R.id.wzf1};
+    private static final int[] FILAS = {R.id.wzf0, R.id.wzf1, R.id.wzf2, R.id.wzf3};
 
     static JSONObject estado(Context ctx) {
         SharedPreferences prefs = ctx.getSharedPreferences(TodayWidgetPlugin.PREFS_NAME, Context.MODE_PRIVATE);
@@ -126,13 +135,16 @@ public abstract class ModusWidget extends AppWidgetProvider {
             indice = Math.max(0, Arrays.binarySearch(ids, id));
         }
         String hoy = WidgetAcciones.hoy();
-        WidgetDibujo.Plano p = WidgetDibujo.plano(ctx, tipo, w, h, estado(ctx), hoy, WidgetAcciones.tomasDe(ctx, hoy), "descanso".equals(tipo) ? descansoVivo(ctx) : null, indice, false);
+        JSONObject est = estado(ctx);
+        // La semana de los suplementos necesita las tomas de los días de antes.
+        if ("sup7".equals(tipo)) { try { est.put("_tomas", WidgetAcciones.tomas(ctx)); } catch (Exception e) { /* sin historia */ } }
+        WidgetDibujo.Plano p = WidgetDibujo.plano(ctx, tipo, w, h, est, hoy, WidgetAcciones.tomasDe(ctx, hoy), "descanso".equals(tipo) ? descansoVivo(ctx) : null, indice, false);
 
         RemoteViews v = new RemoteViews(ctx.getPackageName(), R.layout.widget_zonas);
         v.setImageViewBitmap(R.id.modus_widget_imagen, p.bmp);
         v.setOnClickPendingIntent(R.id.today_widget_root, intento(ctx, p.raiz));
         v.setViewPadding(R.id.wz, p.pl, p.pt, p.pr, p.pb);
-        for (int f = 0; f < 2; f++) {
+        for (int f = 0; f < 4; f++) {
             v.setViewVisibility(FILAS[f], f < p.filas ? View.VISIBLE : View.GONE);
             for (int k = 0; k < 5; k++) {
                 boolean hay = f < p.filas && k < p.cols[f];

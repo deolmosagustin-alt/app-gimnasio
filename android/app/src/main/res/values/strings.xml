@@ -19,4 +19,16 @@
     <string name="w_descanso_cuadro_d">El reloj del descanso, con pausa y cerrar.</string>
     <string name="week_widget_label">La semana</string>
     <string name="week_widget_description">Los días que fuiste esta semana y tu racha.</string>
+    <string name="w_rutina_hoy">La rutina de hoy</string>
+    <string name="w_rutina_hoy_d">Los ejercicios de hoy con sus series y su carga, y el botón de empezar.</string>
+    <string name="w_mes">El mes</string>
+    <string name="w_mes_d">El calendario del mes, con cada día que fuiste en su color.</string>
+    <string name="w_semanas">Volumen por semana</string>
+    <string name="w_semanas_d">Cuánto levantaste esta semana, contra las siete anteriores.</string>
+    <string name="w_record">Tu último récord</string>
+    <string name="w_record_d">El último récord que rompiste: la serie y su 1RM estimado.</string>
+    <string name="w_racha">La racha</string>
+    <string name="w_racha_d">Tus semanas seguidas entrenando, en palitos de tiza.</string>
+    <string name="w_sup_semana">Suplementos de la semana</string>
+    <string name="w_sup_semana_d">Un renglón por suplemento, con los últimos siete días. Tocás uno y queda tomado.</string>
 </resources>

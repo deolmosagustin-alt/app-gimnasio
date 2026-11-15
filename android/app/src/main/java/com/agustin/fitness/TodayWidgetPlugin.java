@@ -32,7 +32,7 @@ public class TodayWidgetPlugin extends Plugin {
     public static final String PREFS_NAME = "modusfit_widget";
     public static final String KEY_LABEL = "today_label";
     public static final String KEY_ESTADO = "estado";
-    public static final int VERSION = 3;
+    public static final int VERSION = 4;
 
     private static volatile TodayWidgetPlugin vivo = null;
 
@@ -129,7 +129,7 @@ public class TodayWidgetPlugin extends Plugin {
     }
 
     /**
-     * Un widget como PNG. tipo: sup, sup1, empezar, descanso o tira; ancho y
+     * Un widget como PNG. tipo: sup, sup1, sup7, empezar, lista, descanso, tira, mes, columnas, record o racha; ancho y
      * alto en dp; estado, el de muestra (o el guardado); vivo, un descanso de
      * muestra; indice, cuál suplemento en "sup1".
      */
@@ -151,6 +151,7 @@ public class TodayWidgetPlugin extends Plugin {
                 tomas = WidgetAcciones.tomasDe(getContext(), hoy);
             }
             JSObject v = call.getObject("vivo", null);
+            if ("sup7".equals(tipo) && estado == null) datos.put("_tomas", WidgetAcciones.tomas(getContext()));
             JSONObject vivoD = v != null ? new JSONObject(v.toString()) : estado != null ? null : ModusWidget.descansoVivo(getContext());
             if (vivoD != null && vivoD.has("faltan")) vivoD.put("fin", System.currentTimeMillis() + vivoD.optLong("faltan") * 1000L);
             Bitmap bmp = WidgetDibujo.plano(getContext(), tipo, Math.min(w, 1400), Math.min(h, 1000), datos, hoy, tomas, vivoD, call.getInt("indice", 0), true).bmp;

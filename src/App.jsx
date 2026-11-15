@@ -7369,6 +7369,86 @@ label.ajuste-rotulo { display: block; }
 .sup-editor-pie .sup-borrar { margin-right: auto; color: #e06a6f; }
 .light-mode .sup-editor-pie .sup-borrar { color: #b0353b; }
 .sup-editor-pie .boton-pildora:disabled { opacity: .45; }
+/* EL TABLERO DE PERFIL (15/11; pedido: "saber diferenciar bien todas las
+   opciones… ahora es muy monótono y no es tan diferenciable"). Tu
+   entrenamiento y La app dejan la lista de renglones iguales: cada opción es
+   una baldosa con el dibujo de lo que guarda (VistaAjuste). La sección no
+   tiene caja (display: contents): su botón es la baldosa y lo que abre ocupa
+   las dos columnas debajo; "dense" vuelve a llenar el lugar de al lado. */
+.solo-tablero { display: none; }
+.vista-ajuste { display: none; }
+.grupo-ajustes.tablero .solo-tablero { display: inline; }
+.grupo-ajustes.tablero .solo-lista { display: none; }
+.grupo-ajustes.tablero > .grupo-ajustes-placa { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: dense; gap: 10px; background: none; box-shadow: none; border-radius: 0; overflow: visible; }
+.grupo-ajustes.tablero > .grupo-ajustes-placa > * + * { border-top: 0; }
+.grupo-ajustes.tablero > .grupo-ajustes-placa > div.seccion-plegable { display: contents; }
+.grupo-ajustes.tablero > .grupo-ajustes-placa > div.seccion-plegable > button,
+.grupo-ajustes.tablero > .grupo-ajustes-placa > button.seccion-plegable { position: relative; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 0; padding: 14px 14px 13px; min-height: 124px; border-radius: 22px; background: var(--surface-1); box-shadow: var(--placa-canto); transition: transform var(--dur-toque, 100ms) ease, background-color var(--dur-chico, 240ms) ease; }
+.grupo-ajustes.tablero > .grupo-ajustes-placa > div.seccion-plegable > button:active,
+.grupo-ajustes.tablero > .grupo-ajustes-placa > button.seccion-plegable:active { transform: scale(.97); background: var(--surface-1); }
+.grupo-ajustes.tablero > .grupo-ajustes-placa > div.seccion-plegable.ancha > button { grid-column: 1 / -1; min-height: 0; flex-direction: row; align-items: center; gap: 14px; }
+.grupo-ajustes.tablero > .grupo-ajustes-placa > div.seccion-plegable.ancha > button > .flex-1 { margin-top: 0; }
+.grupo-ajustes.tablero > .grupo-ajustes-placa > div.seccion-plegable.abierta > button { background: color-mix(in oklab, var(--tono) 13%, var(--surface-1)); }
+.grupo-ajustes.tablero > .grupo-ajustes-placa > div.seccion-plegable > div { grid-column: 1 / -1; border-radius: 22px; background: var(--surface-1); box-shadow: var(--placa-canto); padding-top: 16px; }
+.grupo-ajustes.tablero .placa-icono { display: none !important; }
+.grupo-ajustes.tablero > .grupo-ajustes-placa > .seccion-plegable > button > .flex-1,
+.grupo-ajustes.tablero > .grupo-ajustes-placa > button.seccion-plegable > .flex-1 { flex: 0 0 auto; width: 100%; margin-top: auto; padding-top: 12px; }
+.grupo-ajustes.tablero > .grupo-ajustes-placa > .seccion-plegable > button > svg:last-child,
+.grupo-ajustes.tablero > .grupo-ajustes-placa > button.seccion-plegable > svg:last-child { position: absolute; top: 15px; right: 13px; opacity: .7; }
+.grupo-ajustes.tablero > .grupo-ajustes-placa > div.seccion-plegable.ancha > button > svg:last-child { position: static; }
+.grupo-ajustes.tablero .vista-ajuste { display: flex; align-items: center; height: 40px; max-width: calc(100% - 22px); color: var(--text-muted); }
+
+/* Los días de tu rutina, cada uno en su color (apagado, como las baldosas). */
+.vista-baldosas { gap: 4px; }
+.vista-baldosas i { width: 19px; height: 26px; border-radius: 7px; background: color-mix(in oklab, var(--dia) 60%, #8a8c92); box-shadow: inset 0 1px 0 rgba(255,255,255,.18); }
+.light-mode .vista-baldosas i { background: color-mix(in oklab, var(--dia) 70%, #a7a9ae); }
+.vista-baldosas i.vacia { background: var(--surface-3); box-shadow: none; }
+/* Los cajones del ciclo: los que pasaron, gastados; el de esta semana, entero. */
+.vista-cajones { align-items: flex-end !important; gap: 3px; height: 40px; }
+.vista-cajones i { width: 8px; border-radius: 2.5px 2.5px 1px 1px; background: none; box-shadow: inset 0 0 0 1.2px var(--hairline-fuerte, rgba(255,255,255,.2)); }
+.vista-cajones i.pasada { background: var(--surface-3); box-shadow: none; }
+.vista-cajones i.esta { background: color-mix(in oklab, var(--tono) 72%, white); box-shadow: none; }
+.light-mode .vista-cajones i.esta { background: color-mix(in oklab, var(--tono) 75%, black); }
+/* El plan: los escalones de las semanas. */
+.vista-escalones { align-items: flex-end !important; gap: 0; }
+.vista-escalones i { width: 13px; background: var(--surface-3); border-top: 2px solid var(--text-faint); }
+.vista-escalones i:nth-child(1) { height: 10px; } .vista-escalones i:nth-child(2) { height: 18px; } .vista-escalones i:nth-child(3) { height: 26px; } .vista-escalones i:nth-child(4) { height: 34px; border-radius: 0 3px 0 0; }
+.vista-escalones.activo i { background: color-mix(in oklab, #38bdf8 22%, var(--surface-2)); border-top-color: color-mix(in oklab, #38bdf8 72%, white); }
+.light-mode .vista-escalones.activo i { border-top-color: color-mix(in oklab, #38bdf8 70%, black); }
+.vista-escalones.pausa i { opacity: .55; }
+.vista-escalones.sin i { background: color-mix(in oklab, var(--surface-3) 55%, transparent); border-top: 2px dashed var(--text-faint); }
+/* Tus suplementos: el que ya tomaste hoy, lleno con su color. */
+.vista-sups { gap: 5px; }
+.vista-sups b { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-3); color: var(--text-muted); box-shadow: inset 0 0 0 1.2px var(--hairline); }
+.vista-sups b.tomada { background: color-mix(in oklab, var(--c) 72%, white); color: #14171a; box-shadow: none; }
+.vista-sups b:not(.tomada)[style] { color: color-mix(in oklab, var(--c) 70%, var(--text-muted)); }
+/* El reloj de pared del descanso. */
+.vista-dial { color: var(--text-strong) !important; }
+.vista-dial .arco { stroke: color-mix(in oklab, #14b8a6 72%, white); }
+.light-mode .vista-dial .arco { stroke: color-mix(in oklab, #14b8a6 80%, black); }
+/* La serie en su visor. */
+.vista-visor { gap: 5px; padding: 0 9px 0 11px; height: 34px !important; border-radius: 12px; background: var(--panel-sunken); box-shadow: inset 0 1px 2px rgba(0,0,0,.35); font-size: 19px; font-weight: 750; color: var(--text-strong) !important; letter-spacing: -.01em; }
+.vista-visor small { font-size: 12px; font-weight: 600; color: var(--text-faint); }
+.vista-visor em { margin-left: 4px; width: 19px; height: 19px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in oklab, var(--tono) 72%, white); color: #14171a; font-style: normal; }
+/* Los widgets, en un mosaico. */
+.vista-mosaico { display: grid !important; grid-template-columns: repeat(4, 12px); grid-auto-rows: 12px; gap: 3px; height: auto !important; align-content: center; }
+.vista-mosaico i { border-radius: 4px; background: var(--surface-3); box-shadow: inset 0 0 0 1px var(--hairline); }
+.vista-mosaico i:nth-child(1) { grid-column: span 4; background: color-mix(in oklab, var(--tono) 30%, var(--surface-3)); }
+.vista-mosaico i:nth-child(2) { grid-column: span 2; }
+.vista-mosaico i:nth-child(5) { display: none; }
+/* El recordatorio con su hora. */
+.vista-aviso { gap: 6px; padding: 0 11px; height: 32px !important; border-radius: 999px; background: color-mix(in oklab, #f59e0b 16%, var(--surface-2)); color: color-mix(in oklab, #f59e0b 60%, white) !important; }
+.light-mode .vista-aviso { color: color-mix(in oklab, #f59e0b 60%, black) !important; }
+.vista-aviso b { font-size: 15px; font-weight: 750; }
+.vista-aviso.apagado { background: var(--surface-3); color: var(--text-faint) !important; }
+.vista-aviso.apagado b { font-size: 12px; font-weight: 600; }
+/* El tema: media luna oscura, media clara, y la letra. */
+.vista-tema { gap: 8px; color: var(--text-strong) !important; }
+.vista-tema i { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(90deg, #17181b 50%, #ecece8 50%); box-shadow: inset 0 0 0 1.5px var(--hairline-fuerte, rgba(255,255,255,.25)); }
+.vista-tema.claro i { background: linear-gradient(90deg, #ecece8 50%, #17181b 50%); }
+.vista-tema b { font-size: 19px; font-weight: 750; letter-spacing: -.02em; }
+.vista-tema small { font-size: 12px; font-weight: 650; color: var(--text-faint); padding: 3px 7px; border-radius: 999px; background: var(--surface-3); }
+
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -21455,6 +21535,8 @@ function estadoDeWidgets({ profile, logs, cycleStart }) {
   const st = getProfileSettings(profile);
   const descansos = { largo: st.restLong || REST_LONG, corto: st.restShort || REST_SHORT };
   const sesion = profile.activeSession || null;
+  const unidadW = st.weightUnit === "lbs" ? "lbs" : "kg";
+  const pesoW = (kg) => `${String(Math.round(kgToDisplay(kg, unidadW) * 100) / 100).replace(".", ",")} ${unidadW === "lbs" ? "lb" : "kg"}`;
   const agenda = Array.from({ length: 8 }, (_, i) => {
     const d = new Date(hoy); d.setDate(d.getDate() + i);
     const f = localDateStr(d);
@@ -21463,13 +21545,47 @@ function estadoDeWidgets({ profile, logs, cycleStart }) {
     const nombre = DIAS_DE_LA_SEMANA[(d.getDay() + 6) % 7];
     if (!dd) return { f, dia: nombre };
     const ej = (dd.exercises || []).length;
-    return { f, dia: nombre, key, titulo: String(dd.label || key), color: dd.color || "", ej, min: ej ? minutosDelDia(dd.exercises, descansos) : 0, series: seriesDe(dd) };
+    // Para "La rutina de hoy": cada ejercicio con sus series y su carga (el
+    // peso más alto entre lo último anotado en cada serie, como en la lista).
+    const lista = (dd.exercises || []).slice(0, 8).map((e) => {
+      let kg = 0;
+      if (!e.cardio) (e.sets || []).forEach((_, k) => {
+        const h = ((logs || {})[`${e.id}_${k}`] || []).filter((x) => !x.deload && x.kg > 0);
+        if (h.length) kg = Math.max(kg, h[h.length - 1].kg);
+      });
+      return { n: String(e.name || "").slice(0, 40), s: e.cardio ? 0 : (e.sets || []).length, p: kg > 0 ? pesoW(kg) : "" };
+    });
+    return { f, dia: nombre, key, titulo: String(dd.label || key), color: dd.color || "", ej, min: ej ? minutosDelDia(dd.exercises, descansos) : 0, series: seriesDe(dd), lista };
+  });
+  // LA TERCERA TANDA (15/11; TodayWidgetPlugin v4, APK 1.0.29): el mes en un
+  // calendario, el volumen de ocho semanas y el último récord.
+  const ym = hoyStr.slice(0, 7);
+  const delMes = idx.filter((x) => x.date.startsWith(ym));
+  const mesAntes = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+  const ymAntes = localDateStr(mesAntes).slice(0, 7);
+  const diasDelMes = {};
+  delMes.forEach((x) => { diasDelMes[String(Number(x.date.slice(8, 10)))] = ROUTINE[x.dayKeys?.[0]]?.color || "#8a8c92"; });
+  const volumenes = Array.from({ length: 8 }, (_, k) => {
+    const l = new Date(lunes); l.setDate(l.getDate() - 7 * (7 - k));
+    const fin = new Date(l); fin.setDate(fin.getDate() + 6);
+    const a = localDateStr(l), b = localDateStr(fin);
+    return Math.round(kgToDisplay(idx.filter((x) => x.date >= a && x.date <= b).reduce((t, x) => t + (x.totalVolume || 0), 0), unidadW));
+  });
+  let record = null;
+  [...idx].sort((a, b) => (a.date < b.date ? 1 : -1)).some((x) => {
+    const it = (x.items || []).filter((i) => i.recordDelEjercicio && i.kg > 0 && i.reps).sort((a, b) => prScore(b.kg, b.reps) - prScore(a.kg, a.reps))[0];
+    if (!it) return false;
+    record = { f: x.date, ej: String(it.exerciseName || "").slice(0, 40), serie: `${it.reps} × ${pesoW(it.kg)}`, rm: pesoW(Math.round(estimate1RM(it.kg, it.reps))) };
+    return true;
   });
   const tiempos = [...new Set([descansos.corto, descansos.largo, 60, 90, 120, 180, 240])].filter((x) => x > 0).slice(0, 4).sort((a, b) => a - b);
   return {
-    v: 3,
+    v: 4,
     fecha: hoyStr,
     agenda,
+    mes: { ym, dias: diasDelMes, ses: delMes.length, series: delMes.reduce((t, x) => t + (x.items || []).length, 0), antes: idx.filter((x) => x.date.startsWith(ymAntes)).length },
+    semanas: { lunes: localDateStr(lunes), v: volumenes, u: unidadW === "lbs" ? "lb" : "kg" },
+    record,
     ahora: { hechas, listo: hoyW.estado === "hecho", sesion: !!sesion },
     tira: { lunes: localDateStr(lunes), dias: dias.map((x) => ({ s: x.series, c: x.color })), racha, hechos, planeados },
     sup: suplementosParaWidget(profile.suplementos, profile.suplementosTomas, hoyStr),
@@ -21674,7 +21790,53 @@ function ToggleRow({ icon, label, desc, on, onToggle }) {
 // Sección desplegable reutilizable para ProfileView
 // El ícono va en el tono de la pestaña: antes cada sección traía el suyo y
 // Perfil era un muestrario de colores.
-function CollapsibleSection({ title, subtitle, icon, defaultOpen = false, children, forceOpenSignal = 0, sectionId = null }) {
+// LAS VISTAS DEL TABLERO DE PERFIL (15/11; pedido: "saber diferenciar bien todas
+// las opciones que tenés en el perfil… ahora es muy monótono"). Cada opción de
+// Tu entrenamiento y de La app es una baldosa con un dibujo chico de lo que
+// guarda, hecho con sus datos de verdad: los días de tu rutina en su color,
+// los cajones del ciclo con la semana en la que estás, tus suplementos con los
+// que ya tomaste, el reloj con tu descanso. El color es el del dato, no un
+// adorno: sin datos, el dibujo queda gris.
+function VistaAjuste({ tipo, datos = {} }) {
+  if (tipo === "rutina") {
+    const colores = (datos.colores || []).slice(0, 6);
+    return <span className="vista-ajuste vista-baldosas" aria-hidden="true">{(colores.length ? colores : [null, null, null]).map((c, i) => <i key={i} style={c ? { "--dia": c } : undefined} className={c ? "" : "vacia"} />)}</span>;
+  }
+  if (tipo === "ciclo") {
+    const total = Math.max(2, Math.min(datos.total || 8, 12));
+    return <span className="vista-ajuste vista-cajones" aria-hidden="true">{Array.from({ length: total }, (_, i) => <i key={i} className={!datos.semana ? "" : i + 1 < datos.semana ? "pasada" : i + 1 === datos.semana ? "esta" : ""} style={{ height: `${Math.round(34 + (66 * (i + 1)) / total)}%` }} />)}</span>;
+  }
+  if (tipo === "plan") return <span className={`vista-ajuste vista-escalones ${datos.estado || ""}`} aria-hidden="true"><i /><i /><i /><i /></span>;
+  if (tipo === "suplementos") {
+    const lista = (datos.lista || []).slice(0, 4);
+    return (
+      <span className="vista-ajuste vista-sups" aria-hidden="true">
+        {lista.length ? lista.map((x) => <b key={x.id} className={x.tomada ? "tomada" : ""} style={{ "--c": x.color }}><IconoSuplemento forma={x.forma} size={14} /></b>)
+          : ["capsula", "scoop", "gota"].map((f) => <b key={f}><IconoSuplemento forma={f} size={14} /></b>)}
+      </span>
+    );
+  }
+  if (tipo === "descansos") {
+    return (
+      <span className="vista-ajuste vista-dial" aria-hidden="true">
+        <svg viewBox="0 0 40 40" width="40" height="40">
+          <circle cx="20" cy="20" r="17" fill="none" stroke="currentColor" strokeOpacity=".22" strokeWidth="2.5" />
+          {Array.from({ length: 12 }, (_, i) => { const a = (i * Math.PI) / 6, r0 = i % 3 === 0 ? 11.5 : 13; return <line key={i} x1={20 + r0 * Math.sin(a)} y1={20 - r0 * Math.cos(a)} x2={20 + 14.5 * Math.sin(a)} y2={20 - 14.5 * Math.cos(a)} stroke="currentColor" strokeOpacity={i % 3 === 0 ? 0.6 : 0.3} strokeWidth="1.2" strokeLinecap="round" />; })}
+          <path d="M20 3a17 17 0 0 1 16.7 13.8" fill="none" className="arco" strokeWidth="2.8" strokeLinecap="round" />
+          <path d="M20 20 29 16.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          <circle cx="20" cy="20" r="1.8" fill="currentColor" />
+        </svg>
+      </span>
+    );
+  }
+  if (tipo === "registro") return <span className="vista-ajuste vista-visor num-display" aria-hidden="true">8<small>×</small>80<em><Check size={11} strokeWidth={3} /></em></span>;
+  if (tipo === "widgets") return <span className="vista-ajuste vista-mosaico" aria-hidden="true"><i /><i /><i /><i /><i /></span>;
+  if (tipo === "avisos") return <span className={`vista-ajuste vista-aviso ${datos.hora ? "" : "apagado"}`} aria-hidden="true"><Bell size={15} /><b className="num-display">{datos.hora || "apagado"}</b></span>;
+  if (tipo === "apariencia") return <span className={`vista-ajuste vista-tema ${datos.claro ? "claro" : ""}`} aria-hidden="true"><i /><b>Aa</b><small>{datos.unidad}</small></span>;
+  return null;
+}
+
+function CollapsibleSection({ title, subtitle, icon, vista = null, ancha = false, defaultOpen = false, children, forceOpenSignal = 0, sectionId = null }) {
   const [open, setOpen] = useState(defaultOpen);
   const selfRef = useRef(null);
   // Cuando forceOpenSignal cambia (lo incrementa un botón de otra pantalla),
@@ -21685,12 +21847,14 @@ function CollapsibleSection({ title, subtitle, icon, defaultOpen = false, childr
     // El timer se limpia al desmontar: sin esto, si cambiás de pantalla justo
     // después de abrir la sección, el scroll dispara sobre un nodo que ya no
     // existe (React tira warnings y el scroll salta a un lugar raro).
-    const t = setTimeout(() => { try { selfRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { /* ignorado a propósito */ } }, 120);
+    // En el tablero de Perfil la sección no tiene caja propia (display: contents): se lleva a la vista su botón.
+    const t = setTimeout(() => { try { (selfRef.current?.querySelector("button") || selfRef.current)?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { /* ignorado a propósito */ } }, 120);
     return () => clearTimeout(t);
   }, [forceOpenSignal]);
   return (
-    <div ref={selfRef} id={sectionId || undefined} className="seccion-plegable overflow-hidden">
-      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-slate-800/30 active:bg-slate-800/50">
+    <div ref={selfRef} id={sectionId || undefined} className={`seccion-plegable overflow-hidden ${open ? "abierta" : ""} ${ancha ? "ancha" : ""}`}>
+      <button onClick={() => setOpen((o) => !o)} aria-expanded={open} className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-slate-800/30 active:bg-slate-800/50">
+        {vista}
         {/* Placa de ícono en vez de ícono suelto — mismo lenguaje visual que
             ya usan las tarjetas de ejercicio/rutina y los ToggleRow de acá
             abajo, en vez de quedar como el único ícono "pelado" de Perfil. */}
@@ -22061,6 +22225,15 @@ const WIDGETS_DE_INICIO = [
   { cual: 6, nombre: "Descanso, con el reloj", tam: "2 × 2" },
   { cual: 7, nombre: "La semana", tam: "4 × 1" },
 ];
+// La tercera tanda (plugin v4, APK 1.0.29).
+const WIDGETS_NUEVOS = [
+  { cual: 8, nombre: "La rutina de hoy", tam: "4 × 2" },
+  { cual: 13, nombre: "Suplementos de la semana", tam: "4 × 2" },
+  { cual: 9, nombre: "El mes", tam: "2 × 2" },
+  { cual: 10, nombre: "Volumen por semana", tam: "2 × 2" },
+  { cual: 11, nombre: "Tu último récord", tam: "2 × 1" },
+  { cual: 12, nombre: "La racha", tam: "1 × 1" },
+];
 const A_MANO_AL_INICIO = "Tu teléfono no deja agregarlo desde acá. Mantené apretado un lugar vacío de la pantalla de inicio, Widgets, Modus Fit.";
 async function fijarWidget(cual) {
   try { return !!(await TodayWidget.fijar({ cual }))?.pedido; } catch { return false; }
@@ -22074,9 +22247,9 @@ function WidgetsDeInicio() {
   }, []);
   if (version < 3) return null;
   return (
-    <CollapsibleSection title="Widgets" subtitle="Para la pantalla de inicio" icon={<LayoutGrid size={16} />}>
+    <CollapsibleSection title="Widgets" subtitle="Para la pantalla de inicio" icon={<LayoutGrid size={16} />} vista={<VistaAjuste tipo="widgets" />} ancha>
       <div className="widgets-lista">
-        {WIDGETS_DE_INICIO.map((w) => (
+        {[...WIDGETS_DE_INICIO, ...(version >= 4 ? WIDGETS_NUEVOS : [])].map((w) => (
           <div key={w.cual} className="widgets-renglon">
             <span className="widgets-nombre">{w.nombre}<small className="num-display">{w.tam}</small></span>
             <button onClick={async () => setAviso((await fijarWidget(w.cual)) ? null : A_MANO_AL_INICIO)} className="boton-tonal" aria-label={`Agregar ${w.nombre} a la pantalla de inicio`}>Agregar</button>
@@ -22547,14 +22720,15 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
         {googleLinkError && <p className="text-rose-400 text-xs text-center pt-2">{googleLinkError}</p>}
       </section>
 
-      <section className="grupo-ajustes" aria-label="Tu entrenamiento">
+      <section className="grupo-ajustes tablero" aria-label="Tu entrenamiento">
       <p className="grupo-ajustes-titulo">Tu entrenamiento</p>
       <div className="grupo-ajustes-placa">
       {/* Tu rutina, con la misma forma que las secciones de abajo (antes era
           una fila con otro borde y otro fondo). */}
       <button onClick={onGoToRoutines} className="seccion-plegable w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors active:bg-slate-800/50">
+        <VistaAjuste tipo="rutina" datos={{ colores: Object.values(ROUTINE || {}).map((x) => x?.color).filter(Boolean) }} />
         <span className="placa-icono w-9 h-9 rounded-xl flex items-center justify-center shrink-0"><Layers size={16} /></span>
-        <div className="flex-1 min-w-0"><p className="text-sm font-bold text-white">Tu rutina: {activeRoutineDef?.name || "—"}</p><p className="text-[12px] text-slate-500 mt-0.5 leading-snug">{savedRoutineCount} guardada{savedRoutineCount === 1 ? "" : "s"}</p></div>
+        <div className="flex-1 min-w-0"><p className="text-sm font-bold text-white"><span className="solo-lista">Tu rutina: </span><span className="solo-tablero">Tu rutina</span><span className="solo-lista">{activeRoutineDef?.name || "—"}</span></p><p className="text-[12px] text-slate-500 mt-0.5 leading-snug"><span className="solo-tablero">{activeRoutineDef?.name || "—"}</span><span className="solo-lista">{savedRoutineCount} guardada{savedRoutineCount === 1 ? "" : "s"}</span></p></div>
         <ChevronRight size={16} className="text-slate-600 shrink-0" />
       </button>
 
@@ -22563,7 +22737,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           y su "Cambiar", y más abajo "Configuración de descarga". Ahora es una
           sección como las demás, con los cajones de Progreso adentro, desde
           cuándo y todo lo que arma el ciclo: las semanas y la descarga. */}
-      <CollapsibleSection title="Tu ciclo" icon={<IconoCajones size={16} />}
+      <CollapsibleSection title="Tu ciclo" icon={<IconoCajones size={16} />} vista={<VistaAjuste tipo="ciclo" datos={{ total: weekInfo?.cycleWeeks || 8, semana: weekInfo?.weekInCycle || 0 }} />}
         subtitle={weekInfo ? `Semana ${weekInfo.weekInCycle} de ${weekInfo.cycleWeeks}` : "Elegí cuándo empezó para saber en qué semana estás"}>
         {weekInfo && <div className="ciclo-perfil"><CajonesCiclo semanas={semanasDelCiclo(weekInfo)} trainWeeks={weekInfo.trainWeeks} alto={78} /></div>}
         <div className="ciclo-inicio">
@@ -22603,7 +22777,8 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           ahí). Ahora es la misma acción: pausar o reanudar el plan, y sólo
           si hay uno. Sin plan no hay nada que elegir: todas tus series
           persiguen tu récord, que es el comportamiento de siempre. */}
-      <CollapsibleSection title="Tu plan" subtitle={!hasAnyPlan ? "Sin metas cargadas" : settings.trainingMode === "planned" ? "Activo" : "En pausa"} icon={<Target size={16} />} accent="#38BDF8">
+      <CollapsibleSection title="Tu plan" subtitle={!hasAnyPlan ? "Sin metas cargadas" : settings.trainingMode === "planned" ? "Activo" : "En pausa"} icon={<Target size={16} />} accent="#38BDF8"
+        vista={<VistaAjuste tipo="plan" datos={{ estado: !hasAnyPlan ? "sin" : settings.trainingMode === "planned" ? "activo" : "pausa" }} />}>
         <div className="space-y-2.5">
           {hasAnyPlan ? (() => {
             const enPausa = settings.trainingMode !== "planned";
@@ -22679,11 +22854,12 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
       )}
 
       <CollapsibleSection title="Suplementos" sectionId="suplementos" forceOpenSignal={openSectionSignal.id === "suplementos" ? openSectionSignal.n : 0} icon={<IconoSuplemento forma="capsula" size={17} />}
-        subtitle={(() => { const l = listaDeSuplementos(profile?.suplementos); if (!l.length) return "Creatina, proteína, lo que tomes"; const h = l.filter((x) => tomadas(profile?.suplementosTomas, todayStr(), x.id) >= x.dosis).length; return `${h} de ${l.length} hoy`; })()}>
+        vista={<VistaAjuste tipo="suplementos" datos={{ lista: listaDeSuplementos(profile?.suplementos).map((x) => ({ id: x.id, forma: x.forma, color: x.color, tomada: tomadas(profile?.suplementosTomas, todayStr(), x.id) >= x.dosis })) }} />}
+        subtitle={(() => { const l = listaDeSuplementos(profile?.suplementos); if (!l.length) return "Cargá los que tomás"; const h = l.filter((x) => tomadas(profile?.suplementosTomas, todayStr(), x.id) >= x.dosis).length; return `${h} de ${l.length} hoy`; })()}>
         <Suplementos profile={profile} onUpdateProfile={onUpdateProfile} />
       </CollapsibleSection>
 
-      <CollapsibleSection title="Descansos" subtitle={`${formatTime(settings.restShort)} – ${formatTime(settings.restLong)}`} icon={<Timer size={16} />} accent="#14B8A6">
+      <CollapsibleSection title="Descansos" subtitle={`${formatTime(settings.restShort)} – ${formatTime(settings.restLong)}`} icon={<Timer size={16} />} accent="#14B8A6" vista={<VistaAjuste tipo="descansos" />}>
         <EstadoAvisosDescanso />
         <div><p className="ajuste-rotulo mb-2">Aviso al terminar</p><div className="segmentado">{[{ k: "sound", l: "Sonido" }, { k: "vibration", l: "Vibración" }, { k: "both", l: "Ambos" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ alertType: opt.k })} aria-pressed={settings.alertType === opt.k} className={settings.alertType === opt.k ? "activo" : ""}>{opt.l}</button>)}</div></div>
         <div className="space-y-2">
@@ -22744,6 +22920,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
         onClick={onOpenFieldPreview}
         className="seccion-plegable w-full flex items-center gap-3 px-4 py-3.5 text-left"
       >
+        <VistaAjuste tipo="registro" />
         <span className="placa-icono w-9 h-9 rounded-xl flex items-center justify-center shrink-0">
           <Sliders size={16} />
         </span>
@@ -22758,11 +22935,12 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
       </div>
       </section>
 
-      <section className="grupo-ajustes" aria-label="La app">
+      <section className="grupo-ajustes tablero" aria-label="La app">
       <p className="grupo-ajustes-titulo">La app</p>
       <div className="grupo-ajustes-placa">
       <WidgetsDeInicio />
-      <CollapsibleSection title="Avisos" subtitle={settings.reminderEnabled ? `Recordatorio a las ${settings.reminderTime}` : "Recordatorio apagado"} icon={<Bell size={16} />} accent="#F59E0B">
+      <CollapsibleSection title="Avisos" subtitle={settings.reminderEnabled ? `Recordatorio a las ${settings.reminderTime}` : "Recordatorio apagado"} icon={<Bell size={16} />} accent="#F59E0B"
+        vista={<VistaAjuste tipo="avisos" datos={{ hora: settings.reminderEnabled ? settings.reminderTime : "" }} />}>
         <div className="space-y-3">
           <ToggleRow
             icon={<Bell size={16} />} label="Avisarme los días que entreno"
@@ -22799,7 +22977,8 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
         </div>
       </CollapsibleSection>
 
-      <CollapsibleSection title="Apariencia y accesibilidad" subtitle="Tema, unidad de peso, tamaño de letra" icon={<Sun size={16} />} accent="#F59E0B">
+      <CollapsibleSection title="Apariencia" subtitle="Tema, unidad de peso, tamaño de letra" icon={<Sun size={16} />} accent="#F59E0B"
+        vista={<VistaAjuste tipo="apariencia" datos={{ claro: settings.theme === "light", unidad: settings.weightUnit === "lbs" ? "lb" : "kg" }} />}>
         <div>
           <p className="ajuste-rotulo mb-2">Tema</p>
           <div className="segmentado">
@@ -34030,6 +34209,7 @@ export default function App() {
       TodayWidget.addListener("accion", (ev) => {
         if (ev?.accion === "tomas") { traerTomas(); return; }
         if (ev?.accion === "suplementos") { goToSection("perfil", "suplementos"); return; }
+        if (ev?.accion === "progreso") { setTab("progreso"); return; }
         if (ev?.accion === "iniciar" || ev?.accion === "rutina") {
           setTab("rutina");
           const ctx = notifCtxRef.current || {};

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- El molde de todos los widgets de Modus Fit: la imagen que dibuja
-     WidgetDibujo, encima las zonas que se tocan (hasta dos filas de cinco,
+     WidgetDibujo, encima las zonas que se tocan (hasta cuatro filas de cinco,
      transparentes; ModusWidget prende las que hacen falta y les pone el
      margen) y el reloj en vivo del descanso. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -46,6 +46,20 @@
             <FrameLayout android:id="@+id/wz12" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/widget_toque" android:visibility="gone"/>
             <FrameLayout android:id="@+id/wz13" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/widget_toque" android:visibility="gone"/>
             <FrameLayout android:id="@+id/wz14" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/widget_toque" android:visibility="gone"/>
+        </LinearLayout>
+        <LinearLayout android:id="@+id/wzf2" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="horizontal" android:visibility="gone">
+            <FrameLayout android:id="@+id/wz20" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/widget_toque" android:visibility="gone"/>
+            <FrameLayout android:id="@+id/wz21" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/widget_toque" android:visibility="gone"/>
+            <FrameLayout android:id="@+id/wz22" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/widget_toque" android:visibility="gone"/>
+            <FrameLayout android:id="@+id/wz23" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/widget_toque" android:visibility="gone"/>
+            <FrameLayout android:id="@+id/wz24" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/widget_toque" android:visibility="gone"/>
+        </LinearLayout>
+        <LinearLayout android:id="@+id/wzf3" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="horizontal" android:visibility="gone">
+            <FrameLayout android:id="@+id/wz30" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/widget_toque" android:visibility="gone"/>
+            <FrameLayout android:id="@+id/wz31" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/widget_toque" android:visibility="gone"/>
+            <FrameLayout android:id="@+id/wz32" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/widget_toque" android:visibility="gone"/>
+            <FrameLayout android:id="@+id/wz33" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/widget_toque" android:visibility="gone"/>
+            <FrameLayout android:id="@+id/wz34" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/widget_toque" android:visibility="gone"/>
         </LinearLayout>
     </LinearLayout>
 </FrameLayout>
