@@ -7449,52 +7449,9 @@ label.ajuste-rotulo { display: block; }
 .vista-tema b { font-size: 19px; font-weight: 750; letter-spacing: -.02em; }
 .vista-tema small { font-size: 12px; font-weight: 650; color: var(--text-faint); padding: 3px 7px; border-radius: 999px; background: var(--surface-3); }
 
-/* ══ LA PILA DE PLACAS (15/11): el ciclo como la pila de una máquina de poleas.
-   Las placas de arriba del pasador están en el aire: lo que venís cargando. */
-.pila { --sube: 9px; --guia: linear-gradient(90deg, #6f737a, #d9dce1 45%, #8b8f96);
-  margin-top: 10px; padding: 12px 16px; border-radius: 20px; background: var(--panel-sunken); box-shadow: inset 0 1px 2px rgba(0,0,0,.25); }
-.light-mode .pila { box-shadow: inset 0 1px 2px rgba(20,24,34,.06); }
-.pila-torre { position: relative; display: flex; flex-direction: column; gap: 2px; width: 100%; max-width: 236px; margin: 0 auto; padding: 30px 0 9px; }
-/* El cabezal de la máquina (de donde cuelga el cable) y la base. */
-.pila-cabezal, .pila-base { position: absolute; left: 12%; right: 12%; height: 8px; border-radius: 4px; background: linear-gradient(#4a4d53, #25272b); box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 1px 0 rgba(0,0,0,.4); }
-.pila-cabezal { top: 0; } .pila-base { bottom: 0; height: 6px; left: 6%; right: 6%; }
-.light-mode :is(.pila-cabezal, .pila-base) { background: linear-gradient(#7d8188, #565a61); }
-.pila-guia { position: absolute; top: 6px; bottom: 4px; width: 5px; border-radius: 3px; background: var(--guia); box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
-.pila-guia.izq { left: 21%; } .pila-guia.der { right: 21%; }
-.pila-cable { position: absolute; top: 7px; left: 50%; width: 3px; height: calc(23px - var(--sube)); translate: -50% 0; border-radius: 2px; background: linear-gradient(90deg, #2b2d31, #6d7178, #2b2d31); }
-.pila-placa { --cuerpo: #2b2d32; position: relative; z-index: 1; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; height: var(--placa); padding: 0 8px; border-radius: 4px;
-  background: repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 1px, transparent 1px 3px), linear-gradient(rgba(255,255,255,.16), rgba(255,255,255,0) 38%, rgba(0,0,0,.22)), var(--cuerpo);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.2), inset 0 -1px 0 rgba(0,0,0,.4), 0 1px 0 rgba(0,0,0,.35); }
-.pila-placa.pasada { --cuerpo: color-mix(in oklab, var(--pintura) 46%, #55585e); }
-.pila-placa.actual { --cuerpo: var(--pintura); }
-.pila-placa.descarga { --cuerpo: #1b1c1f; background: repeating-linear-gradient(-45deg, rgba(255,255,255,.07) 0 3px, transparent 3px 7px), linear-gradient(rgba(255,255,255,.08), rgba(0,0,0,.2)), var(--cuerpo); border-radius: 6px; }
-.pila-placa.arriba { translate: 0 calc(var(--sube) * -1); }
-.pila-numero { justify-self: start; min-width: 16px; padding: 1px 3px; border-radius: 3px; font-size: 11px; line-height: 1.1; font-weight: 800; font-stretch: 78%; text-align: center; color: #2a2b30; background: #c9c8c1; box-shadow: inset 0 0 0 1px rgba(0,0,0,.25); }
-.pila-placa.actual .pila-numero { background: #f4f3ee; }
-.pila-placa.futura .pila-numero, .pila-placa.descarga .pila-numero { color: #b9bbc0; background: none; box-shadow: inset 0 0 0 1px rgba(255,255,255,.22); }
-.pila-agujero { width: 7px; height: 7px; border-radius: 50%; background: #0c0d0f; box-shadow: inset 0 1px 1px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.18); }
-/* El pasador: el vástago de acero metido en la placa y su perilla. */
-.pila-pasador { position: relative; display: block; width: 34px; height: 7px; border-radius: 4px; background: linear-gradient(#f1f2f4, #9da1a8 60%, #6a6e75); box-shadow: 0 2px 3px rgba(0,0,0,.5); translate: 8px 0; }
-.pila-pasador i { position: absolute; right: -9px; top: 50%; width: 15px; height: 15px; translate: 0 -50%; border-radius: 50%; background: radial-gradient(circle at 35% 30%, color-mix(in oklab, var(--tono) 60%, white), var(--tono) 55%, color-mix(in oklab, var(--tono) 60%, black)); box-shadow: 0 2px 3px rgba(0,0,0,.55), inset 0 0 0 1px rgba(0,0,0,.25); }
-.pila-veces { justify-self: end; display: flex; align-items: center; }
-.pila-veces .marcas { color: rgba(20,21,24,.78); }
-.pila-placa.pasada .pila-veces .marcas { color: rgba(244,243,238,.82); }
-.light-mode .pila { --guia: linear-gradient(90deg, #8d9198, #eceef1 45%, #a5a9b0); }
-.light-mode .pila-placa { --cuerpo: #c4c7cd; }
-.light-mode .pila-placa.pasada { --cuerpo: color-mix(in oklab, var(--pintura) 52%, #9b9ea5); }
-.light-mode .pila-placa.actual { --cuerpo: var(--pintura); }
-.light-mode .pila-placa.descarga { --cuerpo: #2c2e33; }
-.light-mode .pila-placa.futura .pila-numero { color: #4a4d53; box-shadow: inset 0 0 0 1px rgba(0,0,0,.25); }
-.light-mode .pila-placa.descarga .pila-numero { color: #d5d7db; }
-@keyframes pilaSeLevanta { from { translate: 0 0; } }
-.pila.se-levanta .pila-placa.arriba { animation: pilaSeLevanta .7s var(--resorte, ease-out) .25s backwards; }
-@keyframes pilaCable { from { height: 23px; } }
-.pila.se-levanta .pila-cable { animation: pilaCable .7s var(--resorte, ease-out) .25s backwards; }
-@media (prefers-reduced-motion: reduce) { .pila.se-levanta :is(.pila-placa.arriba, .pila-cable) { animation: none; } }
 .ciclo-pie { display: flex; align-items: center; gap: 4px 14px; flex-wrap: wrap; margin-top: 2px; }
 .ciclo-rotulo span { font-weight: 500; color: var(--text-faint); }
 .ciclo-pie { margin-left: -6px; }
-.ciclo-perfil .pila, .guia-cajones .pila { margin-top: 0; }
 
 /* ══ EL SECTOR DEL MUÑECO, pulido (15/11): el rango general de titular, el
    muñeco en su escena hundida con el reparto por rango, y dos botones. */
@@ -8199,38 +8156,19 @@ button.estante-lugar:active .pesa-rusa { scale: .92; }
   background: radial-gradient(ellipse at 22% 12%, rgba(255,255,255,.055), transparent 60%), radial-gradient(ellipse at 85% 80%, rgba(255,255,255,.03), transparent 55%), #1f2622;
   box-shadow: inset 0 0 0 5px var(--madera), inset 0 0 0 6px rgba(0,0,0,.35), inset 0 3px 12px rgba(0,0,0,.5), 0 12px 24px -18px rgba(0,0,0,.9);
 }
-/* EL RINCÓN DE LOS CAJONES (vista previa del 03/11, pedido: "que deje de
-   ser con el fondo negro; el casillero no es muy colorido, pero tiene esas
-   tonalidades de gris que lo diferencian"): en vez de la pizarra, la pared
-   de chapa perforada del depósito del gimnasio, cepillada como el casillero,
-   y los cajones parados sobre el piso de chapa antideslizante. Las veces que
-   fuiste siguen en tiza, escritas sobre la chapa. */
-.cajones-pizarra.en-chapa { --tiza: #e9e8e1; --tiza-suave: rgba(233,232,225,.5);
-  padding: 10px 12px 0; border-radius: 12px;
-  background:
-    radial-gradient(circle, rgba(10,11,13,.85) 0 1.6px, rgba(255,255,255,.06) 2.1px, transparent 2.6px) 6px 6px / 14px 14px,
-    repeating-linear-gradient(90deg, rgba(255,255,255,.022) 0 2px, transparent 2px 5px),
-    linear-gradient(170deg, #45484e, #393c41 55%, #34373c);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 0 0 5px rgba(0,0,0,.16), inset 0 10px 18px -12px rgba(0,0,0,.55), 0 12px 24px -18px rgba(0,0,0,.9); }
-.cajones-pizarra.en-chapa::after { height: 16px; margin: 0 -12px; border-radius: 0 0 12px 12px;
-  background:
-    repeating-linear-gradient(45deg, transparent 0 5px, rgba(255,255,255,.14) 5px 6.5px, transparent 6.5px 11px),
-    repeating-linear-gradient(-45deg, transparent 0 5px, rgba(0,0,0,.28) 5px 6.5px, transparent 6.5px 11px),
-    linear-gradient(#64676d, #4b4e54);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.22), inset 0 -1px 0 rgba(0,0,0,.35), 0 -1px 0 rgba(0,0,0,.45); }
-.cajones-pizarra.en-chapa .cajon { box-shadow: 0 3px 0 -1px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.18); }
-.light-mode .cajones-pizarra.en-chapa { --tiza: #3a3d43; --tiza-suave: rgba(58,61,67,.55);
-  background:
-    radial-gradient(circle, rgba(70,73,79,.75) 0 1.6px, rgba(255,255,255,.5) 2.1px, transparent 2.6px) 6px 6px / 14px 14px,
-    repeating-linear-gradient(90deg, rgba(0,0,0,.02) 0 2px, transparent 2px 5px),
-    linear-gradient(170deg, #dfe1e5, #d3d6db 55%, #cdd0d5);
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,.08), inset 0 0 0 5px rgba(255,255,255,.35), 0 12px 24px -18px rgba(0,0,0,.35); }
-.light-mode .cajones-pizarra.en-chapa::after { background:
-    repeating-linear-gradient(45deg, transparent 0 5px, rgba(255,255,255,.55) 5px 6.5px, transparent 6.5px 11px),
-    repeating-linear-gradient(-45deg, transparent 0 5px, rgba(0,0,0,.12) 5px 6.5px, transparent 6.5px 11px),
-    linear-gradient(#b9bcc2, #a3a6ac); }
 /* La repisa de madera, donde se paran los cajones. */
 .cajones-pizarra::after { content: ""; display: block; height: 10px; margin: 0 -12px; border-radius: 0 0 12px 12px; background: linear-gradient(#7c6349, #4e3f30); box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 -1px 0 rgba(0,0,0,.5); }
+/* ══ LOS CAJONES, SIN LA PARED (15/11, elegido entre siete bocetos): el fondo
+   es un panel hundido liso, sin la chapa perforada, y el piso, una franja
+   lisa. Vale en Progreso, Perfil, el resumen, la bienvenida y la guía. */
+.cajones-pizarra.en-chapa, .light-mode .cajones-pizarra.en-chapa { padding: 12px 14px 0; border-radius: 20px; background: var(--panel-sunken); box-shadow: inset 0 1px 2px rgba(0,0,0,.25); overflow: hidden; }
+.light-mode .cajones-pizarra.en-chapa { box-shadow: inset 0 1px 2px rgba(20,24,34,.06); }
+.cajones-pizarra.en-chapa::after, .light-mode .cajones-pizarra.en-chapa::after { height: 14px; margin: 0 -14px; border-radius: 0; background: linear-gradient(var(--surface-3), var(--surface-2)); box-shadow: inset 0 1px 0 var(--hairline-fuerte, rgba(255,255,255,.14)); }
+.ciclo-cajones .cajones-pizarra { margin-top: 10px; }
+.cajones-pizarra.en-chapa { --tiza: #e9e8e1; --tiza-suave: rgba(233,232,225,.5); }
+.cajones-pizarra.en-chapa .cajon { box-shadow: 0 3px 0 -1px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.18); }
+.light-mode .cajones-pizarra.en-chapa { --tiza: #3a3d43; --tiza-suave: rgba(58,61,67,.55); }
+.light-mode .cajones-pizarra.en-chapa .cajon.futura .cajon-numero { color: var(--tiza-suave); }
 .cajones { display: flex; align-items: stretch; gap: 6px; }
 .cajon-lugar { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; }
 .cajon-tiza { display: flex; justify-content: center; align-items: flex-end; height: 16px; padding-bottom: 4px; }
@@ -13584,8 +13522,8 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
 // La evidencia: el consenso Delphi de Bell et al. (2023) define la descarga
 // como un período más liviano para reducir la fatiga y recuperarse.
 const BIENVENIDA_DESCARGA = {
-  ciclo: { title: "Entrenás por ciclos", text: "Un ciclo son varias semanas seguidas. Cada placa es una semana: cada semana que pasa levantás una más, y el cansancio se acumula. La de esta semana tiene el pasador; al costado de cada una, las veces que fuiste." },
-  descarga: { title: "Y al final, la descarga", text: "Después de varias semanas subiendo, el cuerpo junta cansancio. La descarga es la placa negra de abajo, la de la D: una semana más liviana para recuperarte y volver a subir con más fuerza. Esa semana Rutina se transforma sola, y si venís bajando, la podés adelantar." },
+  ciclo: { title: "Entrenás por ciclos", text: "Un ciclo son varias semanas seguidas. Cada cajón es una semana, y cada uno es un poco más alto que el anterior: la carga sube de a poco y el cansancio se acumula. Arriba de cada cajón, las veces que fuiste. El de esta semana tiene su color entero; los que vienen están punteados." },
+  descarga: { title: "Y al final, la descarga", text: "Después de varias semanas subiendo, el cuerpo junta cansancio. La descarga es el cajón bajo, el de la D: una semana más liviana para recuperarte y volver a subir con más fuerza. Esa semana Rutina se transforma sola, y si venís bajando, la podés adelantar." },
   elegir: { title: "¿Activamos las semanas de descarga?", text: "Te recomendamos dejarlas prendidas. Las podés cambiar cuando quieras en tu perfil." },
 };
 
@@ -16217,44 +16155,35 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
    "actual" | "futura"; sin `sesiones`, no hay tiza. `meta`: las sesiones
    planeadas por semana. `alto`: el alto de la fila, en px.
 ============================================================================ */
-// LA PILA DE PLACAS (15/11, a la noche). El ciclo es la pila de una máquina
-// de poleas: una placa por semana, colgadas de sus dos guías; cada semana
-// que pasa el pasador baja una placa y levantás una más (lo que cargás, en
-// el aire, separado de lo que falta): el cansancio que se acumula. Las que
-// pasaron, con la pintura gastada; la de esta semana, con su color entero y
-// el pasador; las que vienen, de hierro sin pintar; la descarga, la placa de
-// goma negra de abajo. A la derecha de cada placa, las veces que fuiste.
-// Historia: los cajones de salto contra la pared perforada ("no me gusta la
-// pared, tiene como circulitos", "que represente la acumulación de fatiga")
-// y, el mismo día, una curva de fatiga ("no me gustó... mantené la estética,
-// como de adaptar algo del gimnasio"). No vuelvas a la curva ni a la pared.
-// Conserva el nombre y las props de los cajones. `alto`: el alto pedido, en px.
+// LOS CAJONES DEL CICLO, sin la pared (15/11). Historia del día: la pared de
+// chapa perforada no gustó ("tiene como circulitos"); se probaron una curva
+// de fatiga ("no me gustó... mantené la estética, como de adaptar algo del
+// gimnasio") y la pila de placas de una máquina; de siete bocetos (la pila,
+// los cajones, un mancuernero, bandas, una soga, una escalera de agilidad y
+// una botella) eligió "B, los cajones": los de siempre, parados sobre el piso
+// liso. No vuelvas a la pared, al piso de goma ni a un gráfico.
 const PINTURA_CAJON = ["#ECECE6", "#2BA35F", "#F4C430", "#2F6FED", "#E5383B"];
 function CajonesCiclo({ semanas = [], trainWeeks = TRAIN_WEEKS, alto = 100, animar = false, meta = null }) {
-  const n = semanas.length;
-  if (!n) return null;
+  const conTiza = semanas.some((s) => s.sesiones != null);
+  const lugar = alto - (conTiza ? 16 : 0);
+  const altura = (wi, descarga) => Math.round(lugar * (descarga ? 0.36 : 0.45 + (Math.min(wi, trainWeeks - 1) / Math.max(1, trainWeeks - 1)) * 0.55));
   const pintura = (wi) => PINTURA_CAJON[Math.round((trainWeeks > 1 ? Math.min(wi, trainWeeks - 1) / (trainWeeks - 1) : 1) * (PINTURA_CAJON.length - 1))];
-  const placa = Math.max(14, Math.min(22, Math.round((alto + 70) / n) - 2));
-  const iAct = semanas.findIndex((x) => x.estado === "actual");
-  const cargadas = iAct >= 0 ? iAct + 1 : semanas.every((x) => x.estado === "pasada") ? n : 0;
   return (
-    <div className={`pila ${animar ? "se-levanta" : ""}`} style={{ "--placa": `${placa}px` }} aria-hidden="true">
-      <div className="pila-torre">
-      <i className="pila-cabezal" />
-      <i className="pila-guia izq" /><i className="pila-guia der" />
-      <i className="pila-cable" />
-      {semanas.map((x, wi) => {
-        const cumplida = !!meta && !x.descarga && x.estado !== "futura" && (x.sesiones || 0) >= meta;
-        return (
-          <div key={x.n} className={`pila-placa ${x.estado} ${x.descarga ? "descarga" : ""} ${wi < cargadas ? "arriba" : ""} ${cumplida ? "cumplida" : ""}`}
-            style={x.descarga ? null : { "--pintura": pintura(wi) }}>
-            <b className="pila-numero">{x.descarga ? "D" : x.n}</b>
-            {x.estado === "actual" ? <span className="pila-pasador"><i /></span> : <i className="pila-agujero" />}
-            <span className="pila-veces">{x.sesiones != null && x.estado !== "futura" && x.sesiones > 0 && <MarcasTiza dias={x.sesiones} max={7} alto={Math.min(10, placa - 6)} decorativa />}</span>
-          </div>
-        );
-      })}
-      <i className="pila-base" />
+    <div className={`cajones-pizarra en-chapa ${conTiza ? "con-tiza" : ""}`} aria-hidden="true">
+      <div className="cajones" style={{ height: alto }}>
+        {semanas.map((s, wi) => {
+          const cumplida = !!meta && !s.descarga && s.estado !== "futura" && (s.sesiones || 0) >= meta;
+          return (
+            <div key={s.n} className="cajon-lugar">
+              {conTiza && <span className={`cajon-tiza ${cumplida ? "cumplida" : ""}`}>{s.estado !== "futura" && s.sesiones > 0 && <MarcasTiza dias={s.sesiones} max={7} alto={10} decorativa />}</span>}
+              <div className={`cajon ${s.estado} ${s.descarga ? "descarga" : ""} ${animar ? "sube" : ""}`}
+                style={{ height: altura(wi, s.descarga), ...(s.descarga ? null : { "--pintura": pintura(wi) }), ...(animar ? { animationDelay: `${wi * 70}ms` } : null) }}>
+                {!s.descarga && <i className="cajon-agarre" />}
+                <b className="cajon-numero">{s.descarga ? "D" : s.n}</b>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
