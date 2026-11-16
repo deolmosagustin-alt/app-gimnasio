@@ -4795,7 +4795,10 @@ button.carrera-carril:active { background: var(--velo); }
 .grafica-ref { stroke: var(--record); stroke-width: 1; stroke-dasharray: 3 4; opacity: .8; }
 .grafica-ref-texto { fill: var(--record); font-size: 11px; font-weight: 650; }
 .grafica-record { fill: var(--record); stroke: var(--surface-1); stroke-width: 1.5; }
-.grafica-descarga { fill: var(--surface-1); stroke: var(--text-faint); stroke-width: 1.5; }
+.grafica-descarga { fill: var(--surface-1); stroke: var(--text-muted); stroke-width: 1.8; }
+.grafica-franja-raya { fill: var(--text-faint); opacity: .32; }
+.grafica-franja-d { fill: var(--text-muted); font-size: 11px; font-weight: 800; }
+.grafica-franja { animation: graficaAparece .5s .3s ease-out both; }
 .grafica-ultimo, .grafica-tocado { stroke: var(--surface-1); stroke-width: 2; }
 .grafica-guia { stroke: var(--hairline-fuerte); stroke-width: 1; }
 .grafica-tiempo .grafica-globo { --gx: -50%; --gy: calc(-100% - 14px); transform: translate(var(--gx), var(--gy)); min-width: 0; max-width: 190px; white-space: nowrap; }
@@ -4903,7 +4906,7 @@ button.carrera-carril:active { background: var(--velo); }
 .dia-rutina-datos b { font-size: 0.9375rem; font-weight: 700; color: var(--text-strong); margin-right: 2px; }
 /* Armá la tuya. */
 .accion-rutina {
-  display: grid; align-content: start; justify-items: start; gap: 2px; min-height: 118px; padding: 14px; border-radius: 22px; text-align: left;
+  display: grid; align-content: start; justify-items: start; gap: 2px; min-height: 90px; padding: 14px; border-radius: 22px; text-align: left;
   background: var(--surface-1); box-shadow: var(--placa-canto); transition: transform .25s var(--resorte);
 }
 .accion-rutina:active { transform: scale(.97); }
@@ -6313,7 +6316,8 @@ label.ajuste-rotulo { display: block; }
    baldosa de adelante. Los cajones se paran sobre el piso con su sombra. */
 .ciclo-cajones.en-pared { position: relative; overflow: hidden; padding-bottom: 0;
   background:
-    radial-gradient(circle, rgba(10,11,13,.85) 0 1.6px, rgba(255,255,255,.06) 2.1px, transparent 2.6px) 8px 8px / 14px 14px,
+    linear-gradient(to top, rgba(0,0,0,.26) 0 90px, color-mix(in oklab, var(--tono) 62%, #6b6e75) 90px calc(90px + 3px), transparent calc(90px + 3px)),
+    radial-gradient(ellipse 80% 70% at 22% 0%, rgba(255,255,255,.09), transparent 70%),
     repeating-linear-gradient(90deg, rgba(255,255,255,.022) 0 2px, transparent 2px 5px),
     linear-gradient(170deg, #45484e, #393c41 55%, #34373c);
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 0 0 6px rgba(0,0,0,.16), 0 12px 30px -18px rgba(0,0,0,.8); }
@@ -6328,7 +6332,8 @@ label.ajuste-rotulo { display: block; }
 .piso-goma-junta { fill: none; stroke: #0b0c0d; stroke-width: 1.4; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .piso-goma .escalera-enlace { position: relative; z-index: 1; margin: 0; color: #e9eaee; text-shadow: 0 1px 2px rgba(0,0,0,.7); }
 .light-mode .ciclo-cajones.en-pared { background:
-    radial-gradient(circle, rgba(70,73,79,.7) 0 1.6px, rgba(255,255,255,.5) 2.1px, transparent 2.6px) 8px 8px / 14px 14px,
+    linear-gradient(to top, rgba(0,0,0,.09) 0 90px, color-mix(in oklab, var(--tono) 70%, #8a8d94) 90px calc(90px + 3px), transparent calc(90px + 3px)),
+    radial-gradient(ellipse 80% 70% at 22% 0%, rgba(255,255,255,.5), transparent 70%),
     repeating-linear-gradient(90deg, rgba(0,0,0,.02) 0 2px, transparent 2px 5px),
     linear-gradient(170deg, #dfe1e5, #d3d6db 55%, #cdd0d5); }
 .light-mode .ciclo-cajones.en-pared .escalera-cabeza { color: #1d2433; text-shadow: 0 1px 0 rgba(255,255,255,.6); }
@@ -6362,7 +6367,8 @@ label.ajuste-rotulo { display: block; }
 .dia-seccion:has(.con-plataforma) { overflow: clip; }
 .plataforma { position: relative; margin: 0 -20px; padding: 24px 20px 0; border-radius: 30px 30px 0 0; overflow: hidden;
   background:
-    radial-gradient(circle, rgba(10,11,13,.85) 0 1.6px, rgba(255,255,255,.06) 2.1px, transparent 2.6px) 8px 8px / 14px 14px,
+    linear-gradient(to top, rgba(0,0,0,.26) 0 90px, color-mix(in oklab, var(--tono) 62%, #6b6e75) 90px calc(90px + 3px), transparent calc(90px + 3px)),
+    radial-gradient(ellipse 80% 70% at 22% 0%, rgba(255,255,255,.09), transparent 70%),
     repeating-linear-gradient(90deg, rgba(255,255,255,.022) 0 2px, transparent 2px 5px),
     linear-gradient(170deg, #45484e, #393c41 55%, #34373c);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.07); }
@@ -6386,7 +6392,8 @@ label.ajuste-rotulo { display: block; }
 .plataforma-pie { padding-top: 10px; }
 .dia-seccion.en-descarga .plataforma .dia-chip { color: #eef0f2; }
 .light-mode .plataforma { background:
-    radial-gradient(circle, rgba(70,73,79,.7) 0 1.6px, rgba(255,255,255,.5) 2.1px, transparent 2.6px) 8px 8px / 14px 14px,
+    linear-gradient(to top, rgba(0,0,0,.09) 0 90px, color-mix(in oklab, var(--tono) 70%, #8a8d94) 90px calc(90px + 3px), transparent calc(90px + 3px)),
+    radial-gradient(ellipse 80% 70% at 22% 0%, rgba(255,255,255,.5), transparent 70%),
     repeating-linear-gradient(90deg, rgba(0,0,0,.02) 0 2px, transparent 2px 5px),
     linear-gradient(170deg, #dfe1e5, #d3d6db 55%, #cdd0d5); }
 .light-mode .plataforma .dia-chip { color: #1d2433; background: rgba(255,255,255,.6); }
@@ -8158,17 +8165,41 @@ button.estante-lugar:active .pesa-rusa { scale: .92; }
 }
 /* La repisa de madera, donde se paran los cajones. */
 .cajones-pizarra::after { content: ""; display: block; height: 10px; margin: 0 -12px; border-radius: 0 0 12px 12px; background: linear-gradient(#7c6349, #4e3f30); box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 -1px 0 rgba(0,0,0,.5); }
-/* ══ LOS CAJONES, SIN LA PARED (15/11, elegido entre siete bocetos): el fondo
-   es un panel hundido liso, sin la chapa perforada, y el piso, una franja
-   lisa. Vale en Progreso, Perfil, el resumen, la bienvenida y la guía. */
-.cajones-pizarra.en-chapa, .light-mode .cajones-pizarra.en-chapa { padding: 12px 14px 0; border-radius: 20px; background: var(--panel-sunken); box-shadow: inset 0 1px 2px rgba(0,0,0,.25); overflow: hidden; }
-.light-mode .cajones-pizarra.en-chapa { box-shadow: inset 0 1px 2px rgba(20,24,34,.06); }
-.cajones-pizarra.en-chapa::after, .light-mode .cajones-pizarra.en-chapa::after { height: 14px; margin: 0 -14px; border-radius: 0; background: linear-gradient(var(--surface-3), var(--surface-2)); box-shadow: inset 0 1px 0 var(--hairline-fuerte, rgba(255,255,255,.14)); }
-.ciclo-cajones .cajones-pizarra { margin-top: 10px; }
-.cajones-pizarra.en-chapa { --tiza: #e9e8e1; --tiza-suave: rgba(233,232,225,.5); }
+/* EL RINCÓN DE LOS CAJONES (vista previa del 03/11, pedido: "que deje de
+   ser con el fondo negro; el casillero no es muy colorido, pero tiene esas
+   tonalidades de gris que lo diferencian"): en vez de la pizarra, la pared
+   de chapa perforada del depósito del gimnasio, cepillada como el casillero,
+   y los cajones parados sobre el piso de chapa antideslizante. Las veces que
+   fuiste siguen en tiza, escritas sobre la chapa. */
+.cajones-pizarra.en-chapa { --tiza: #e9e8e1; --tiza-suave: rgba(233,232,225,.5);
+  padding: 10px 12px 0; border-radius: 12px;
+  background:
+    linear-gradient(to top, rgba(0,0,0,.26) 0 46%, color-mix(in oklab, var(--tono) 62%, #6b6e75) 46% calc(46% + 3px), transparent calc(46% + 3px)),
+    radial-gradient(ellipse 80% 70% at 22% 0%, rgba(255,255,255,.09), transparent 70%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.022) 0 2px, transparent 2px 5px),
+    linear-gradient(170deg, #45484e, #393c41 55%, #34373c);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 0 0 5px rgba(0,0,0,.16), inset 0 10px 18px -12px rgba(0,0,0,.55), 0 12px 24px -18px rgba(0,0,0,.9); }
+.cajones-pizarra.en-chapa::after { height: 16px; margin: 0 -12px; border-radius: 0 0 12px 12px;
+  background:
+    repeating-linear-gradient(45deg, transparent 0 5px, rgba(255,255,255,.14) 5px 6.5px, transparent 6.5px 11px),
+    repeating-linear-gradient(-45deg, transparent 0 5px, rgba(0,0,0,.28) 5px 6.5px, transparent 6.5px 11px),
+    linear-gradient(#64676d, #4b4e54);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.22), inset 0 -1px 0 rgba(0,0,0,.35), 0 -1px 0 rgba(0,0,0,.45); }
 .cajones-pizarra.en-chapa .cajon { box-shadow: 0 3px 0 -1px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.18); }
-.light-mode .cajones-pizarra.en-chapa { --tiza: #3a3d43; --tiza-suave: rgba(58,61,67,.55); }
-.light-mode .cajones-pizarra.en-chapa .cajon.futura .cajon-numero { color: var(--tiza-suave); }
+.light-mode .cajones-pizarra.en-chapa { --tiza: #3a3d43; --tiza-suave: rgba(58,61,67,.55);
+  background:
+    linear-gradient(to top, rgba(0,0,0,.09) 0 46%, color-mix(in oklab, var(--tono) 70%, #8a8d94) 46% calc(46% + 3px), transparent calc(46% + 3px)),
+    radial-gradient(ellipse 80% 70% at 22% 0%, rgba(255,255,255,.5), transparent 70%),
+    repeating-linear-gradient(90deg, rgba(0,0,0,.02) 0 2px, transparent 2px 5px),
+    linear-gradient(170deg, #dfe1e5, #d3d6db 55%, #cdd0d5);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.08), inset 0 0 0 5px rgba(255,255,255,.35), 0 12px 24px -18px rgba(0,0,0,.35); }
+.light-mode .cajones-pizarra.en-chapa::after { background:
+    repeating-linear-gradient(45deg, transparent 0 5px, rgba(255,255,255,.55) 5px 6.5px, transparent 6.5px 11px),
+    repeating-linear-gradient(-45deg, transparent 0 5px, rgba(0,0,0,.12) 5px 6.5px, transparent 6.5px 11px),
+    linear-gradient(#b9bcc2, #a3a6ac); }
+/* La repisa de madera, donde se paran los cajones. */
+.cajones-pizarra::after { content: ""; display: block; height: 10px; margin: 0 -12px; border-radius: 0 0 12px 12px; background: linear-gradient(#7c6349, #4e3f30); box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 -1px 0 rgba(0,0,0,.5); }
+.light-mode .cajon.futura .cajon-numero { color: rgba(58,61,67,.6); }
 .cajones { display: flex; align-items: stretch; gap: 6px; }
 .cajon-lugar { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; }
 .cajon-tiza { display: flex; justify-content: center; align-items: flex-end; height: 16px; padding-bottom: 4px; }
@@ -16226,6 +16257,38 @@ function IconoCajones({ size = 16 }) {
    sesiones de cada semana en tiza arriba de su cajón. Lo de cuánto falta para
    la descarga queda para el lector de pantalla.
 ============================================================================ */
+// EL PISO DE GOMA (vista previa del 03/11, pedido: "el piso de goma típico
+// pero bien hecho"): las baldosas encastrables del gimnasio, de caucho negro
+// mate con las motas de colores del reciclado, unidas por las juntas de
+// rompecabezas. Va de punta a punta, abajo de los cajones.
+const MOTAS_GOMA = [[22.4, 37.0, 0.73, "#d9d9d3"], [23.5, 7.4, 0.76, "#d9d9d3"], [31.7, 3.8, 0.63, "#5f9e78"], [32.4, 27.7, 0.48, "#5b7fd1"], [38.6, 26.2, 0.82, "#9a9ca2"], [0.6, 21.1, 0.49, "#5b7fd1"], [9.7, 1.2, 0.73, "#c25a5c"], [33.7, 20.8, 0.83, "#d9d9d3"], [26.5, 18.3, 0.62, "#d9d9d3"], [39.8, 33.6, 0.87, "#9a9ca2"], [9.2, 11.6, 0.49, "#c25a5c"], [16.0, 33.9, 0.68, "#9a9ca2"], [33.9, 0.0, 0.58, "#9a9ca2"], [18.8, 39.2, 0.69, "#9a9ca2"], [25.2, 31.1, 0.61, "#5b7fd1"], [13.3, 38.6, 0.90, "#5b7fd1"], [9.9, 4.0, 0.49, "#5b7fd1"], [7.1, 22.4, 0.72, "#9a9ca2"], [29.3, 5.2, 0.84, "#c25a5c"], [16.8, 8.5, 0.61, "#5b7fd1"], [32.1, 12.2, 0.98, "#9a9ca2"], [15.8, 34.2, 0.84, "#c25a5c"], [39.6, 8.5, 0.60, "#5b7fd1"], [13.2, 11.9, 0.49, "#9a9ca2"], [23.3, 9.7, 0.81, "#5b7fd1"], [18.1, 38.4, 0.74, "#d9d9d3"], [34.7, 7.3, 0.54, "#d9d9d3"], [32.7, 10.0, 0.56, "#9a9ca2"], [37.6, 7.9, 1.02, "#d1b25a"], [24.1, 16.9, 0.51, "#9a9ca2"], [38.5, 9.5, 0.87, "#5b7fd1"], [32.9, 23.9, 0.63, "#c25a5c"], [28.8, 2.8, 0.59, "#5b7fd1"], [34.1, 24.6, 0.62, "#d9d9d3"]];
+const JUNTAS_GOMA = ["M-221.5 0 L-400.0 72", "M-137.2 0 L-280.0 72", "M-52.9 0 L-160.0 72", "M31.4 0 L-40.0 72", "M115.7 0 L80.0 72", "M200.0 0 L200.0 72", "M284.3 0 L320.0 72", "M368.6 0 L440.0 72", "M452.9 0 L560.0 72", "M537.2 0 L680.0 72", "M621.5 0 L800.0 72", "M0 9 L400 9", "M0 25 L400 25", "M0 47 L400 47"];
+function PisoGoma({ children = null }) {
+  const uid = `pg${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
+  return (
+    <div className="piso-goma">
+      <svg className="piso-goma-dibujo" viewBox="0 0 400 72" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <defs>
+          <pattern id={`${uid}-m`} width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="scale(1 .62)">
+            {MOTAS_GOMA.map(([x, y, rr, c], k) => <circle key={k} cx={x} cy={y} r={rr} fill={c} opacity=".55" />)}
+          </pattern>
+          <linearGradient id={`${uid}-l`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#000" stopOpacity=".7" />
+            <stop offset=".35" stopColor="#000" stopOpacity=".15" />
+            <stop offset="1" stopColor="#fff" stopOpacity=".05" />
+          </linearGradient>
+        </defs>
+        <rect width="400" height="72" className="piso-goma-caucho" />
+        <rect width="400" height="72" fill={`url(#${uid}-m)`} />
+        <rect width="400" height="72" fill={`url(#${uid}-m)`} transform="translate(0 30) scale(1 1.5)" opacity=".7" />
+        {JUNTAS_GOMA.map((d, k) => <path key={k} d={d} className="piso-goma-junta" />)}
+        <rect width="400" height="72" fill={`url(#${uid}-l)`} />
+      </svg>
+      {children}
+    </div>
+  );
+}
+
 // EL RESUMEN DEL CICLO (12/11, pedido: "que al final de cada ciclo te muestre
 // en comparación todos los ejercicios, con las mejores marcas antes de
 // empezar y con los récords nuevos"). Se pide desde cualquier lado con un
@@ -16362,7 +16425,7 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
   const estaSemana = semanas[weekInfo.weekInCycle - 1]?.sesiones || 0;
   const cumplida = !!metaSemanal && estaSemana >= metaSemanal;
   return (
-    <section className="tarjeta-tonal escalera-ciclo ciclo-cajones" aria-label={`Ciclo ${weekInfo.cycleNumber}, semana ${weekInfo.weekInCycle} de ${cycleWeeks}: ${falta}. ${estaSemana} ${estaSemana === 1 ? "sesión" : "sesiones"} esta semana.`}>
+    <section className="tarjeta-tonal escalera-ciclo ciclo-cajones en-pared" aria-label={`Ciclo ${weekInfo.cycleNumber}, semana ${weekInfo.weekInCycle} de ${cycleWeeks}: ${falta}. ${estaSemana} ${estaSemana === 1 ? "sesión" : "sesiones"} esta semana.`}>
       <div className="escalera-cabeza" aria-hidden="true">
         <div className="min-w-0">
           <p className="ciclo-rotulo">Tu ciclo</p>
@@ -16374,10 +16437,10 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
         </div>
       </div>
       <CajonesCiclo semanas={semanas} trainWeeks={trainWeeks} meta={metaSemanal} animar={!yaAnimado && cajonesHoy} />
-      <div className="ciclo-pie">
-        <button onClick={() => pedirResumenDeCiclo()} className="enlace-suave"><Trophy size={13} /> Mis marcas</button>
-        <button onClick={onGoToDeload} className="enlace-suave"><Zap size={13} /> Mi descarga</button>
-      </div>
+      <PisoGoma>
+        <button onClick={() => pedirResumenDeCiclo()} className="enlace-suave escalera-enlace"><Trophy size={13} /> Mis marcas del ciclo</button>
+        <button onClick={onGoToDeload} className="enlace-suave escalera-enlace"><Zap size={13} /> Mi descarga</button>
+      </PisoGoma>
     </section>
   );
 }
@@ -18726,7 +18789,19 @@ function GraficaTiempo({ puntos, color = "var(--tono)", alto = 200, formato = (v
               <stop offset="0" style={{ stopColor: color, stopOpacity: 0.16 }} />
               <stop offset="1" style={{ stopColor: color, stopOpacity: 0 }} />
             </linearGradient>
+            <pattern id={`${uid}-d`} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
+              <rect width="2.4" height="6" className="grafica-franja-raya" />
+            </pattern>
           </defs>
+          {/* Las sesiones de descarga (16/11, pedido: "algún detalle que te
+              muestre cuándo fue una sesión de descarga"): una franja rayada,
+              como el cajón de la descarga, con su D arriba. */}
+          {puntos.map((p, i) => (p.descarga ? (
+            <g key={`d${i}`} className="grafica-franja">
+              <rect x={xs[i] - 8} y={padT} width={16} height={plotH} rx="4" fill={`url(#${uid}-d)`} />
+              <text x={xs[i]} y={padT - 3} textAnchor="middle" className="grafica-franja-d">D</text>
+            </g>
+          ) : null))}
           {marcasY.map((v, i) => (
             <g key={v}>
               <line x1={padL} x2={padL + plotW} y1={yDe(v)} y2={yDe(v)} className={i === 0 ? "grafica-base" : "grafica-raya"} />
