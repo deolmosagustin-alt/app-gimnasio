@@ -6600,19 +6600,23 @@ label.ajuste-rotulo { display: block; }
 .dia-hero.escena-completa .dia-chip { background: rgba(13,14,16,.55); color: #eef0f2; }
 .light-mode .dia-hero.escena-completa .dia-chip { background: rgba(255,255,255,.7); color: #1d2433; }
 /* Rutinas: el rack dibujado entero, contra la pared de cemento liso. */
-/* La pared del rack es de ladrillo a la vista, a soga (16/11, pedido:
-   "cambiá también el de las kettlebells, pero sin repetir"): en Rutina es
-   chapa cepillada y en Progreso, tablas de madera. Antes era cemento liso. */
+/* La pared del rack: revoque pintado en dos tonos, como la de un gimnasio
+   de barrio; abajo, la franja del color de la pestaña, apagada, con su
+   filete (16/11, pedido: "cambiá también el de las kettlebells, pero sin
+   repetir": en Rutina es chapa cepillada y en Progreso, tablas de madera).
+   Antes fue cemento liso y, ese mismo día, ladrillo a la vista ("no me
+   gustó la pared de los kettlebell"): no vuelvas al ladrillo. La primera
+   capa es el piso, que sigue debajo de los botones. */
 .rutina-activa.rack-nuevo { background:
     linear-gradient(to top, #2a2b2e 0 138px, transparent 139px),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='124' height='80'%3E%3Crect x='2' y='2' width='60' height='18' fill='%23fff' fill-opacity='.035'/%3E%3Crect x='64' y='42' width='60' height='18' fill='%23fff' fill-opacity='.035'/%3E%3Crect x='33' y='22' width='60' height='18' fill='%23000' fill-opacity='.07'/%3E%3Crect x='2' y='42' width='60' height='18' fill='%23000' fill-opacity='.07'/%3E%3Crect x='95' y='62' width='29' height='18' fill='%23fff' fill-opacity='.035'/%3E%3Crect x='0' y='62' width='31' height='18' fill='%23000' fill-opacity='.07'/%3E%3Cpath d='M0 1H124M0 21H124M0 41H124M0 61H124M1 2V20M63 2V20M32 22V40M94 22V40M1 42V60M63 42V60M32 62V80M94 62V80' fill='none' stroke='%23000' stroke-opacity='.38' stroke-width='2'/%3E%3Cpath d='M0 2.5H124M0 22.5H124M0 42.5H124M0 62.5H124' fill='none' stroke='%23fff' stroke-opacity='.05'/%3E%3C/svg%3E") 0 0 / 124px 80px,
-    radial-gradient(ellipse at 20% 15%, rgba(255,255,255,.07), transparent 50%), radial-gradient(ellipse at 80% 75%, rgba(0,0,0,.2), transparent 55%),
-    linear-gradient(#54433d, #45372f) !important; }
+    linear-gradient(to top, color-mix(in oklab, var(--c, #3B82F6) 30%, #2b2d31) 0 262px, color-mix(in oklab, var(--c, #3B82F6) 45%, #a9acb2) 262px 265px, transparent 265px),
+    radial-gradient(ellipse 70% 45% at 22% 0%, rgba(255,255,255,.08), transparent 70%), radial-gradient(ellipse at 85% 40%, rgba(0,0,0,.14), transparent 55%),
+    linear-gradient(#45474c, #3b3d42) !important; }
 .light-mode .rutina-activa.rack-nuevo { background:
     linear-gradient(to top, #b6b7b5 0 138px, transparent 139px),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='124' height='80'%3E%3Crect x='2' y='2' width='60' height='18' fill='%23fff' fill-opacity='.2'/%3E%3Crect x='64' y='42' width='60' height='18' fill='%23fff' fill-opacity='.2'/%3E%3Crect x='33' y='22' width='60' height='18' fill='%23000' fill-opacity='.035'/%3E%3Crect x='2' y='42' width='60' height='18' fill='%23000' fill-opacity='.035'/%3E%3Crect x='95' y='62' width='29' height='18' fill='%23fff' fill-opacity='.2'/%3E%3Crect x='0' y='62' width='31' height='18' fill='%23000' fill-opacity='.035'/%3E%3Cpath d='M0 1H124M0 21H124M0 41H124M0 61H124M1 2V20M63 2V20M32 22V40M94 22V40M1 42V60M63 42V60M32 62V80M94 62V80' fill='none' stroke='%23000' stroke-opacity='.2' stroke-width='2'/%3E%3Cpath d='M0 2.5H124M0 22.5H124M0 42.5H124M0 62.5H124' fill='none' stroke='%23fff' stroke-opacity='.45'/%3E%3C/svg%3E") 0 0 / 124px 80px,
-    radial-gradient(ellipse at 20% 15%, rgba(255,255,255,.4), transparent 50%), radial-gradient(ellipse at 80% 75%, rgba(0,0,0,.05), transparent 55%),
-    linear-gradient(#d9c2b3, #cfb5a4) !important; }
+    linear-gradient(to top, color-mix(in oklab, var(--c, #3B82F6) 26%, #cfd2d7) 0 262px, color-mix(in oklab, var(--c, #3B82F6) 45%, #f4f5f7) 262px 265px, transparent 265px),
+    radial-gradient(ellipse 70% 45% at 22% 0%, rgba(255,255,255,.6), transparent 70%), radial-gradient(ellipse at 85% 40%, rgba(0,0,0,.04), transparent 55%),
+    linear-gradient(#ecebe7, #e2e1dd) !important; }
 .rack-kb { position: relative; width: 100%; aspect-ratio: 360 / 290; }
 .rack-kb-fondo, .rack-kb-frente { position: absolute; inset: 0; width: 100%; height: 100%; }
 .rack-kb-frente { pointer-events: none; z-index: 2; }
@@ -15685,11 +15689,15 @@ function CespedTrineo({ avance = 0, largo = 4, orden = 0 }) {
       {Array.from({ length: largo }, (_, k) => <i key={k} className="cesped-linea" style={{ left: `${((k + 1) / largo) * 100}%` }} />)}
       <span className="cesped-rastro" />
       <svg className="cesped-trineo" viewBox="0 0 40 24" aria-hidden="true">
-        {/* El trineo de empuje: los patines, la base con los discos y los dos caños. */}
+        {/* El trineo de empuje, mirando hacia donde avanza (a la derecha): los
+            patines con la punta levantada adelante, la base con los discos y,
+            atrás, los dos caños de donde se empuja (16/11, reporte: "están
+            dados vuelta, como mirando para el otro lado": los caños iban
+            adelante, inclinados hacia la punta). */}
         <path d="M2 21 H34 Q38 21 38 17" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-        <rect x="6" y="14.5" width="22" height="4" rx="1" fill="currentColor" />
-        <rect x="11" y="7" width="12" height="8" rx="2" fill="#1d1e21" stroke="currentColor" strokeWidth="1.2" />
-        <path d="M27 15 L33 2 M23 15 L29 3" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+        <rect x="6" y="14.5" width="24" height="4" rx="1" fill="currentColor" />
+        <rect x="16" y="7" width="12" height="8" rx="2" fill="#1d1e21" stroke="currentColor" strokeWidth="1.2" />
+        <path d="M8 15 L4 2 M12.5 15 L8.5 3" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
       </svg>
     </span>
   );
@@ -25582,11 +25590,11 @@ function Casillero({ semilla = "", nombre, usuario = null, foto = null, rango = 
 // TU CASILLERO, arriba de Social: la puerta chica del mismo casillero que ven
 // tus amigos al entrar a tu perfil (Casillero, el número sale de la misma
 // semilla), con lo de todos los días pegado en calcomanías: tu rango (tocalo
-// y te explica por qué), tu racha en marcas de tiza y los aplausos que te
+// y te explica por qué) y los aplausos que te (la racha se sacó el 16/11, a pedido: ya la dicen los trineos de abajo; no la vuelvas a poner) que te
 // dieron. Tocás la foto o el nombre y se abre grande, como el reloj del
 // descanso. Antes era una credencial con tres casilleros de datos. Sin
 // `onAbrir` (la guía del "?") es un dibujo: nada se toca.
-function CasilleroChico({ semilla = "", nombre, foto = null, rango = null, racha = 0, aplausos = 0, onAbrir = null, onRango = null, accion = null }) {
+function CasilleroChico({ semilla = "", nombre, foto = null, rango = null, aplausos = 0, onAbrir = null, onRango = null, accion = null }) {
   const numero = numeroDeCasillero(semilla || nombre || "");
   const Puerta = onAbrir ? "button" : "div";
   const Rango = onRango && rango ? "button" : "span";
@@ -25613,11 +25621,6 @@ function CasilleroChico({ semilla = "", nombre, foto = null, rango = null, racha
           {rango && <RankBadgeIcon tier={rango.tier} sub={null} color={rango.color} size={20} />}
           {rango ? `${rango.tier} ${rango.sub}` : "Sin rango"}
         </Rango>
-        <span className="calco calco-tiza" role="img" aria-label={`${racha} ${racha === 1 ? "día seguido" : "días seguidos"}`}>
-          <b className="num-display" aria-hidden="true">{racha}</b>
-          <MarcasTiza dias={racha} max={5} alto={14} decorativa className={racha > 0 ? "viva" : ""} />
-          <span aria-hidden="true">{racha === 1 ? "día seguido" : "días seguidos"}</span>
-        </span>
         <span className="calco calco-papel" role="img" aria-label={`${aplausos} ${aplausos === 1 ? "aplauso" : "aplausos"}`}>
           <span aria-hidden="true">👏 {aplausos}</span>
         </span>
