@@ -6309,17 +6309,23 @@ label.ajuste-rotulo { display: block; }
 /* ── VISTA PREVIA 4 (03/11, pedido: "volvamos a como estaba antes, pero
    abarcando todo el recuadro; el de los cajones con el piso de goma típico
    pero bien hecho, y lo de las kettlebell como esos racks donde se dejan") ── */
-/* Progreso: la tarjeta entera es el rincón del gimnasio. Arriba, la pared de
-   chapa perforada gris (la de la vuelta anterior); abajo, de punta a punta,
+/* Progreso: la tarjeta entera es el rincón del gimnasio. Arriba, la pared
+   revestida en tablas de madera, como la de un gimnasio de colegio, que es
+   donde viven los cajones de salto (16/11, pedido: "que sea distinto a la
+   pared de la barra y a la de las kettlebells": aquélla es chapa cepillada
+   y ésta, cemento; antes fue chapa perforada, "tiene como circulitos", y un
+   día, pintada en dos tonos); abajo, de punta a punta,
    el piso de goma encastrable: negro mate con las motas de colores del
    caucho reciclado, las juntas en forma de rompecabezas y el canto de la
    baldosa de adelante. Los cajones se paran sobre el piso con su sombra. */
 .ciclo-cajones.en-pared { position: relative; overflow: hidden; padding-bottom: 0;
   background:
-    linear-gradient(to top, rgba(0,0,0,.26) 0 90px, color-mix(in oklab, var(--tono) 62%, #6b6e75) 90px calc(90px + 3px), transparent calc(90px + 3px)),
-    radial-gradient(ellipse 80% 70% at 22% 0%, rgba(255,255,255,.09), transparent 70%),
-    repeating-linear-gradient(90deg, rgba(255,255,255,.022) 0 2px, transparent 2px 5px),
-    linear-gradient(170deg, #45484e, #393c41 55%, #34373c);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='230' height='52'%3E%3Cpath d='M69.5 0v26M184.5 26v26' stroke='%23000' stroke-opacity='.4'/%3E%3Cpath d='M70.5 0v26M185.5 26v26' stroke='%23fff' stroke-opacity='.05'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse 80% 70% at 22% 0%, rgba(255,255,255,.1), transparent 70%),
+    repeating-linear-gradient(to bottom, rgba(255,255,255,.07) 0 1px, transparent 1px 25px, rgba(0,0,0,.42) 25px 26px),
+    repeating-linear-gradient(to bottom, rgba(0,0,0,.08) 0 26px, transparent 26px 52px),
+    repeating-linear-gradient(to bottom, rgba(255,255,255,.02) 0 1px, transparent 1px 4px, rgba(0,0,0,.03) 4px 5px, transparent 5px 9px),
+    linear-gradient(170deg, #5a5046, #4b4239 55%, #423a32);
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 0 0 6px rgba(0,0,0,.16), 0 12px 30px -18px rgba(0,0,0,.8); }
 .ciclo-cajones.en-pared .escalera-cabeza { color: #f2f3f5; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
 .ciclo-cajones.en-pared .escalera-cabeza :is(p, span):not(.num-display) { color: rgba(242,243,245,.8); }
@@ -6332,10 +6338,12 @@ label.ajuste-rotulo { display: block; }
 .piso-goma-junta { fill: none; stroke: #0b0c0d; stroke-width: 1.4; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .piso-goma .escalera-enlace { position: relative; z-index: 1; margin: 0; color: #e9eaee; text-shadow: 0 1px 2px rgba(0,0,0,.7); }
 .light-mode .ciclo-cajones.en-pared { background:
-    linear-gradient(to top, rgba(0,0,0,.09) 0 90px, color-mix(in oklab, var(--tono) 70%, #8a8d94) 90px calc(90px + 3px), transparent calc(90px + 3px)),
-    radial-gradient(ellipse 80% 70% at 22% 0%, rgba(255,255,255,.5), transparent 70%),
-    repeating-linear-gradient(90deg, rgba(0,0,0,.02) 0 2px, transparent 2px 5px),
-    linear-gradient(170deg, #dfe1e5, #d3d6db 55%, #cdd0d5); }
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='230' height='52'%3E%3Cpath d='M69.5 0v26M184.5 26v26' stroke='%23000' stroke-opacity='.2'/%3E%3Cpath d='M70.5 0v26M185.5 26v26' stroke='%23fff' stroke-opacity='.5'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse 80% 70% at 22% 0%, rgba(255,255,255,.45), transparent 70%),
+    repeating-linear-gradient(to bottom, rgba(255,255,255,.5) 0 1px, transparent 1px 25px, rgba(0,0,0,.17) 25px 26px),
+    repeating-linear-gradient(to bottom, rgba(0,0,0,.035) 0 26px, transparent 26px 52px),
+    repeating-linear-gradient(to bottom, rgba(255,255,255,.14) 0 1px, transparent 1px 4px, rgba(0,0,0,.018) 4px 5px, transparent 5px 9px),
+    linear-gradient(170deg, #e3d8c8, #d9ccb9 55%, #d1c3ae); }
 .light-mode .ciclo-cajones.en-pared .escalera-cabeza { color: #1d2433; text-shadow: 0 1px 0 rgba(255,255,255,.6); }
 .light-mode .ciclo-cajones.en-pared .escalera-cabeza :is(p, span):not(.num-display) { color: rgba(29,36,51,.72); }
 .light-mode .piso-goma-caucho { fill: #34363b; }
@@ -8174,10 +8182,12 @@ button.estante-lugar:active .pesa-rusa { scale: .92; }
 .cajones-pizarra.en-chapa { --tiza: #e9e8e1; --tiza-suave: rgba(233,232,225,.5);
   padding: 10px 12px 0; border-radius: 12px;
   background:
-    linear-gradient(to top, rgba(0,0,0,.26) 0 46%, color-mix(in oklab, var(--tono) 62%, #6b6e75) 46% calc(46% + 3px), transparent calc(46% + 3px)),
-    radial-gradient(ellipse 80% 70% at 22% 0%, rgba(255,255,255,.09), transparent 70%),
-    repeating-linear-gradient(90deg, rgba(255,255,255,.022) 0 2px, transparent 2px 5px),
-    linear-gradient(170deg, #45484e, #393c41 55%, #34373c);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='190' height='40'%3E%3Cpath d='M57.5 0v20M152.5 20v20' stroke='%23000' stroke-opacity='.4'/%3E%3Cpath d='M58.5 0v20M153.5 20v20' stroke='%23fff' stroke-opacity='.05'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse 80% 70% at 22% 0%, rgba(255,255,255,.1), transparent 70%),
+    repeating-linear-gradient(to bottom, rgba(255,255,255,.07) 0 1px, transparent 1px 19px, rgba(0,0,0,.42) 19px 20px),
+    repeating-linear-gradient(to bottom, rgba(0,0,0,.08) 0 20px, transparent 20px 40px),
+    repeating-linear-gradient(to bottom, rgba(255,255,255,.02) 0 1px, transparent 1px 4px, rgba(0,0,0,.03) 4px 5px, transparent 5px 9px),
+    linear-gradient(170deg, #5a5046, #4b4239 55%, #423a32);
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 0 0 5px rgba(0,0,0,.16), inset 0 10px 18px -12px rgba(0,0,0,.55), 0 12px 24px -18px rgba(0,0,0,.9); }
 .cajones-pizarra.en-chapa::after { height: 16px; margin: 0 -12px; border-radius: 0 0 12px 12px;
   background:
@@ -8188,10 +8198,12 @@ button.estante-lugar:active .pesa-rusa { scale: .92; }
 .cajones-pizarra.en-chapa .cajon { box-shadow: 0 3px 0 -1px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.18); }
 .light-mode .cajones-pizarra.en-chapa { --tiza: #3a3d43; --tiza-suave: rgba(58,61,67,.55);
   background:
-    linear-gradient(to top, rgba(0,0,0,.09) 0 46%, color-mix(in oklab, var(--tono) 70%, #8a8d94) 46% calc(46% + 3px), transparent calc(46% + 3px)),
-    radial-gradient(ellipse 80% 70% at 22% 0%, rgba(255,255,255,.5), transparent 70%),
-    repeating-linear-gradient(90deg, rgba(0,0,0,.02) 0 2px, transparent 2px 5px),
-    linear-gradient(170deg, #dfe1e5, #d3d6db 55%, #cdd0d5);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='190' height='40'%3E%3Cpath d='M57.5 0v20M152.5 20v20' stroke='%23000' stroke-opacity='.2'/%3E%3Cpath d='M58.5 0v20M153.5 20v20' stroke='%23fff' stroke-opacity='.5'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse 80% 70% at 22% 0%, rgba(255,255,255,.45), transparent 70%),
+    repeating-linear-gradient(to bottom, rgba(255,255,255,.5) 0 1px, transparent 1px 19px, rgba(0,0,0,.17) 19px 20px),
+    repeating-linear-gradient(to bottom, rgba(0,0,0,.035) 0 20px, transparent 20px 40px),
+    repeating-linear-gradient(to bottom, rgba(255,255,255,.14) 0 1px, transparent 1px 4px, rgba(0,0,0,.018) 4px 5px, transparent 5px 9px),
+    linear-gradient(170deg, #e3d8c8, #d9ccb9 55%, #d1c3ae);
   box-shadow: inset 0 0 0 1px rgba(0,0,0,.08), inset 0 0 0 5px rgba(255,255,255,.35), 0 12px 24px -18px rgba(0,0,0,.35); }
 .light-mode .cajones-pizarra.en-chapa::after { background:
     repeating-linear-gradient(45deg, transparent 0 5px, rgba(255,255,255,.55) 5px 6.5px, transparent 6.5px 11px),
