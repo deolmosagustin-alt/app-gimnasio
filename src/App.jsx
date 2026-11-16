@@ -7449,6 +7449,82 @@ label.ajuste-rotulo { display: block; }
 .vista-tema b { font-size: 19px; font-weight: 750; letter-spacing: -.02em; }
 .vista-tema small { font-size: 12px; font-weight: 650; color: var(--text-faint); padding: 3px 7px; border-radius: 999px; background: var(--surface-3); }
 
+/* ══ LA CURVA DEL CICLO (15/11): la fatiga que se acumula semana a semana y la
+   descarga que la baja. Reemplaza a los cajones y a la pared perforada. */
+.curva-ciclo { margin-top: 8px; }
+.curva-ciclo svg { display: block; overflow: visible; }
+.curva-piso { stroke: var(--hairline); stroke-width: 1; }
+.curva-franja { fill: var(--velo); }
+.curva-linea { fill: none; stroke: color-mix(in oklab, var(--tono) 72%, white); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.curva-por-venir { fill: none; stroke: var(--text-faint); stroke-width: 1.6; stroke-dasharray: 2 5; stroke-linecap: round; opacity: .75; }
+.curva-punto { fill: var(--surface-1); stroke: var(--text-faint); stroke-width: 1.6; }
+.curva-semana.pasada .curva-punto, .curva-semana.actual .curva-punto { stroke: color-mix(in oklab, var(--tono) 72%, white); }
+.curva-semana.cumplida .curva-punto, .curva-semana.actual .curva-punto { fill: color-mix(in oklab, var(--tono) 72%, white); }
+.curva-halo { fill: var(--tono); opacity: .22; }
+.curva-numero { font-size: 11px; font-weight: 700; fill: var(--text-faint); }
+.curva-semana.actual .curva-numero { fill: var(--text-strong); font-weight: 800; }
+.curva-veces { font-size: 11px; font-weight: 700; fill: var(--text-muted); }
+.curva-semana.cumplida .curva-veces { fill: color-mix(in oklab, var(--tono) 72%, white); }
+.light-mode .curva-linea { stroke: var(--tono); }
+.light-mode .curva-semana.pasada .curva-punto, .light-mode .curva-semana.actual .curva-punto { stroke: var(--tono); }
+.light-mode .curva-semana.cumplida .curva-punto, .light-mode .curva-semana.actual .curva-punto { fill: var(--tono); }
+.light-mode .curva-semana.cumplida .curva-veces { fill: color-mix(in oklab, var(--tono) 75%, black); }
+@keyframes curvaSeDibuja { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes curvaAparece { from { opacity: 0; } }
+.curva-ciclo.se-dibuja .curva-linea { stroke-dasharray: 1; animation: curvaSeDibuja var(--dur-momento, 1.1s) var(--sale, ease-out) backwards; }
+.curva-ciclo.se-dibuja :is(.curva-area, .curva-semana) { animation: curvaAparece .4s ease-out .7s backwards; }
+@media (prefers-reduced-motion: reduce) { .curva-ciclo.se-dibuja :is(.curva-linea, .curva-area, .curva-semana) { animation: none; } }
+.ciclo-pie { display: flex; align-items: center; gap: 4px 14px; flex-wrap: wrap; margin-top: 2px; }
+.ciclo-rotulo span { font-weight: 500; color: var(--text-faint); }
+.ciclo-pie { margin-left: -6px; }
+.ciclo-perfil .curva-ciclo, .guia-cajones .curva-ciclo { margin-top: 0; }
+.ciclo-resumen-pizarra .curva-ciclo { padding: 4px 8px 0; border-radius: 18px; background: var(--panel-sunken); }
+
+/* ══ EL SECTOR DEL MUÑECO, pulido (15/11): el rango general de titular, el
+   muñeco en su escena hundida con el reparto por rango, y dos botones. */
+.rango-tarjeta { display: grid; gap: 12px; padding: 16px; }
+.rango-cabeza { display: flex; align-items: center; gap: 12px; }
+.rango-cabeza-vacia { display: grid; place-items: center; width: 46px; height: 46px; color: var(--text-faint); }
+.rango-cabeza-rotulo { font-size: 13px; font-weight: 600; color: var(--text-muted); line-height: 1.2; }
+.rango-cabeza-rango { font-size: 24px; font-weight: 800; line-height: 1.1; font-stretch: 88%; letter-spacing: -.01em; }
+.rango-cabeza-rango.sin { font-size: 16px; font-weight: 700; color: var(--text-strong); font-stretch: normal; }
+.rango-escena { display: grid; gap: 6px; padding: 14px 8px 12px; border-radius: 22px; background: var(--panel-sunken); box-shadow: inset 0 1px 2px rgba(0,0,0,.25); }
+.light-mode .rango-escena { box-shadow: inset 0 1px 2px rgba(20,24,34,.06); }
+.rango-reparto { display: flex; justify-content: center; flex-wrap: wrap; gap: 2px 16px; padding-top: 8px; margin: 0 8px; border-top: 1px solid var(--hairline); font-size: 12px; font-weight: 600; }
+.rango-reparto b { font-size: 15px; font-weight: 800; margin-right: 2px; }
+.rango-acciones { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.rango-acciones .boton-tonal { min-height: 44px; padding-inline: 10px; font-size: 13px; text-wrap: balance; }
+.rango-ayuda { text-align: center; font-size: 12px; color: var(--text-faint); }
+
+/* ══ EVOLUCIÓN, con menos texto (15/11): el récord en un renglón con sus datos. */
+.records-renglon { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding-top: 14px; border-top: 1px solid var(--hairline); }
+.records-renglon .records-valor { font-size: 2.1rem; }
+.records-datos { display: flex; gap: 18px; margin: 0; text-align: right; }
+.records-datos dt { font-size: 12px; font-weight: 600; color: var(--text-faint); }
+.records-datos dd { margin: 2px 0 0; font-size: 1.3rem; line-height: 1.05; font-weight: 750; color: var(--text-strong); }
+.records-datos dd small { margin-left: 2px; font-size: 11px; font-weight: 600; color: var(--text-muted); }
+.evo-ritmo b { font-weight: 700; }
+
+/* ══ MEDIDAS, pulida (15/11): la lectura y su recorrido en un panel hundido. */
+.medida-panel { margin-top: 18px !important; display: grid; gap: 14px; padding: 16px 14px 12px; border-radius: 22px; background: var(--panel-sunken); box-shadow: inset 0 1px 2px rgba(0,0,0,.25); }
+.light-mode .medida-panel { box-shadow: inset 0 1px 2px rgba(20,24,34,.06); }
+.medida-panel .balanza-cabeza { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; }
+.medida-panel .balanza-valor { flex-wrap: wrap; }
+.medida-panel .balanza-delta { margin: 0 0 4px; padding: 5px 10px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.medida-panel .balanza-delta b { font-size: 14px; font-weight: 800; color: var(--text-strong); }
+.medida-panel .balanza-leyenda { font-size: 12px; color: var(--text-faint); }
+
+/* ══ EL DESCANSO ENTRE LADOS (15/11): el renglón de los ejercicios unilaterales. */
+.entre-lados { display: grid; gap: 8px; margin-top: 8px; }
+.entre-lados-fila { display: flex; align-items: stretch; gap: 6px; }
+.entre-lados-iniciar { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border-radius: 999px; font-size: 14px; font-weight: 700; color: color-mix(in oklab, var(--c, var(--tono)) 72%, white); background: color-mix(in oklab, var(--c, var(--tono)) 13%, transparent); transition: transform var(--dur-toque, .1s); }
+.entre-lados-iniciar:active { transform: scale(.97); }
+.entre-lados-iniciar:disabled { opacity: .5; }
+.light-mode .entre-lados-iniciar { color: color-mix(in oklab, var(--c, var(--tono)) 70%, black); }
+.entre-lados-tiempo { min-width: 64px; min-height: 44px; padding: 0 12px; border-radius: 999px; font-size: 16px; font-weight: 750; color: var(--text-strong); background: var(--surface-2); }
+.entre-lados-opciones { display: flex; flex-wrap: wrap; gap: 6px; }
+.entre-lados > .enlace-suave { justify-self: start; }
+
 /* LAS ANIMACIONES DEL 03/11 (las propuestas A1 a A12, menos el disco que
    rueda y el aplauso con magnesio) */
 /* A1: la barra sube de los ganchos cuando se va el molinete. */
@@ -11718,6 +11794,56 @@ function Onda({ fraccion = 1, quieta = false }) {
 // serie"): dos relojes a la vez se pisaban y el de la tarjeta se iba con el
 // scroll. Acá queda nada más el renglón para arrancarlo a mano, que sólo se
 // muestra si el descanso no arranca solo al guardar (Perfil › Descansos).
+// EL DESCANSO ENTRE LADOS (15/11, pedido: "para los ejercicios unilaterales,
+// poder agregar un cronómetro entre lados; por ejemplo en banco Scott con
+// mancuerna, un temporizador entre el brazo izquierdo y el derecho"). Se
+// guarda por ejercicio en settings.entreLados ({ id: segundos }); se elige
+// acá o en el armado de la rutina. Terminás un lado, tocás "Cambio de lado"
+// y corre el mismo reloj del dock, corto; el ✓ de la serie se toca al
+// terminar el segundo lado, como siempre. A los ejercicios que el catálogo
+// reconoce como unilaterales se les ofrece sin haberlo prendido.
+const ENTRE_LADOS = [15, 30, 45, 60, 90];
+function esUnilateral(ex) {
+  if (!ex || ex.cardio) return false;
+  const lib = EXERCISE_LIBRARY_BY_ID[ex.id];
+  return /unilateral|a una (mano|pierna)|una mano|una pierna|un brazo|zancada|b[uú]lgara|scott con mancuerna|concentrado|kroc|estocada/i.test(`${ex.id || ""} ${ex.name || ""} ${lib?.nota || ""}`);
+}
+function EntreLados({ exercise, accent, timerId, settings, onUpdateSettings }) {
+  const [eligiendo, setEligiendo] = useState(false);
+  const { estado } = useRelojDescanso(timerId || "__sin__");
+  const seg = Number(settings?.entreLados?.[exercise.id]) || 0;
+  if (!timerId || (!seg && !esUnilateral(exercise))) return null;
+  const guardar = (v) => {
+    if (!onUpdateSettings) return;
+    const todos = { ...(settings?.entreLados || {}) };
+    if (v > 0) todos[exercise.id] = v; else delete todos[exercise.id];
+    onUpdateSettings({ entreLados: todos });
+    haptic(10);
+    setEligiendo(false);
+  };
+  return (
+    <div className="entre-lados" style={{ "--c": accent }}>
+      {seg > 0 ? (
+        <div className="entre-lados-fila">
+          <button className="entre-lados-iniciar" disabled={estado === "running"}
+            onClick={() => { haptic(15); iniciarDescanso(timerId, { segundos: seg, ejercicio: exercise.name || null, siguiente: "el otro lado", color: accent }); }}>
+            <ArrowLeftRight size={15} /> Cambio de lado
+          </button>
+          {onUpdateSettings && <button className="entre-lados-tiempo num-display" onClick={() => setEligiendo((v) => !v)} aria-expanded={eligiendo} aria-label={`Descanso entre lados: ${relojCorto(seg)}. Cambiar`}>{relojCorto(seg)}</button>}
+        </div>
+      ) : onUpdateSettings && (
+        <button className="enlace-suave" onClick={() => setEligiendo((v) => !v)} aria-expanded={eligiendo}><ArrowLeftRight size={14} /> Descanso entre lados</button>
+      )}
+      {eligiendo && (
+        <div className="entre-lados-opciones" role="group" aria-label="Cuánto descansar entre un lado y el otro">
+          {ENTRE_LADOS.map((v) => <button key={v} onClick={() => guardar(v)} aria-pressed={seg === v} className={`armado-salto ${seg === v ? "activo" : ""}`}>{relojCorto(v)}</button>)}
+          {seg > 0 && <button onClick={() => guardar(0)} className="armado-salto">Sacar</button>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RestTimer({ seconds, accent, timerId = "default", exerciseName = "" }) {
   const { estado } = useRelojDescanso(timerId);
   if (estado !== "idle") return null;
@@ -13444,8 +13570,8 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
 // La evidencia: el consenso Delphi de Bell et al. (2023) define la descarga
 // como un período más liviano para reducir la fatiga y recuperarse.
 const BIENVENIDA_DESCARGA = {
-  ciclo: { title: "Entrenás por ciclos", text: "Un ciclo son varias semanas seguidas. Cada cajón es una semana, y cada uno es un poco más alto que el anterior: la carga sube de a poco. Arriba de cada cajón, en tiza, las veces que fuiste. El de esta semana tiene su color entero; los que vienen están dibujados con tiza." },
-  descarga: { title: "Y al final, la descarga", text: "Después de varias semanas subiendo, el cuerpo junta cansancio. La descarga es el cajón bajo, el de la D: una semana más liviana para recuperarte y volver a subir con más fuerza. Esa semana Rutina se transforma sola, y si venís bajando, la podés adelantar." },
+  ciclo: { title: "Entrenás por ciclos", text: "Un ciclo son varias semanas seguidas. Cada punto es una semana, y la línea sube con cada una: la carga crece de a poco y el cansancio se acumula. Arriba de cada punto, las veces que fuiste. Lo que viene está punteado." },
+  descarga: { title: "Y al final, la descarga", text: "Después de varias semanas subiendo, el cuerpo junta cansancio. La descarga es la D, donde la línea baja: una semana más liviana para recuperarte y volver a subir con más fuerza. Esa semana Rutina se transforma sola, y si venís bajando, la podés adelantar." },
   elegir: { title: "¿Activamos las semanas de descarga?", text: "Te recomendamos dejarlas prendidas. Las podés cambiar cuando quieras en tu perfil." },
 };
 
@@ -15014,7 +15140,7 @@ function BalanzaCursor({ inicio, actual, min, max, unidad, nota = null }) {
       </div>
       <div className="balanza-escala" aria-hidden="true"><span>{bajo}</span><span>{alto}</span></div>
       <div className="balanza-leyenda" aria-hidden="true">
-        <span><i className="fantasma" /> Empezaste: {inicio}</span>
+        <span><i className="fantasma" /> Inicio {numeroAR(inicio)}</span>
         <span><i /> Hoy</span>
       </div>
     </div>
@@ -15027,8 +15153,8 @@ function LecturaCabeza({ actual, inicio, unidad, nota }) {
   const delta = Math.round((actual - inicio) * 10) / 10;
   return (
     <div className="balanza-cabeza">
-      <p className="balanza-valor"><b className="num-display">{actual}</b><small>{unidad}</small>{nota && <span className="balanza-nota">{nota}</span>}</p>
-      {delta !== 0 && <span className="balanza-delta">{delta > 0 ? "+" : ""}{delta} {unidad} desde que empezaste</span>}
+      <p className="balanza-valor"><b className="num-display">{numeroAR(actual)}</b><small>{unidad}</small>{nota && <span className="balanza-nota">{nota}</span>}</p>
+      {delta !== 0 && <span className="balanza-delta" aria-label={`${delta > 0 ? "más" : "menos"} ${numeroAR(Math.abs(delta))} ${unidad} desde que empezaste`}><b className="num-display">{delta > 0 ? "+" : "−"}{numeroAR(Math.abs(delta))}</b> {unidad} desde el inicio</span>}
     </div>
   );
 }
@@ -15065,7 +15191,7 @@ function CintaMetrica({ inicio, actual, min, max, unidad, nota = null }) {
         <span className="cinta-marca" style={{ left: pos(actual) }} />
       </div>
       <div className="balanza-leyenda" aria-hidden="true">
-        <span><i className="cinta-fantasma" /> Empezaste: {inicio}</span>
+        <span><i className="cinta-fantasma" /> Inicio {numeroAR(inicio)}</span>
         <span><i className="cinta-hoy" /> Hoy</span>
       </div>
     </div>
@@ -16042,6 +16168,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
             )}
           </React.Fragment>)}
         </div>
+        {!descarga && hasActiveSession && <EntreLados exercise={exercise} accent={accent} timerId={restTimerId} settings={settings} onUpdateSettings={onUpdateSettings} />}
         </div>
         )}
         {exercise.video && (
@@ -16076,29 +16203,67 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
    "actual" | "futura"; sin `sesiones`, no hay tiza. `meta`: las sesiones
    planeadas por semana. `alto`: el alto de la fila, en px.
 ============================================================================ */
-const PINTURA_CAJON = ["#ECECE6", "#2BA35F", "#F4C430", "#2F6FED", "#E5383B"];
+// LA CURVA DEL CICLO (15/11, pedido: "cambiarle el diseño general de los
+// ciclos... algo visual, que se entienda que representa la acumulación de
+// fatiga", y sin la pared de chapa perforada: "tiene como circulitos").
+// Reemplaza a los cajones de salto en todos lados (Progreso, Perfil, el
+// resumen del ciclo, la bienvenida y la guía). Una sola línea: la fatiga
+// sube con cada semana que entrenás (lo que fuiste contra lo planeado: una
+// semana que faltaste no suma), lo que viene sigue punteado, y la descarga
+// la baja. El punto de esta semana, en el tono. Mismas props que antes.
 function CajonesCiclo({ semanas = [], trainWeeks = TRAIN_WEEKS, alto = 100, animar = false, meta = null }) {
-  const conTiza = semanas.some((s) => s.sesiones != null);
-  const lugar = alto - (conTiza ? 16 : 0);
-  const altura = (wi, descarga) => Math.round(lugar * (descarga ? 0.36 : 0.45 + (Math.min(wi, trainWeeks - 1) / Math.max(1, trainWeeks - 1)) * 0.55));
-  const pintura = (wi) => PINTURA_CAJON[Math.round((trainWeeks > 1 ? Math.min(wi, trainWeeks - 1) / (trainWeeks - 1) : 1) * (PINTURA_CAJON.length - 1))];
+  const uid = `cc${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
+  const n = semanas.length;
+  if (!n) return null;
+  const W = 320, H = Math.max(84, alto + 26), izq = 6, der = 14, arriba = 14, abajo = 24;
+  const paso = (W - izq - der) / n;
+  const suma = (x) => (x.sesiones == null ? 1 : meta ? Math.min(1.15, x.sesiones / meta) : x.sesiones > 0 ? 1 : 0);
+  // El valor de cada semana: lo real hasta hoy; después, lo que vendría.
+  const valores = [];
+  let v = 0, pico = 0;
+  semanas.forEach((x) => {
+    if (x.descarga) v = pico * 0.3;
+    else { v += x.estado === "futura" ? 1 : suma(x); pico = v; }
+    valores.push(v);
+  });
+  const tope = Math.max(trainWeeks, ...valores, 1) * 1.08;
+  const X = (k) => izq + (k + 1) * paso;
+  const Y = (val) => arriba + (1 - val / tope) * (H - arriba - abajo);
+  const piso = Y(0);
+  const pts = [[izq, piso], ...valores.map((val, k) => [X(k), Y(val)])];
+  const iAct = semanas.findIndex((x) => x.estado === "actual");
+  const hasta = iAct >= 0 ? iAct + 1 : semanas.every((x) => x.estado === "pasada") ? n : 0;
+  const linea = (a) => a.map(([x, y], k) => `${k ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+  const hecho = pts.slice(0, hasta + 1), porVenir = pts.slice(hasta);
+  const iDesc = semanas.findIndex((x) => x.descarga);
   return (
-    <div className={`cajones-pizarra en-chapa ${conTiza ? "con-tiza" : ""}`} aria-hidden="true">
-      <div className="cajones" style={{ height: alto }}>
-        {semanas.map((s, wi) => {
-          const cumplida = !!meta && !s.descarga && s.estado !== "futura" && (s.sesiones || 0) >= meta;
+    <div className={`curva-ciclo ${animar ? "se-dibuja" : ""}`} aria-hidden="true">
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="presentation">
+        <defs>
+          <linearGradient id={`${uid}-a`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="var(--tono)" stopOpacity=".3" />
+            <stop offset="1" stopColor="var(--tono)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {/* La franja de la descarga: donde la fatiga baja. */}
+        {iDesc >= 0 && <rect className="curva-franja" x={X(iDesc) - paso / 2} y={arriba - 6} width={paso * (n - iDesc) - paso / 2 + der} height={piso - arriba + 6} rx="8" />}
+        <line className="curva-piso" x1={izq} x2={W - der + 8} y1={piso} y2={piso} />
+        {hecho.length > 1 && <path className="curva-area" d={`${linea(hecho)} L${hecho[hecho.length - 1][0].toFixed(1)} ${piso} L${izq} ${piso} Z`} fill={`url(#${uid}-a)`} />}
+        {porVenir.length > 1 && <path className="curva-por-venir" d={linea(porVenir)} />}
+        {hecho.length > 1 && <path className="curva-linea" d={linea(hecho)} pathLength="1" />}
+        {semanas.map((x, k) => {
+          const [cx, cy] = pts[k + 1];
+          const cumplida = !!meta && !x.descarga && x.estado !== "futura" && (x.sesiones || 0) >= meta;
           return (
-            <div key={s.n} className="cajon-lugar">
-              {conTiza && <span className={`cajon-tiza ${cumplida ? "cumplida" : ""}`}>{s.estado !== "futura" && s.sesiones > 0 && <MarcasTiza dias={s.sesiones} max={7} alto={10} decorativa />}</span>}
-              <div className={`cajon ${s.estado} ${s.descarga ? "descarga" : ""} ${animar ? "sube" : ""}`}
-                style={{ height: altura(wi, s.descarga), ...(s.descarga ? null : { "--pintura": pintura(wi) }), ...(animar ? { animationDelay: `${wi * 70}ms` } : null) }}>
-                {!s.descarga && <i className="cajon-agarre" />}
-                <b className="cajon-numero">{s.descarga ? "D" : s.n}</b>
-              </div>
-            </div>
+            <g key={x.n} className={`curva-semana ${x.estado} ${x.descarga ? "descarga" : ""} ${cumplida ? "cumplida" : ""}`}>
+              {x.estado === "actual" && <circle className="curva-halo" cx={cx} cy={cy} r="9" />}
+              <circle className="curva-punto" cx={cx} cy={cy} r={x.estado === "actual" ? 5 : 3.2} />
+              {x.sesiones != null && x.estado !== "futura" && !x.descarga && <text className="curva-veces" x={cx} y={cy - 9} textAnchor="middle">{x.sesiones}</text>}
+              <text className="curva-numero" x={cx} y={H - 6} textAnchor="middle">{x.descarga ? "D" : x.n}</text>
+            </g>
           );
         })}
-      </div>
+      </svg>
     </div>
   );
 }
@@ -16140,38 +16305,6 @@ function IconoCajones({ size = 16 }) {
    sesiones de cada semana en tiza arriba de su cajón. Lo de cuánto falta para
    la descarga queda para el lector de pantalla.
 ============================================================================ */
-// EL PISO DE GOMA (vista previa del 03/11, pedido: "el piso de goma típico
-// pero bien hecho"): las baldosas encastrables del gimnasio, de caucho negro
-// mate con las motas de colores del reciclado, unidas por las juntas de
-// rompecabezas. Va de punta a punta, abajo de los cajones.
-const MOTAS_GOMA = [[22.4, 37.0, 0.73, "#d9d9d3"], [23.5, 7.4, 0.76, "#d9d9d3"], [31.7, 3.8, 0.63, "#5f9e78"], [32.4, 27.7, 0.48, "#5b7fd1"], [38.6, 26.2, 0.82, "#9a9ca2"], [0.6, 21.1, 0.49, "#5b7fd1"], [9.7, 1.2, 0.73, "#c25a5c"], [33.7, 20.8, 0.83, "#d9d9d3"], [26.5, 18.3, 0.62, "#d9d9d3"], [39.8, 33.6, 0.87, "#9a9ca2"], [9.2, 11.6, 0.49, "#c25a5c"], [16.0, 33.9, 0.68, "#9a9ca2"], [33.9, 0.0, 0.58, "#9a9ca2"], [18.8, 39.2, 0.69, "#9a9ca2"], [25.2, 31.1, 0.61, "#5b7fd1"], [13.3, 38.6, 0.90, "#5b7fd1"], [9.9, 4.0, 0.49, "#5b7fd1"], [7.1, 22.4, 0.72, "#9a9ca2"], [29.3, 5.2, 0.84, "#c25a5c"], [16.8, 8.5, 0.61, "#5b7fd1"], [32.1, 12.2, 0.98, "#9a9ca2"], [15.8, 34.2, 0.84, "#c25a5c"], [39.6, 8.5, 0.60, "#5b7fd1"], [13.2, 11.9, 0.49, "#9a9ca2"], [23.3, 9.7, 0.81, "#5b7fd1"], [18.1, 38.4, 0.74, "#d9d9d3"], [34.7, 7.3, 0.54, "#d9d9d3"], [32.7, 10.0, 0.56, "#9a9ca2"], [37.6, 7.9, 1.02, "#d1b25a"], [24.1, 16.9, 0.51, "#9a9ca2"], [38.5, 9.5, 0.87, "#5b7fd1"], [32.9, 23.9, 0.63, "#c25a5c"], [28.8, 2.8, 0.59, "#5b7fd1"], [34.1, 24.6, 0.62, "#d9d9d3"]];
-const JUNTAS_GOMA = ["M-221.5 0 L-400.0 72", "M-137.2 0 L-280.0 72", "M-52.9 0 L-160.0 72", "M31.4 0 L-40.0 72", "M115.7 0 L80.0 72", "M200.0 0 L200.0 72", "M284.3 0 L320.0 72", "M368.6 0 L440.0 72", "M452.9 0 L560.0 72", "M537.2 0 L680.0 72", "M621.5 0 L800.0 72", "M0 9 L400 9", "M0 25 L400 25", "M0 47 L400 47"];
-function PisoGoma({ children = null }) {
-  const uid = `pg${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
-  return (
-    <div className="piso-goma">
-      <svg className="piso-goma-dibujo" viewBox="0 0 400 72" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-        <defs>
-          <pattern id={`${uid}-m`} width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="scale(1 .62)">
-            {MOTAS_GOMA.map(([x, y, rr, c], k) => <circle key={k} cx={x} cy={y} r={rr} fill={c} opacity=".55" />)}
-          </pattern>
-          <linearGradient id={`${uid}-l`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#000" stopOpacity=".7" />
-            <stop offset=".35" stopColor="#000" stopOpacity=".15" />
-            <stop offset="1" stopColor="#fff" stopOpacity=".05" />
-          </linearGradient>
-        </defs>
-        <rect width="400" height="72" className="piso-goma-caucho" />
-        <rect width="400" height="72" fill={`url(#${uid}-m)`} />
-        <rect width="400" height="72" fill={`url(#${uid}-m)`} transform="translate(0 30) scale(1 1.5)" opacity=".7" />
-        {JUNTAS_GOMA.map((d, k) => <path key={k} d={d} className="piso-goma-junta" />)}
-        <rect width="400" height="72" fill={`url(#${uid}-l)`} />
-      </svg>
-      {children}
-    </div>
-  );
-}
-
 // EL RESUMEN DEL CICLO (12/11, pedido: "que al final de cada ciclo te muestre
 // en comparación todos los ejercicios, con las mejores marcas antes de
 // empezar y con los récords nuevos"). Se pide desde cualquier lado con un
@@ -16308,10 +16441,10 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
   const estaSemana = semanas[weekInfo.weekInCycle - 1]?.sesiones || 0;
   const cumplida = !!metaSemanal && estaSemana >= metaSemanal;
   return (
-    <section className="tarjeta-tonal escalera-ciclo ciclo-cajones en-pared" aria-label={`Ciclo ${weekInfo.cycleNumber}, semana ${weekInfo.weekInCycle} de ${cycleWeeks}: ${falta}. ${estaSemana} ${estaSemana === 1 ? "sesión" : "sesiones"} esta semana.`}>
+    <section className="tarjeta-tonal escalera-ciclo ciclo-cajones" aria-label={`Ciclo ${weekInfo.cycleNumber}, semana ${weekInfo.weekInCycle} de ${cycleWeeks}: ${falta}. ${estaSemana} ${estaSemana === 1 ? "sesión" : "sesiones"} esta semana.`}>
       <div className="escalera-cabeza" aria-hidden="true">
         <div className="min-w-0">
-          <p className="ciclo-rotulo">Tu ciclo</p>
+          <p className="ciclo-rotulo">Tu ciclo <span>· fatiga acumulada</span></p>
           <p className="ciclo-semana num-display"><b>{weekInfo.weekInCycle}</b><span>/{cycleWeeks}</span></p>
         </div>
         <div className={`ciclo-esta-semana ${cumplida ? "cumplida" : ""}`}>
@@ -16320,10 +16453,10 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
         </div>
       </div>
       <CajonesCiclo semanas={semanas} trainWeeks={trainWeeks} meta={metaSemanal} animar={!yaAnimado && cajonesHoy} />
-      <PisoGoma>
-        <button onClick={() => pedirResumenDeCiclo()} className="enlace-suave escalera-enlace"><Trophy size={13} /> Mis marcas del ciclo</button>
-        <button onClick={onGoToDeload} className="enlace-suave escalera-enlace"><Zap size={13} /> Mi descarga</button>
-      </PisoGoma>
+      <div className="ciclo-pie">
+        <button onClick={() => pedirResumenDeCiclo()} className="enlace-suave"><Trophy size={13} /> Mis marcas</button>
+        <button onClick={onGoToDeload} className="enlace-suave"><Zap size={13} /> Mi descarga</button>
+      </div>
     </section>
   );
 }
@@ -20144,6 +20277,19 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
   }, [logs, mode, bodyWeightKg, sex, age, dumbbellDouble]);
 
   const selInfo = selected ? ranks[selected] : null;
+  // La cabecera: el rango general (tu mejor músculo) y el reparto por rango.
+  const general = useMemo(() => computeTopRankFromRanks(ranks), [ranks]);
+  const reparto = useMemo(() => {
+    const por = new Map();
+    MUSCLE_GROUPS.forEach((g) => {
+      const x = ranks[g.key];
+      if (!x?.hasData) return;
+      const a = por.get(x.tier) || { tier: x.tier, color: x.color, n: 0, idx: x.levelIdx };
+      a.n += 1; a.idx = Math.max(a.idx, x.levelIdx);
+      por.set(x.tier, a);
+    });
+    return [...por.values()].sort((a, b) => b.idx - a.idx);
+  }, [ranks]);
   // Para mostrar "te faltan X kg a tus mismas reps para llegar a {rango}"
   // en vez de hablar de 1RM o de "el siguiente rango" en abstracto:
   // a partir del 1RM objetivo (el umbral del próximo nivel) se despeja,
@@ -20208,17 +20354,19 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
   };
 
   return (
-    <div className="tarjeta-tonal relative overflow-hidden p-4 space-y-3" style={{ "--c": "#3B82F6" }}>
-      <div className="relative flex items-center justify-between gap-2 mb-1">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <span className="galleta icono-galleta" aria-hidden="true"><Award size={17} /></span>
-          <div className="min-w-0">
-            <p className="text-[15px] font-bold text-white leading-tight">Rango por músculo</p>
-          </div>
+    <div className="tarjeta-tonal rango-tarjeta relative overflow-hidden" style={{ "--c": "#3B82F6" }}>
+      {/* La cabecera (15/11, pedido: "mejorar el sector del muñeco, que
+          mantenga la apariencia actual"): tu rango general con su insignia,
+          como titular, y cuántos músculos tienen marca. */}
+      <div className="rango-cabeza" style={general ? { "--rango-c": general.color } : null}>
+        {general ? <RankBadgeIcon tier={general.tier} sub={null} color={general.color} size={46} /> : <span className="rango-cabeza-vacia" aria-hidden="true"><Award size={20} /></span>}
+        <div className="min-w-0 flex-1">
+          <p className="rango-cabeza-rotulo">Rango por músculo</p>
+          {general
+            ? <p className="rango-cabeza-rango tinta-rango">{general.tier}{general.sub ? ` ${general.sub}` : ""}</p>
+            : <p className="rango-cabeza-rango sin">Sin marcas todavía</p>}
         </div>
-        {/* Arriba queda sólo compartir; el análisis y la escala van abajo
-            del muñeco, donde se usan (03/11: tres botones apretaban el título). */}
-        <button onClick={() => setShowImage(true)} aria-label="Compartir tus rangos" className="boton-redondo !w-9 !h-9 shrink-0"><Share2 size={16} /></button>
+        <button onClick={() => setShowImage(true)} aria-label="Compartir tus rangos" className="boton-redondo shrink-0"><Share2 size={16} /></button>
       </div>
 
       <div>
@@ -20235,10 +20383,18 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
         )}
       </div>
 
-      <MuscleHighlighterBody ranks={ranks} selected={selected} onMuscleClick={goToMuscle} frontRef={frontBodyRef} backRef={backBodyRef} rankMode={mode} pulseMuscles={musculosQueSubieron} sex={sex} />
-      <div className="flex justify-center gap-2 flex-wrap">
-        <button onClick={() => setShowAnalysis(true)} className="enlace-suave"><BarChart3 size={15} /> Análisis muscular</button>
-        <button onClick={() => setShowTierRef(true)} className="enlace-suave"><Trophy size={15} /> La escala de rangos</button>
+      <div className="rango-escena">
+        <MuscleHighlighterBody ranks={ranks} selected={selected} onMuscleClick={goToMuscle} frontRef={frontBodyRef} backRef={backBodyRef} rankMode={mode} pulseMuscles={musculosQueSubieron} sex={sex} />
+        {/* Qué quiere decir cada color: los rangos que tenés, y en cuántos músculos. */}
+        {reparto.length > 0 && (
+          <p className="rango-reparto" aria-label={`Tus músculos por rango: ${reparto.map((x) => `${x.n} en ${x.tier}`).join(", ")}`}>
+            {reparto.map((x) => <span key={x.tier} className="tinta-rango" style={{ "--rango-c": x.color }} aria-hidden="true"><b className="num-display">{x.n}</b> {x.tier}</span>)}
+          </p>
+        )}
+      </div>
+      <div className="rango-acciones">
+        <button onClick={() => setShowAnalysis(true)} className="boton-tonal"><BarChart3 size={15} /> Análisis</button>
+        <button onClick={() => setShowTierRef(true)} className="boton-tonal"><Trophy size={15} /> Escala de rangos</button>
       </div>
 
      {selInfo ? (
@@ -20281,7 +20437,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
           )}
         </div>
       ) : (
-        <p className="text-center text-[12px] text-slate-500">Tocá un músculo para ver tu rango y tu mejor marca.</p>
+        <p className="rango-ayuda">Tocá un músculo para ver tu rango y tu mejor marca.</p>
       )}
       {/* Los ejercicios que trabajan un grupo SIN entrenar: el atajo para
           estrenar su rango, con un botón directo a Rutinas. */}
@@ -20604,7 +20760,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
           return (
             <button key={t.k} role="tab" aria-selected={active} onClick={() => { setSelType(t.k); setInputVal(""); }} className={`medida-ficha ${active ? "activa" : ""}`}>
               <span className="medida-ficha-nombre">{t.l}</span>
-              <span className="medida-ficha-valor"><b className="num-display">{t.latest ? t.latest.value : "—"}</b><small>{t.unit}</small></span>
+              <span className="medida-ficha-valor"><b className="num-display">{t.latest ? numeroAR(t.latest.value) : "—"}</b><small>{t.unit}</small></span>
               {t.serie?.length > 1 ? <Sparkline valores={t.serie} color="currentColor" ancho={70} alto={12} /> : <span className="medida-ficha-raya" aria-hidden="true" />}
             </button>
           );
@@ -20615,6 +20771,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
           cintura, el pecho, el brazo y la pierna, en la cinta métrica. Las
           dos cuentan lo mismo sin hacer la cuenta: dónde estás hoy, dónde
           empezaste y entre qué valores te moviste. */}
+      <div className={lectura ? "medida-panel" : "contents"}>
       {lectura ? (
         selType === "weight" ? <BalanzaCursor {...lectura} /> : <CintaMetrica {...lectura} />
       ) : !latest && (
@@ -20642,6 +20799,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
           />
         </div>
       )}
+      </div>
 
       <div className="pt-1 space-y-3">
         <p className="seccion-titulo">Tu calendario</p>
@@ -21131,7 +21289,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                         <button key={m.k} role="tab" aria-selected={m === met} onClick={() => setMetrica(m.k)} className="evo-metrica">
                           <span className="evo-metrica-nombre">{m.l}</span>
                           <span className="evo-metrica-valor"><b className="num-display">{numeroAR(m.v(ultimoV), m.k === "vol" || m.k === "repsDia" ? 0 : 1)}</b><small>{m.u}</small></span>
-                          <span className={`evo-metrica-cambio ${c > 0 ? "sube" : ""}`}>{c == null ? "una sesión" : <>{conSigno(c)} %<small>desde el {primeroV.fechaCorta}</small></>}</span>
+                          <span className={`evo-metrica-cambio ${c > 0 ? "sube" : ""}`} aria-label={c == null ? undefined : `${conSigno(c)} por ciento desde el ${primeroV.fechaCorta}`}>{c == null ? "1 sesión" : <>{conSigno(c)} %</>}</span>
                         </button>
                       );
                     })}
@@ -21157,7 +21315,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                   {(RANGOS.length > 0 || ritmo) && (
                     <div className="evo-pie">
                       {ritmo ? (
-                        <p className="evo-ritmo">{ritmo.estable ? <>Ritmo: <b>estable</b></> : <>Ritmo: <b>{conSigno(ritmo.pendiente, decimales)} {met.u}</b> por semana</>}</p>
+                        <p className="evo-ritmo" aria-label={ritmo.estable ? "Ritmo estable" : `Ritmo: ${conSigno(ritmo.pendiente, decimales)} ${met.u} por semana`}>{ritmo.estable ? <b>Estable</b> : <><b>{conSigno(ritmo.pendiente, decimales)} {met.u}</b> por semana</>}</p>
                       ) : <span />}
                       {RANGOS.length > 0 && (
                         <div className="segmentado chico" role="tablist" aria-label="Período">
@@ -21172,36 +21330,34 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
 
                   {/* Tu mejor serie, abajo de la gráfica (pedido: primero la curva, después
                       el récord y su 1RM estimado). */}
-                  <div className="records-hero">
+                  <div className="records-renglon">
                     <div className="min-w-0">
                       <p className="records-rotulo">Tu récord</p>
                       <p className="records-valor num-display">
                         {esCardio ? <>{mejor.minutos}<small>min</small></> : sinPeso ? <>{mejor.reps}<small>reps</small></> : <>{mejor.reps}<i>×</i>{numeroAR(mejor.kg)}<small>{uLabel}</small></>}
                       </p>
-                      <p className="records-sub">{esCardio ? (mejor.km ? `${numeroAR(mejor.km)} km` : "Tu sesión más larga") : sinPeso ? "Con tu peso" : `≈ ${numeroAR(Math.round(mejor.e1rm))} ${uLabel} de 1RM estimado`}</p>
                     </div>
-                    <div className="records-chips">
-                      <span className="chip-dato records"><Trophy size={13} />{records} {records === 1 ? "récord" : "récords"}</span>
-                    </div>
+                    <dl className="records-datos">
+                      {!esCardio && !sinPeso && <div><dt>1RM</dt><dd className="num-display">{numeroAR(Math.round(mejor.e1rm))}<small>{uLabel}</small></dd></div>}
+                      {esCardio && mejor.km ? <div><dt>Distancia</dt><dd className="num-display">{numeroAR(mejor.km)}<small>km</small></dd></div> : null}
+                      <div><dt>{records === 1 ? "Récord" : "Récords"}</dt><dd className="num-display">{records}</dd></div>
+                    </dl>
                   </div>
 
-                  {/* Hace cuánto que no subís un escalón. Con tres sesiones o
-                      más sin superarlo se pone ámbar: conviene cambiar algo. */}
-                  {n >= 2 && (
-                    sesionesDesde === 0 ? (
-                      <p className="records-pie fuego"><Flame size={15} className="shrink-0" /> {escalera[n - 1].esRecord ? "Tu última sesión fue récord." : "Tu última sesión igualó tu récord."}</p>
-                    ) : (
-                      <p className={`records-pie ${sesionesDesde >= 3 ? "alerta" : ""}`}>
-                        {sesionesDesde >= 3 ? <AlertTriangle size={15} className="shrink-0" /> : <Clock size={15} className="shrink-0" />}
-                        <span>Último récord {diasDesde != null ? haceCuanto(diasDesde) : `${sesionesDesde} sesiones atrás`}: {sesionesDesde} {sesionesDesde === 1 ? "sesión" : "sesiones"} sin superarlo.</span>
-                      </p>
-                    )
+                  {/* Sólo cuando hay algo que hacer: tres sesiones o más sin
+                      superar el récord (15/11: "tiene mucho texto"; antes
+                      también decía "tu última sesión igualó tu récord"). */}
+                  {n >= 2 && sesionesDesde >= 3 && (
+                    <p className="records-pie alerta">
+                      <AlertTriangle size={15} className="shrink-0" />
+                      <span>{sesionesDesde} sesiones sin superarlo{diasDesde != null ? `, ${haceCuanto(diasDesde)}` : ""}.</span>
+                    </p>
                   )}
 
                   {/* Cada sesión, la más reciente arriba: la serie que hiciste y
                       su 1RM estimado. Las que fueron récord, con la galleta. */}
                   <button onClick={() => setVerSesiones((v) => !v)} className="enlace-suave mx-auto" aria-expanded={verSesiones}>
-                    {verSesiones ? <>Ocultar las sesiones <ChevronUp size={13} /></> : <>Ver {n === 1 ? "la sesión" : `las ${n} sesiones`} <ChevronDown size={13} /></>}
+                    {verSesiones ? <>Ocultar <ChevronUp size={13} /></> : <>{n === 1 ? "1 sesión" : `${n} sesiones`} <ChevronDown size={13} /></>}
                   </button>
                   {verSesiones && (
                     <div className="space-y-1.5">
@@ -26436,6 +26592,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
       <RoutineBuilder
         dumbbellDouble={getProfileSettings(profile)?.dumbbellDouble || null}
         saltosDePeso={getProfileSettings(profile)?.saltosDePeso || null}
+        entreLados={getProfileSettings(profile)?.entreLados || null}
         onUpdateSettings={(patch) => onUpdateProfile?.({ settings: { ...getProfileSettings(profile), ...patch } })}
         logs={profile?.logs || {}}
         descansos={{ largo: getProfileSettings(profile).restLong, corto: getProfileSettings(profile).restShort }}
@@ -27477,7 +27634,7 @@ function CambiarEjercicio({ ex, existingIds, onElegir, onCerrar }) {
 // UN EJERCICIO DEL DÍA: cerrado es un renglón (el asa para arrastrarlo, el
 // nombre, el músculo y sus series en rayitas); abierto, sus series y lo
 // demás: mancuernas, superserie, subir, bajar, cambiar y quitar.
-function ArmadoEjercicio({ ex, i, abierto, onAbrir, siguiente, enlazadoArriba, enlazadoAbajo, existingIds, dumbbellFactor, onToggleDumbbell, salto = null, onSalto = null, onConfigChange, onQuitar, onSubir, onBajar, onToggleSuperset, onCambiar, recienAgregado, saliendo, arrastrando, sinTransicion = false, desplazamiento, onAsa }) {
+function ArmadoEjercicio({ ex, i, abierto, onAbrir, siguiente, enlazadoArriba, enlazadoAbajo, existingIds, dumbbellFactor, onToggleDumbbell, salto = null, onSalto = null, entreLados = 0, onEntreLados = null, onConfigChange, onQuitar, onSubir, onBajar, onToggleSuperset, onCambiar, recienAgregado, saliendo, arrastrando, sinTransicion = false, desplazamiento, onAsa }) {
   const unit = useWeightUnit();
   const [cambiando, setCambiando] = useState(false);
   const n = ex.sets?.length || 0;
@@ -27547,6 +27704,18 @@ function ArmadoEjercicio({ ex, i, abierto, onAbrir, siguiente, enlazadoArriba, e
                 <span className="armado-saltos-unidad">{weightLabel(unit)}</span>
               </div>
               <p className="armado-nota">{salto === (unit === "lbs" ? 5 : 2.5) ? "El disco chico. Si es una máquina con placas, elegí lo que sube cada placa." : `Como una máquina de placas de ${conComa(salto)} ${weightLabel(unit)}: la serie, tu plan y la descarga suben y bajan de a eso.`}</p>
+            </div>
+          )}
+          {!ex.cardio && onEntreLados && (
+            <div className="armado-saltos">
+              <span className="armado-campo-rotulo">Descanso entre lados</span>
+              <div className="armado-saltos-opciones" role="group" aria-label="Cuánto descansar entre un lado y el otro">
+                <button onClick={() => onEntreLados(0)} aria-pressed={!entreLados} className={`armado-salto ${!entreLados ? "activo" : ""}`}>No</button>
+                {ENTRE_LADOS.map((v) => (
+                  <button key={v} onClick={() => onEntreLados(v)} aria-pressed={entreLados === v} className={`armado-salto ${entreLados === v ? "activo" : ""}`}>{relojCorto(v)}</button>
+                ))}
+              </div>
+              {entreLados > 0 && <p className="armado-nota">Para los ejercicios de un lado por vez: en la serie aparece "Cambio de lado", que arranca un reloj de {relojCorto(entreLados)}.</p>}
             </div>
           )}
           {siguiente && (
@@ -27683,7 +27852,7 @@ function ArmadoCalentamiento({ day, onSetWarmup, otherDays = [], onCopyWarmupTo 
 // el calentamiento, los ejercicios y el buscador para sumar más.
 function ArmadoDia({ day, dayIdx, totalDays, otherDays = [], descansos, cuando, tuyos = [], onIrAlCronograma, siguienteDia, onIrAlDia, onSumarDia,
   onRename, onRemove, onMoveDay, onChangeColor, onDuplicate, onAddExercise, onAddCustomExercise, onRemoveExercise, onMoveExercise, onConfigExercise, onToggleSuperset, onSwapExercise,
-  onSetWarmup = null, onCopyWarmupTo = null, dumbbellDouble = null, saltosDePeso = null, onUpdateSettings = null }) {
+  onSetWarmup = null, onCopyWarmupTo = null, dumbbellDouble = null, saltosDePeso = null, entreLados = null, onUpdateSettings = null }) {
   const unitDia = useWeightUnit();
   const [pickerOpen, setPickerOpen] = useState(day.exercises.length === 0);
   const [ajustes, setAjustes] = useState(false);
@@ -27856,6 +28025,13 @@ function ArmadoDia({ day, dayIdx, totalDays, otherDays = [], descansos, cuando, 
                   if (v === (unitDia === "lbs" ? 5 : 2.5)) delete saltos[ex.id];
                   else saltos[ex.id] = { v, u: unitDia };
                   onUpdateSettings({ saltosDePeso: saltos });
+                  haptic(10);
+                } : null}
+                entreLados={Number(entreLados?.[ex.id]) || 0}
+                onEntreLados={onUpdateSettings ? (v) => {
+                  const todos = { ...(entreLados || {}) };
+                  if (v > 0) todos[ex.id] = v; else delete todos[ex.id];
+                  onUpdateSettings({ entreLados: todos });
                   haptic(10);
                 } : null}
                 onConfigChange={(cfg) => onConfigExercise(i, cfg)}
@@ -31182,7 +31358,7 @@ function WeeklyScheduleEditor({ dayOrder, days, schedule, onChange }) {
 
 // `nueva`: arranca con una rutina (la importada, para corregirla) pero se
 // guarda como una nueva.
-function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = null, saltosDePeso = null, onUpdateSettings = null, logs = {}, descansos = null, sinPestanas = false, titulo = null, nueva = false }) {
+function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = null, saltosDePeso = null, entreLados = null, onUpdateSettings = null, logs = {}, descansos = null, sinPestanas = false, titulo = null, nueva = false }) {
   const isEditing = !!initialRoutine && !nueva;
   const [name, setNameRaw] = useState(initialRoutine?.name || "");
   const [days, setDaysRaw] = useState(() => (initialRoutine ? builderDaysFromRoutineDef(initialRoutine) : [{ key: builderUid("day"), label: "DÍA 1", color: BUILDER_COLOR_PALETTE[0], exercises: [] }]));
@@ -31434,7 +31610,7 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = nul
           descansos={pasos} cuando={cuandoSeEntrena(schedule, dia.key)} tuyos={tuyos}
           onIrAlCronograma={() => cronoRef.current?.scrollIntoView?.({ block: "start", behavior: "smooth" })}
           siguienteDia={siguiente} onIrAlDia={() => siguiente && setDiaKey(siguiente.key)} onSumarDia={addDay}
-          dumbbellDouble={dumbbellDouble} saltosDePeso={saltosDePeso} onUpdateSettings={onUpdateSettings}
+          dumbbellDouble={dumbbellDouble} saltosDePeso={saltosDePeso} entreLados={entreLados} onUpdateSettings={onUpdateSettings}
           onDuplicate={() => duplicateDay(idxSel)}
           onRename={(label) => renameDay(idxSel, label)} onRemove={() => removeDay(idxSel)} onMoveDay={(delta) => moveDay(idxSel, delta)} onChangeColor={(color) => changeDayColor(idxSel, color)}
           onAddExercise={(libEx) => addExercise(idxSel, libEx)} onAddCustomExercise={(rawName, muscle) => addCustomExercise(idxSel, rawName, muscle)}
@@ -32309,6 +32485,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
       <RoutineBuilder
         dumbbellDouble={getProfileSettings(profile)?.dumbbellDouble || null}
         saltosDePeso={getProfileSettings(profile)?.saltosDePeso || null}
+        entreLados={getProfileSettings(profile)?.entreLados || null}
         onUpdateSettings={(patch) => onUpdateProfile?.({ settings: { ...getProfileSettings(profile), ...patch } })}
         logs={profile?.logs || {}}
         descansos={{ largo: getProfileSettings(profile).restLong, corto: getProfileSettings(profile).restShort }}
