@@ -70,7 +70,7 @@ import {
 // orden, con errores de tipeo, en inglés o con el apodo del gimnasio).
 import { buscarEjercicios, mejorEjercicio, nombreCoincide, partesResaltadas, REGIONES_BUSCADOR, alternativasDe } from "./buscar-ejercicios.js";
 import { FORMAS, NOMBRE_DE_FORMA, COLORES_SUPLEMENTO, SUGERIDOS, MAX_SUPLEMENTOS, MAX_DOSIS, listaDeSuplementos, nuevoSuplemento, sanearSuplemento, tomadas, tomar, unirTomas, rachaDe, ultimosDias, recortarTomas, suplementosParaWidget } from "./suplementos.js";
-import { rangoDeReps, siguientePaso, seriesDeDescarga, cargaDeDescarga, ejerciciosEnBaja, planDeEntrenador, equilibrarReps, redondearConReps, resumenDeCiclo } from "./entrenamiento.js";
+import { rangoDeReps, siguientePaso, seriesDeDescarga, seriesDeAdaptacion, cargaDeDescarga, ejerciciosEnBaja, planDeEntrenador, equilibrarReps, redondearConReps, resumenDeCiclo } from "./entrenamiento.js";
 // Modus Fit Premium: preparada y con el cobro apagado por bandera (ver
 // src/suscripcion.js y docs/suscripcion.md).
 import {
@@ -974,7 +974,7 @@ const DEFAULT_SETTINGS = {
   // Pantalla encendida mientras hay una sesión en curso (ver
   // useMantenerPantalla).
   keepScreenOn: true,
-  trainWeeks: TRAIN_WEEKS, deloadWeeks: DELOAD_WEEKS, deloadPct: 0.75, deloadSetDivisor: 2, deloadEnabled: true,
+  trainWeeks: TRAIN_WEEKS, deloadWeeks: DELOAD_WEEKS, deloadPct: 0.9, deloadSetDivisor: 2, deloadEnabled: true,
   // La letra de fábrica es la chica (pedido: "que la letra default sea la chica");
   // quien eligió otra en Perfil la conserva.
   theme: "dark", textScale: 0.9, smallTextScale: 1, autoShowPrShare: true, bodyWeightKg: 0, muscleRankMode: "general", allowZoom: false,
@@ -1036,7 +1036,14 @@ const DEFAULT_SETTINGS = {
 };
 
 
-function getProfileSettings(profile) { return { ...DEFAULT_SETTINGS, ...(profile?.settings || {}) }; }
+// La descarga cambió el 16/11 (peso alto, mitad de series, lejos del fallo):
+// quien tenía el 75 % de fábrica pasa al 90 %; quien lo eligió a mano
+// (descargaElegida) conserva lo suyo.
+function getProfileSettings(profile) {
+  const s = { ...DEFAULT_SETTINGS, ...(profile?.settings || {}) };
+  if (!s.descargaElegida && s.deloadPct === 0.75) s.deloadPct = 0.9;
+  return s;
+}
 
 // Context de unidad de peso — permite que SetRow, DeloadView y cualquier
 // otro componente lean "kg" o "lbs" sin necesitar un prop extra en cada nivel.
@@ -1737,6 +1744,37 @@ function getWeekInfo(cycleStart, settings = DEFAULT_SETTINGS) {
   const weekInCycle = (totalWeek % cycleWeeks) + 1;
   const isDeload = weekInCycle > trainWeeks;
   return { totalWeek: totalWeek + 1, weekInCycle, isDeload, cycleNumber: Math.floor(totalWeek / cycleWeeks) + 1, cycleWeeks, trainWeeks, deloadWeeks };
+}
+
+// LA SEMANA DE ADAPTACIÓN (16/11, pedido: "hacé una semana de rampa al
+// volver": los pesos normales con el 70-80 % de las series, a 2 del fallo, y
+// recién la semana siguiente todo). Es la primera semana del ciclo, si en las
+// dos semanas anteriores marcaste series de descarga (quien se la salteó no
+// la necesita). Se apaga en Perfil › Tu ciclo. Rutina recibe el día con las
+// series recortadas (diaDeAdaptacion), así la barra, el dock y las tarjetas
+// cuentan lo mismo; las series guardadas llevan `adapt: true`, que es la A
+// de la gráfica de Evolución.
+function esSemanaDeAdaptacion(cycleStart, settings, logs) {
+  if (settings?.deloadEnabled === false || settings?.adaptacionTrasDescarga === false) return false;
+  const info = getWeekInfo(cycleStart, settings);
+  if (!info || info.isDeload || info.weekInCycle !== 1) return false;
+  const desde = localDateStr(new Date(Date.now() - 14 * 86400000));
+  for (const k in logs || {}) {
+    const h = logs[k];
+    if (Array.isArray(h) && h.some((e) => e?.deload && e.date >= desde)) return true;
+  }
+  return false;
+}
+function diaDeAdaptacion(dia) {
+  if (!dia) return dia;
+  return {
+    ...dia,
+    exercises: (dia.exercises || []).map((ex) => {
+      if (ex.cardio) return ex;
+      const n = ex.sets?.length || 0, q = seriesDeAdaptacion(n);
+      return { ...ex, adaptacion: true, ...(q < n ? { sets: ex.sets.slice(0, q), seriesDeSiempre: n } : {}) };
+    }),
+  };
 }
 
 /* ============================================================================
@@ -4819,6 +4857,32 @@ button.carrera-carril:active { background: var(--velo); }
 .grafica-franja-raya { fill: var(--text-faint); opacity: .32; }
 .grafica-franja-d { fill: var(--text-muted); font-size: 11px; font-weight: 800; }
 .grafica-franja { animation: graficaAparece .5s .3s ease-out both; }
+.grafica-franja.adaptacion rect { opacity: .5; }
+.grafica-marca-banda { fill: var(--text-faint); opacity: .13; }
+.grafica-marca-asta { fill: var(--text-muted); stroke: var(--text-muted); stroke-width: 1.3; stroke-linejoin: round; stroke-linecap: round; }
+.grafica-globo-marca { font-size: 12px; font-weight: 650; color: var(--text-strong); }
+.grafica-leyenda { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 14px; margin-top: 2px !important; font-size: 12px; color: var(--text-muted); }
+.grafica-leyenda li { display: inline-flex; align-items: center; gap: 5px; min-height: 28px; }
+.grafica-leyenda b { font-weight: 800; color: var(--text-strong); }
+.grafica-leyenda button { position: relative; display: inline-flex; align-items: center; gap: 5px; min-height: 28px; color: inherit; font: inherit; text-align: left; }
+.grafica-leyenda button::after { content: ""; position: absolute; inset: -8px -4px; }
+/* MARCAR UNA SEMANA (MarcaSemanaModal). */
+.marca-modal { width: 100%; max-width: 380px; max-height: 86vh; overflow-y: auto; padding: 20px 18px 16px; border-radius: 28px; background: var(--surface-1); box-shadow: var(--placa-canto), 0 24px 60px -20px rgba(0,0,0,.6); display: grid; gap: 14px; }
+.marca-modal > * { min-width: 0; }
+.marca-modal-titulo { font-size: 16px; font-weight: 750; color: var(--text-strong); }
+.marca-modal-bajada { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+.marca-rotulo { font-size: 13px; font-weight: 650; color: var(--text-muted); margin-bottom: 8px; }
+.marca-semanas { display: flex; gap: 6px; overflow-x: auto; margin: 0 -18px; padding: 0 18px 2px; scrollbar-width: none; }
+.marca-semanas::-webkit-scrollbar { display: none; }
+.marca-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.marca-chip { flex: none; min-height: 44px; padding: 0 14px; border-radius: 999px; font-size: 14px; font-weight: 600; white-space: nowrap; color: var(--text-muted); background: var(--surface-2); transition: background .24s, color .24s, transform .1s; }
+.marca-chip:active { transform: scale(.95); }
+.marca-chip.activo { color: var(--accion-tinta); background: var(--accion-fondo); }
+.marca-chip small { display: block; font-size: 11px; font-weight: 550; opacity: .8; }
+.marca-chip.con-marca { display: grid; align-content: center; text-align: left; line-height: 1.15; }
+.marca-campo { width: 100%; height: 46px; padding: 0 14px; border-radius: 14px; font-size: 15px; color: var(--text-strong); background: var(--panel-sunken, var(--surface-2)); box-shadow: inset 0 0 0 1px var(--hairline); outline: none; }
+.marca-campo:focus { box-shadow: inset 0 0 0 1.5px var(--tono); }
+.marca-campo::placeholder { color: var(--text-faint); }
 .grafica-ultimo, .grafica-tocado { stroke: var(--surface-1); stroke-width: 2; }
 .grafica-guia { stroke: var(--hairline-fuerte); stroke-width: 1; }
 .grafica-tiempo .grafica-globo { --gx: -50%; --gy: calc(-100% - 14px); transform: translate(var(--gx), var(--gy)); min-width: 0; max-width: 190px; white-space: nowrap; }
@@ -6953,6 +7017,8 @@ label.ajuste-rotulo { display: block; }
   background: rgba(225,220,200,.55); box-shadow: 0 1px 2px rgba(0,0,0,.18); backdrop-filter: none;
   clip-path: polygon(0 8%, 4% 0, 9% 10%, 14% 0, 100% 0, 96% 12%, 100% 24%, 96% 40%, 100% 56%, 96% 72%, 100% 88%, 96% 100%, 0 100%, 4% 86%, 0 70%, 4% 54%, 0 38%, 4% 22%); }
 .nota-descarga-titulo { font-size: 20px; line-height: 1; color: #b23c40; }
+.nota-descarga.adaptacion .nota-descarga-titulo { color: #3d6e9e; }
+.nota-descarga.adaptacion .subrayado { background: linear-gradient(transparent 62%, color-mix(in oklab, #3d6e9e 30%, transparent) 62% 86%, transparent 86%); }
 .nota-descarga-lista { display: grid; gap: 0; margin-top: 2px; font-size: 19px; line-height: 1.08; }
 .nota-descarga-lista li { position: relative; padding-left: 20px; white-space: nowrap; }
 .nota-descarga-lista li::before { content: "✓"; position: absolute; left: 0; top: 0; font-size: 16px; color: #3d6e9e; rotate: -6deg; }
@@ -13600,10 +13666,14 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
 // antes de elegir: el ciclo en cajones y la descarga, con la nota del profe.
 // La evidencia: el consenso Delphi de Bell et al. (2023) define la descarga
 // como un período más liviano para reducir la fatiga y recuperarse.
+// 16/11 (pedido: "asesorar bien y explicar de qué se trata, y decir que si sos
+// principiante o no tenés muchos conocimientos, es recomendable no usarla"):
+// la explicación cuenta la descarga nueva (peso alto, menos series, lejos del
+// fallo) y la semana de adaptación, y al elegir se dice para quién es.
 const BIENVENIDA_DESCARGA = {
   ciclo: { title: "Entrenás por ciclos", text: "Un ciclo son varias semanas seguidas. Cada cajón es una semana, y cada uno es un poco más alto que el anterior: la carga sube de a poco y el cansancio se acumula. Arriba de cada cajón, las veces que fuiste. El de esta semana tiene su color entero; los que vienen están punteados." },
-  descarga: { title: "Y al final, la descarga", text: "Después de varias semanas subiendo, el cuerpo junta cansancio. La descarga es el cajón bajo, el de la D: una semana más liviana para recuperarte y volver a subir con más fuerza. Esa semana Rutina se transforma sola, y si venís bajando, la podés adelantar." },
-  elegir: { title: "¿Activamos las semanas de descarga?", text: "Te recomendamos dejarlas prendidas. Las podés cambiar cuando quieras en tu perfil." },
+  descarga: { title: "Y al final, la descarga", text: "Después de varias semanas subiendo, el cuerpo junta cansancio. La descarga es el cajón bajo, el de la D: una semana con casi el mismo peso, la mitad de las series y cortando lejos del fallo. Te recuperás sin perder la mano con las cargas. La semana siguiente es de adaptación, con algunas series menos, y después seguís subiendo." },
+  elegir: { title: "¿Activamos las semanas de descarga?", text: "Sirven si entrenás hace tiempo y venís subiendo las cargas en serio. Si recién empezás, o el tema te resulta nuevo, te recomendamos empezar sin ellas: al principio el cuerpo se recupera bien de una sesión a la otra. Se prenden cuando quieras en tu perfil." },
 };
 
 function WelcomeIntro({ onClose, onOpenTutorial, onUpdateSettings = null }) {
@@ -13627,8 +13697,8 @@ function WelcomeIntro({ onClose, onOpenTutorial, onUpdateSettings = null }) {
                   <p className="nota-descarga-titulo a-mano">La descarga</p>
                   <ul className="nota-descarga-lista a-mano">
                     <li><b>½</b> de las series</li>
-                    <li><b>75 %</b> del peso</li>
-                    <li>las mismas reps</li>
+                    <li><b>90 %</b> del peso</li>
+                    <li>a <b>3 o 4</b> del fallo</li>
                     <li className="subrayado">sin buscar marcas</li>
                   </ul>
                 </div>
@@ -13660,8 +13730,8 @@ function WelcomeIntro({ onClose, onOpenTutorial, onUpdateSettings = null }) {
             // Elegir acá mismo si querés las semanas de descarga (el mismo
             // ajuste que Perfil › Descarga, deloadEnabled).
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => { onUpdateSettings?.({ deloadEnabled: true }); onClose(); }} className="boton-pildora">Sí, activalas</button>
-              <button onClick={() => { onUpdateSettings?.({ deloadEnabled: false }); onClose(); }} className="boton-tonal" style={{ "--c": "#8a8c92" }}>No, por ahora</button>
+              <button onClick={() => { onUpdateSettings?.({ deloadEnabled: true }); onClose(); }} className="boton-tonal">Sí, activalas</button>
+              <button onClick={() => { onUpdateSettings?.({ deloadEnabled: false }); onClose(); }} className="boton-tonal">Recién empiezo</button>
             </div>
           ) : (
             <button onClick={() => setI((n) => n + 1)} className="boton-pildora w-full">Siguiente</button>
@@ -14120,7 +14190,7 @@ function describePlannedOutcome(target, hecho, esRecord, unit) {
   return { type: "down", msg: `Te faltó para la meta: ${target.reps} × ${conComa(kgToDisplay(target.kg, unit))} ${weightLabel(unit)}.` };
 }
 
-function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null, restTimerId = null, restSeconds = null, isLastSet = false, totalSets = null, weekInCycle = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null, activa = true, onEnfocar = null, objetivoSiguiente = null, objetivoProximo = null, cicloActual = null }) {
+function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null, restTimerId = null, restSeconds = null, isLastSet = false, totalSets = null, weekInCycle = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null, activa = true, onEnfocar = null, objetivoSiguiente = null, objetivoProximo = null, cicloActual = null, adaptacion = false }) {
   // Modo "rutina planificada" (ver DEFAULT_SETTINGS.trainingMode): si hay
   // una meta cargada para ESTA semana, se muestra "Marca a alcanzar" en
   // vez de "Récord" — pensado para quien sigue un plan con cargas ya
@@ -14223,8 +14293,12 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   // ejercicio al llegar al tope del rango. Con "Progresión sugerida" apagada,
   // con lo de la vez pasada tal cual.
   const pasoKg = saltoDe(fieldSettings, exerciseId, unit);
+  // En la semana de adaptación (la que sigue a la descarga) no se suma nada:
+  // lo de la vez pasada, tal cual.
   const pasoProgresion = !cardio && !isPlannedMode && lastSession && fieldSettings.showProgressionSuggestion !== false
-    ? siguientePaso(kgToDisplay(lastSession.kg, unit), lastSession.reps, setDef.repRange, pasoKg, { rpe: lastSession.rpe ?? null })
+    ? adaptacion
+      ? { kg: kgToDisplay(lastSession.kg, unit), reps: lastSession.reps, motivo: "adaptacion" }
+      : siguientePaso(kgToDisplay(lastSession.kg, unit), lastSession.reps, setDef.repRange, pasoKg, { rpe: lastSession.rpe ?? null })
     : null;
   const escribeProgresion = !!pasoProgresion && fieldSettings.showLastSession !== false && fieldSettings.prefillLastSession !== false;
   const sugerido = isPlannedMode && !cardio && plannedTarget?.kg != null && plannedTarget?.reps
@@ -14406,6 +14480,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       if (exerciseMuscle) entry.exMuscle = exerciseMuscle;
       if (d && !isNaN(d)) entry.km = d; if (rpe != null) entry.rpe = rpe;
       if (!hasActiveSession) entry.noSession = true;
+      if (adaptacion) entry.adapt = true;
       const metaHoyC = metaDeHoy(setDef, logs[key], weekInCycle, fieldSettings.trainingMode, { cicloActual });
       if (metaHoyC?.minutes != null) {
         entry.meta = { minutes: metaHoyC.minutes };
@@ -14470,6 +14545,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     if (exerciseMuscle) entry.exMuscle = exerciseMuscle;
     if (rpe != null) entry.rpe = rpe;
     if (!hasActiveSession) entry.noSession = true;
+    if (adaptacion) entry.adapt = true;
     // La meta que tenía esta serie hoy y en qué escalón del plan iba: con eso,
     // la próxima vez se sabe si la cumpliste (ver metaDeHoy).
     const metaHoy = metaDeHoy(setDef, logs[key], weekInCycle, fieldSettings.trainingMode, { cicloActual, saltoKg: displayToKg(pasoKg, unit) });
@@ -14961,7 +15037,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
 {/* (el renglón "antes…" del plan pasó arriba a la derecha) */}
       {/* La serie viene con la progresión: arriba, de dónde sale. */}
       {escribeProgresion && !draft.editing && (
-        <p className="foco-pasada">{laVezPasada}<span className="foco-hoy">{pasoProgresion.motivo === "peso" ? "sube el peso" : pasoProgresion.motivo === "fallo" ? "hoy lo mismo" : "+1 rep"}</span></p>
+        <p className="foco-pasada">{laVezPasada}<span className="foco-hoy">{pasoProgresion.motivo === "peso" ? "sube el peso" : pasoProgresion.motivo === "fallo" ? "hoy lo mismo" : pasoProgresion.motivo === "adaptacion" ? "lo mismo, a 2 del fallo" : "+1 rep"}</span></p>
       )}
 
       {/* El visor: reps × kilos en grande y el ✓. Vienen propuestos con lo de
@@ -16061,6 +16137,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
               {exercise.cardio && String(exercise.muscle || "").toLowerCase() !== "cardio" && <span className="text-[11px] bg-rose-400/15 text-rose-300 rounded-md px-1.5 py-0.5 font-bold flex items-center gap-1"><Footprints size={9} /> CARDIO</span>}
               {!open && restTimerId && <ChipDescansoEnCurso timerId={restTimerId} color={accent} />}
               {descarga && quedanEnDescarga < setsToShow.length && <span className="ejercicio-descarga">{setsToShow.length} → {quedanEnDescarga} {quedanEnDescarga === 1 ? "serie" : "series"}</span>}
+              {!descarga && exercise.seriesDeSiempre > setsToShow.length && <span className="ejercicio-descarga" title="Semana de adaptación: volvés de la descarga">{exercise.seriesDeSiempre} → {setsToShow.length} series</span>}
               {/* El ×1/×2 de mancuernas se configura al editar la rutina
                   ("¿Con cuántas mancuernas?"), no acá: durante el
                   entrenamiento sumaba ruido y ya está definido. */}
@@ -16196,7 +16273,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
           )}
           {setsToShow.map((s, i) => <React.Fragment key={`${exercise.id}:frag:${i}`}>
             <m.div layout="position" layoutDependency={`${foco}|${timerSlot}`} transition={RESORTE_LISTA}>
-            <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} restTimerId={restTimerId} restSeconds={restSeconds} isLastSet={i === setsToShow.length - 1} totalSets={setsToShow.length} weekInCycle={weekInCycle} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} nextExerciseName={nextExerciseName} activa={i === foco} onEnfocar={() => setFocoElegido(i)} objetivoSiguiente={objetivoDeSerie(exercise, i + 1, logs, weekInCycle, settings, planUnit, cicloActual)} objetivoProximo={i === setsToShow.length - 1 ? nextObjetivo : null} cicloActual={cicloActual} />
+            <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} restTimerId={restTimerId} restSeconds={restSeconds} isLastSet={i === setsToShow.length - 1} totalSets={setsToShow.length} weekInCycle={weekInCycle} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} nextExerciseName={nextExerciseName} activa={i === foco} onEnfocar={() => setFocoElegido(i)} objetivoSiguiente={objetivoDeSerie(exercise, i + 1, logs, weekInCycle, settings, planUnit, cicloActual)} objetivoProximo={i === setsToShow.length - 1 ? nextObjetivo : null} cicloActual={cicloActual} adaptacion={!!exercise.adaptacion} />
             </m.div>
             {timerSlot === i + 1 && settings.autoStartRestTimer !== true && (
               <m.div layout="position" layoutDependency={`${foco}|${timerSlot}`} transition={RESORTE_LISTA}><div className="timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} timerId={restTimerId} exerciseName={exercise.name} /></div></m.div>
@@ -16739,7 +16816,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
       ``,
       `PERSONA: ${niv.ia}.`,
       `OBJETIVO: ${obj.ia}.`,
-      hayDescarga ? `CICLO: son ${ciclo} semanas de trabajo y después ${settings.deloadWeeks} de descarga al ${Math.round((settings.deloadPct || 0.75) * 100)}% de la carga. La semana ${ciclo} es la última de trabajo.` : `CICLO: ${ciclo} semanas de trabajo seguidas, sin descarga programada.`,
+      hayDescarga ? `CICLO: son ${ciclo} semanas de trabajo y después ${settings.deloadWeeks} de descarga: la mitad de las series, con el ${Math.round((settings.deloadPct || 0.9) * 100)}% del peso y cortando a 3 o 4 reps del fallo; la semana siguiente es de adaptación (los pesos de siempre con tres cuartos de las series). La semana ${ciclo} es la última de trabajo.` : `CICLO: ${ciclo} semanas de trabajo seguidas, sin descarga programada.`,
       enLibras
         ? `UNIDAD: LIBRAS (lbs). Todas las cargas que devuelvas tienen que estar en libras, y cada una se tiene que poder armar con el salto de su ejercicio (dice "el peso sube de a"): partí de su peso y sumá saltos enteros.`
         : `UNIDAD: kilos. Cada carga se tiene que poder armar con el salto de su ejercicio (dice "el peso sube de a"; hay máquinas que van de 7 en 7 kg): partí de su peso y sumá saltos enteros.`,
@@ -17429,7 +17506,12 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
     const limpiar = setTimeout(() => { tarjetas.forEach((t) => { t.style.animation = ""; }); }, 1200);
     return () => clearTimeout(limpiar);
   }, [sessionForThisDay]);
-  const weekInfo = getWeekInfo(cycleStart, settings), isDeload = weekInfo?.isDeload, day = ROUTINE[activeDay];
+  const weekInfo = getWeekInfo(cycleStart, settings), isDeload = weekInfo?.isDeload;
+  // La semana de adaptación (ver esSemanaDeAdaptacion): el día, con tres
+  // cuartos de las series.
+  const adaptacion = !semanaDescarga && !descargaPrevia && esSemanaDeAdaptacion(cycleStart, settings, logs);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const day = useMemo(() => (adaptacion ? diaDeAdaptacion(ROUTINE[activeDay]) : ROUTINE[activeDay]), [adaptacion, activeDay, activeRoutineDef]);
   // "Color de día": el día que estás mirando tiñe la app entera.
   useEffect(() => { TONO_RUTINA = day?.color || null; ponerTono(day?.color); }, [day?.color]);
   // ── EL MODO DESCARGA ──────────────────────────────────────────────────────
@@ -17452,7 +17534,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   const modoDescarga = pideDescarga && transformada;
   const hoyDescarga = todayStr();
   const divisorDescarga = settings.deloadSetDivisor || 2;
-  const pctDescarga = settings.deloadPct || 0.75;
+  const pctDescarga = settings.deloadPct || 0.9;
   const unidadDescarga = settings?.weightUnit === "lbs" ? "lbs" : "kg";
   const mismaSemanaDescarga = (fecha) => {
     if (!cycleStart || !fecha) return false;
@@ -17499,7 +17581,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   });
   const descargaParaTarjetas = modoDescarga ? { divisor: divisorDescarga, pct: pctDescarga, unit: unidadDescarga, progreso: deloadProgress || {}, hoy: hoyDescarga, previa, onMarcar: marcarDescarga } : null;
   const tildaronDescargaHoy = Object.values(deloadProgress || {}).some((d) => d === hoyDescarga);
-  const reglaDescarga = `${{ 2: "La mitad", 3: "Un tercio", 4: "Un cuarto" }[divisorDescarga] || "Menos"} de las series, al ${Math.round(pctDescarga * 100)} % del peso y con las mismas reps. Sin buscar marcas.`;
+  const reglaDescarga = `${{ 2: "La mitad", 3: "Un tercio", 4: "Un cuarto" }[divisorDescarga] || "Menos"} de las series, con el ${Math.round(pctDescarga * 100)} % del peso y menos reps, a 3 o 4 del fallo. Sin buscar marcas.`;
   // El aviso de que venís bajando (ver ejerciciosEnBaja), desde la semana 3 del
   // ciclo y fuera de la descarga. "Ahora no" lo calla hasta la semana que viene.
   const enBaja = useMemo(() => (hayDescarga && !esSemanaDescarga && (weekInfo?.weekInCycle || 0) >= 3 ? ejerciciosEnBaja(logs, ROUTINE) : []),
@@ -17755,8 +17837,20 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
                   <ul className="nota-descarga-lista a-mano" aria-hidden="true">
                     <li><b>{{ 2: "½", 3: "⅓", 4: "¼" }[divisorDescarga] || "menos"}</b> de las series</li>
                     <li><b>{Math.round(pctDescarga * 100)} %</b> del peso</li>
-                    <li>las mismas reps</li>
+                    <li>a <b>3 o 4</b> del fallo</li>
                     <li className="subrayado">sin buscar marcas</li>
+                  </ul>
+                </div>
+              )}
+              {!modoDescarga && adaptacion && (
+                <div className="nota-descarga adaptacion" role="note" aria-label="Semana de adaptación: volvés de la descarga. Tres cuartos de las series, con tus pesos de siempre y sin sumar reps, a unas dos del fallo. La semana que viene, todo.">
+                  <span className="nota-descarga-cinta" aria-hidden="true" />
+                  <p className="nota-descarga-titulo a-mano" aria-hidden="true">Volvés de la descarga</p>
+                  <ul className="nota-descarga-lista a-mano" aria-hidden="true">
+                    <li><b>¾</b> de las series</li>
+                    <li>tus pesos de siempre</li>
+                    <li>a <b>2</b> del fallo</li>
+                    <li className="subrayado">la que viene, todo</li>
                   </ul>
                 </div>
               )}
@@ -18746,12 +18840,71 @@ function marcasDeTiempo(t0, t1, ancho) {
   return [{ t: t0, texto: diaMes(new Date(t0)) }, { t: t1, texto: diaMes(new Date(t1)) }];
 }
 
+// MARCAR UNA SEMANA: qué semana (las últimas doce, la más nueva primero) y qué
+// pasó (cuatro motivos comunes o lo que escribas). Una marca por semana;
+// guardar sin nada elegido la quita.
+const MOTIVOS_DE_MARCA = ["Mucho estrés", "Semana pesada", "Poco descanso", "Viaje"];
+function MarcaSemanaModal({ marcas = {}, lunesInicial, onGuardar, onClose }) {
+  useAndroidBack(onClose);
+  const semanas = useMemo(() => {
+    const esta = lunesDe(new Date());
+    return Array.from({ length: 12 }, (_, i) => {
+      const lunes = new Date(esta); lunes.setDate(esta.getDate() - 7 * i);
+      const dom = new Date(lunes); dom.setDate(lunes.getDate() + 6);
+      const iso = localDateStr(lunes);
+      const nombre = i === 0 ? "Esta semana" : i === 1 ? "La pasada" : `${lunes.getDate()} ${MESES_CORTOS[lunes.getMonth()]} al ${dom.getDate()} ${MESES_CORTOS[dom.getMonth()]}`;
+      return { iso, nombre };
+    });
+  }, []);
+  const inicial = semanas.some((x) => x.iso === lunesInicial) ? lunesInicial : semanas[0].iso;
+  const [lunes, setLunes] = useState(inicial);
+  const [texto, setTexto] = useState(marcas[inicial] || "");
+  const elegirSemana = (iso) => { setLunes(iso); setTexto(marcas[iso] || ""); };
+  const limpio = texto.trim().slice(0, 28);
+  const propio = MOTIVOS_DE_MARCA.includes(texto) ? "" : texto;
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[140] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
+      <div className="marca-modal modal-pop-in" role="dialog" aria-modal="true" aria-label="Marcar una semana" onClick={(e) => e.stopPropagation()}>
+        <div>
+          <p className="marca-modal-titulo">Marcar una semana</p>
+          <p className="marca-modal-bajada">Queda señalada en la gráfica de todos tus ejercicios.</p>
+        </div>
+        <div>
+          <p className="marca-rotulo" id="marca-semana">Qué semana</p>
+          <div className="marca-semanas" role="radiogroup" aria-labelledby="marca-semana">
+            {semanas.map((x) => (
+              <button key={x.iso} role="radio" aria-checked={lunes === x.iso} onClick={() => elegirSemana(x.iso)} className={`marca-chip ${lunes === x.iso ? "activo" : ""} ${marcas[x.iso] ? "con-marca" : ""}`}>
+                {x.nombre}{marcas[x.iso] ? <small>{marcas[x.iso]}</small> : null}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p className="marca-rotulo" id="marca-motivo">Qué pasó</p>
+          <div className="marca-chips" role="group" aria-labelledby="marca-motivo">
+            {MOTIVOS_DE_MARCA.map((m) => (
+              <button key={m} aria-pressed={texto === m} onClick={() => setTexto(texto === m ? "" : m)} className={`marca-chip ${texto === m ? "activo" : ""}`}>{m}</button>
+            ))}
+          </div>
+          <input id="marca-propia" className="marca-campo mt-2" type="text" maxLength={28} placeholder="U otra cosa, con tus palabras" aria-label="Otra cosa, con tus palabras" value={propio} onChange={(e) => setTexto(e.target.value)} />
+        </div>
+        <div className="grid gap-1">
+          <button onClick={() => onGuardar(lunes, limpio || null)} disabled={!limpio && !marcas[lunes]} className="boton-pildora w-full disabled:opacity-40">{limpio || !marcas[lunes] ? "Guardar" : "Quitar la marca"}</button>
+          <button onClick={onClose} className="enlace-suave mx-auto">Cancelar</button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // `puntos`: [{ fecha: "2026-10-14", v, record?, descarga? , ...lo que use el
 // globo }], en orden. `referencia`: { v, etiqueta } (la raya punteada del
 // récord), con su rótulo donde la línea no pasa. `globo(punto)`: lo que dice
 // el globo de la sesión tocada. Para que se olvide de la sesión tocada al
 // cambiar de ejercicio o de métrica, quien la usa le cambia la `key`.
-function GraficaTiempo({ puntos, color = "var(--tono)", alto = 200, formato = (v) => numeroAR(v), referencia = null, globo = null, etiqueta = "" }) {
+function GraficaTiempo({ puntos, color = "var(--tono)", alto = 200, formato = (v) => numeroAR(v), referencia = null, globo = null, etiqueta = "", semanas = [] }) {
   const cajaRef = useRef(null);
   const svgRef = useRef(null);
   const [ancho, setAncho] = useState(0);
@@ -18848,10 +19001,26 @@ function GraficaTiempo({ puntos, color = "var(--tono)", alto = 200, formato = (v
           {/* Las sesiones de descarga (16/11, pedido: "algún detalle que te
               muestre cuándo fue una sesión de descarga"): una franja rayada,
               como el cajón de la descarga, con su D arriba. */}
-          {puntos.map((p, i) => (p.descarga ? (
-            <g key={`d${i}`} className="grafica-franja">
+          {/* Las semanas marcadas a mano (`semanas`: [{ lunes, texto }]): una
+              banda lisa de lunes a domingo con un banderín arriba. La A es
+              una sesión de la semana de adaptación, la que sigue a la descarga. */}
+          {semanas.map((m) => {
+            const a = fechaMs(m.lunes) - DIA_MS / 2, b = a + 7 * DIA_MS;
+            if (b < t0 || a > t1) return null;
+            let x0 = xDe(Math.max(a, t0)), x1 = xDe(Math.min(b, t1));
+            if (x1 - x0 < 16) { const c = (x0 + x1) / 2; x0 = Math.max(padL, c - 8); x1 = Math.min(padL + plotW, x0 + 16); }
+            const xm = (x0 + x1) / 2;
+            return (
+              <g key={`m${m.lunes}`} className="grafica-franja">
+                <rect x={x0} y={padT} width={x1 - x0} height={plotH} rx="4" className="grafica-marca-banda" />
+                <path d={`M${xm - 2.5} ${padT - 1}V${padT - 11}l7 2.6l-7 2.6`} className="grafica-marca-asta" />
+              </g>
+            );
+          })}
+          {puntos.map((p, i) => (p.descarga || p.adaptacion ? (
+            <g key={`d${i}`} className={`grafica-franja ${p.descarga ? "" : "adaptacion"}`}>
               <rect x={xs[i] - 8} y={padT} width={16} height={plotH} rx="4" fill={`url(#${uid}-d)`} />
-              <text x={xs[i]} y={padT - 3} textAnchor="middle" className="grafica-franja-d">D</text>
+              <text x={xs[i]} y={padT - 3} textAnchor="middle" className="grafica-franja-d">{p.descarga ? "D" : "A"}</text>
             </g>
           ) : null))}
           {marcasY.map((v, i) => (
@@ -21145,8 +21314,9 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
   // Qué dibuja la gráfica (el 1RM, el peso o el volumen; en cardio, los
   // minutos), de qué período y si se ve la lista de sesiones.
   const [metrica, setMetrica] = useState("e1rm");
-  const [rango, setRango] = useState("3m");
-  const [verSesiones, setVerSesiones] = useState(false);
+  const [rango, setRango] = useState("todo");
+  // La semana que se está marcando (ver MarcaSemanaModal), o null.
+  const [marcando, setMarcando] = useState(null);
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const selEx = allExercises.find((e) => e.id === selId);
   // La curva es SIEMPRE la mejor serie de cada sesión. El selector de serie
@@ -21186,6 +21356,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
     e1rm: Math.round(kgToDisplay(estimate1RM(h.kg, h.reps), unit) * 10) / 10,
     rpe: h.rpe ?? null,
     deload: !!h.deload,
+    adapt: !!h.adapt,
   })), [history, unit]);
 
   const [confirmResetProgress, setConfirmResetProgress] = useState(false);
@@ -21244,7 +21415,6 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
             return { ...d, esRecord };
           });
           const n = escalera.length;
-          const records = escalera.filter((d) => d.esRecord).length;
           const iMejor = escalera.reduce((b, d, i) => (!d.deload && puntaje(d) >= puntaje(escalera[b]) ? i : b), 0);
           const mejor = escalera[iMejor];
           const sesionesDesde = n - 1 - iMejor;
@@ -21286,6 +21456,27 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
             return { pendiente, estable: Math.abs(pendiente) < Math.max(0.05, Math.abs(my) * 0.004) };
           })();
           const decimales = met.k === "vol" || met.k === "repsDia" ? 0 : 1;
+          // LAS MARCAS DE LA SEMANA (16/11, pedido: "poder agregar marcadores
+          // como el de la descarga, o personalizables: si tuve una semana de
+          // mucho estrés, anotarlo para leer mejor la gráfica"). Una por
+          // semana, por su lunes, en settings.marcasSemana; son de todos los
+          // ejercicios.
+          const marcas = settings.marcasSemana || {};
+          const lunesIso = (fecha) => localDateStr(lunesDe(new Date(`${fecha}T12:00:00`)));
+          const desdeV = primeroV ? lunesIso(primeroV.fecha) : "", hastaV = ultimoV ? ultimoV.fecha : "";
+          const semanasMarcadas = Object.keys(marcas).filter((l) => l >= desdeV && l <= hastaV).sort().map((l) => ({ lunes: l, texto: marcas[l] }));
+          const hayD = visibles.some((d) => d.deload), hayA = visibles.some((d) => d.adapt);
+          const diaMes = (iso) => `${Number(iso.slice(8, 10))}/${Number(iso.slice(5, 7))}`;
+          const guardarMarca = (lunes, texto) => {
+            const sig = { ...marcas };
+            if (texto) sig[lunes] = texto; else delete sig[lunes];
+            // A lo sumo 80 marcas: se van las más viejas.
+            const claves = Object.keys(sig).sort();
+            claves.slice(0, Math.max(0, claves.length - 80)).forEach((k) => delete sig[k]);
+            onUpdateSettings?.({ marcasSemana: sig });
+            setMarcando(null);
+            haptic(12);
+          };
           return (
             <section className="tarjeta-tonal p-4 space-y-4" style={{ "--c": colorEj }} aria-label="Evolución por ejercicio">
               {/* El ejercicio elegido, con el color de su día. Abre la lista
@@ -21302,7 +21493,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                 <ExercisePickerModal
                   groups={exercisesByDay}
                   selId={selId}
-                  onSelect={(id) => { setSelId(id); setVerSesiones(false); setShowExercisePicker(false); }}
+                  onSelect={(id) => { setSelId(id); setShowExercisePicker(false); }}
                   onClose={() => setShowExercisePicker(false)}
                 />
               )}
@@ -21330,7 +21521,8 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
 
                   <GraficaTiempo
                     key={`${selId}-${met.k}-${rangoSel?.k || "todo"}`}
-                    puntos={visibles.map((d) => ({ fecha: d.fecha, v: met.v(d), record: esPuntaje && d.esRecord, descarga: d.deload, d }))}
+                    puntos={visibles.map((d) => ({ fecha: d.fecha, v: met.v(d), record: esPuntaje && d.esRecord, descarga: d.deload, adaptacion: d.adapt, d }))}
+                    semanas={semanasMarcadas}
                     color={colorEj}
                     alto={204}
                     formato={(v) => numeroAR(v, decimales)}
@@ -21338,9 +21530,10 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                     etiqueta={`${met.l} de ${selEx?.name || "este ejercicio"}: de ${numeroAR(met.v(primeroV), decimales)} a ${numeroAR(met.v(ultimoV), decimales)} ${met.u} en ${visibles.length} ${visibles.length === 1 ? "sesión" : "sesiones"}`}
                     globo={(p) => (
                       <>
-                        <p className="grafica-globo-fecha">{p.d.fechaCorta}{p.d.deload ? " · descarga" : ""}{p.d.esRecord ? " · récord" : ""}</p>
+                        <p className="grafica-globo-fecha">{p.d.fechaCorta}{p.d.deload ? " · descarga" : ""}{p.d.adapt ? " · adaptación" : ""}{p.d.esRecord ? " · récord" : ""}</p>
                         <p className="grafica-globo-serie num-display">{esCardio ? `${p.d.minutos} min${p.d.km ? ` · ${numeroAR(p.d.km)} km` : ""}` : sinPeso ? `${p.d.reps} reps` : `${p.d.reps} × ${numeroAR(p.d.kg)} ${uLabel}`}</p>
                         <p className="grafica-globo-dato">{met.l}: {numeroAR(p.v, decimales)} {met.u}{p.d.rpe != null ? ` · ${formatEffort(p.d.rpe, settings.rpeDisplayMode)}` : ""}</p>
+                        {marcas[lunesIso(p.d.fecha)] && <p className="grafica-globo-marca">{marcas[lunesIso(p.d.fecha)]}</p>}
                       </>
                     )}
                   />
@@ -21361,50 +21554,32 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                     </div>
                   )}
 
-                  {/* Tu mejor serie, abajo de la gráfica (pedido: primero la curva, después
-                      el récord y su 1RM estimado). */}
-                  <div className="records-renglon">
-                    <div className="min-w-0">
-                      <p className="records-rotulo">Tu récord</p>
-                      <p className="records-valor num-display">
-                        {esCardio ? <>{mejor.minutos}<small>min</small></> : sinPeso ? <>{mejor.reps}<small>reps</small></> : <>{mejor.reps}<i>×</i>{numeroAR(mejor.kg)}<small>{uLabel}</small></>}
-                      </p>
-                    </div>
-                    <dl className="records-datos">
-                      {!esCardio && !sinPeso && <div><dt>1RM</dt><dd className="num-display">{numeroAR(Math.round(mejor.e1rm))}<small>{uLabel}</small></dd></div>}
-                      {esCardio && mejor.km ? <div><dt>Distancia</dt><dd className="num-display">{numeroAR(mejor.km)}<small>km</small></dd></div> : null}
-                      <div><dt>{records === 1 ? "Récord" : "Récords"}</dt><dd className="num-display">{records}</dd></div>
-                    </dl>
-                  </div>
+                  {/* Qué quiere decir cada marca de la gráfica, sólo las que hay. */}
+                  {(hayD || hayA || semanasMarcadas.length > 0) && (
+                    <ul className="grafica-leyenda" aria-label="Marcas de la gráfica">
+                      {hayD && <li><b>D</b> descarga</li>}
+                      {hayA && <li><b>A</b> adaptación</li>}
+                      {semanasMarcadas.slice(-3).map((m) => (
+                        <li key={m.lunes}><button onClick={() => setMarcando({ lunes: m.lunes })} aria-label={`Semana del ${diaMes(m.lunes)}: ${m.texto}. Cambiar`}><Flag size={11} aria-hidden="true" /> {diaMes(m.lunes)} {m.texto}</button></li>
+                      ))}
+                      {semanasMarcadas.length > 3 && <li>y {semanasMarcadas.length - 3} más</li>}
+                    </ul>
+                  )}
 
-                  {/* Sólo cuando hay algo que hacer: tres sesiones o más sin
-                      superar el récord (15/11: "tiene mucho texto"; antes
-                      también decía "tu última sesión igualó tu récord"). */}
+                  {/* El récord con su 1RM y la lista de sesiones se sacaron
+                      (16/11, pedido: "sacar esa parte"): el récord es la raya
+                      punteada de la gráfica y cada sesión se lee tocándola.
+                      Queda el aviso, sólo cuando hay algo que hacer: tres
+                      sesiones o más sin superar el récord. */}
                   {n >= 2 && sesionesDesde >= 3 && (
                     <p className="records-pie alerta">
                       <AlertTriangle size={15} className="shrink-0" />
-                      <span>{sesionesDesde} sesiones sin superarlo{diasDesde != null ? `, ${haceCuanto(diasDesde)}` : ""}.</span>
+                      <span>{sesionesDesde} sesiones sin superar tu récord{diasDesde != null ? `, ${haceCuanto(diasDesde)}` : ""}.</span>
                     </p>
                   )}
 
-                  {/* Cada sesión, la más reciente arriba: la serie que hiciste y
-                      su 1RM estimado. Las que fueron récord, con la galleta. */}
-                  <button onClick={() => setVerSesiones((v) => !v)} className="enlace-suave mx-auto" aria-expanded={verSesiones}>
-                    {verSesiones ? <>Ocultar <ChevronUp size={13} /></> : <>{n === 1 ? "1 sesión" : `${n} sesiones`} <ChevronDown size={13} /></>}
-                  </button>
-                  {verSesiones && (
-                    <div className="space-y-1.5">
-                      {escalera.slice().reverse().map((h) => (
-                        <div key={h.fecha} className={`sesion-renglon ${h.esRecord ? "record" : ""} ${h.deload ? "descarga" : ""}`}>
-                          <span className={`galleta sesion-renglon-marca ${h.esRecord ? "" : "hueca"}`} aria-hidden="true">{h.esRecord ? <Trophy size={12} /> : h.deload ? <Zap size={11} /> : null}</span>
-                          <span className="sesion-renglon-fecha">{h.fechaCorta}</span>
-                          <span className="sesion-renglon-serie">{esCardio ? `${h.minutos} min` : sinPeso ? `${h.reps} reps` : `${h.reps}×${numeroAR(h.kg)}${uLabel}`}</span>
-                          <b className="sesion-renglon-1rm num-display">{esCardio ? (h.km ? <>{numeroAR(h.km)}<small>km</small></> : null) : sinPeso ? <>{h.repsDia}<small>reps</small></> : <>{numeroAR(Math.round(h.e1rm))}<small>{uLabel}</small></>}</b>
-                        </div>
-                      ))}
-                      {!esCardio && !sinPeso && <p className="text-[12px] text-slate-500 pt-1">El 1RM es una estimación (fórmula de Epley) que junta reps y kilos. Sirve para comparar, no es un máximo real.</p>}
-                    </div>
-                  )}
+                  <button onClick={() => setMarcando({ lunes: lunesIso(ultimoV.fecha) })} className="enlace-suave mx-auto"><Flag size={13} /> Marcar una semana</button>
+                  {marcando && <MarcaSemanaModal marcas={marcas} lunesInicial={marcando.lunes} onGuardar={guardarMarca} onClose={() => setMarcando(null)} />}
                 </>
               )}
             </section>
@@ -22610,7 +22785,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
   const updateSettings = (patch) => onUpdateProfile({ settings: { ...settings, ...patch } });
   const adjustRest = (key, delta) => updateSettings({ [key]: Math.min(600, Math.max(30, settings[key] + delta)) });
   const adjustSetting = (key, delta, min, max) => updateSettings({ [key]: Math.min(max, Math.max(min, settings[key] + delta)) });
-  const adjustDeloadPct = (delta) => updateSettings({ deloadPct: Math.min(0.95, Math.max(0.5, Math.round((settings.deloadPct + delta) * 100) / 100)) });
+  const adjustDeloadPct = (delta) => updateSettings({ deloadPct: Math.min(1, Math.max(0.5, Math.round((settings.deloadPct + delta) * 100) / 100)), descargaElegida: true });
   // Navegación desde "Personalizar qué ves al registrar" (Rutina): antes
   // scrolleaba hasta la sección y la abría (CollapsibleSection). Ahora esa
   // fila es directamente el botón del modal de vista previa, así que el
@@ -22953,8 +23128,13 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           <>
             <div className="space-y-2">
               <AjustePasos rotulo="Semanas de descarga" valor={settings.deloadWeeks} onMenos={() => adjustSetting("deloadWeeks", -1, 1, 4)} onMas={() => adjustSetting("deloadWeeks", 1, 1, 4)} menos="Una semana de descarga menos" mas="Una semana de descarga más" />
-              <AjustePasos rotulo="Carga en la descarga" valor={`${Math.round(settings.deloadPct * 100)} %`} onMenos={() => adjustDeloadPct(-0.05)} onMas={() => adjustDeloadPct(0.05)} menos="Menos carga en la descarga" mas="Más carga en la descarga" />
+              <AjustePasos rotulo="Peso en la descarga" valor={`${Math.round(settings.deloadPct * 100)} %`} onMenos={() => adjustDeloadPct(-0.05)} onMas={() => adjustDeloadPct(0.05)} menos="Menos carga en la descarga" mas="Más carga en la descarga" />
             </div>
+            <ToggleRow
+              icon={<TrendingUp size={16} />} label="Semana de adaptación al volver"
+              desc="La primera semana después de la descarga: tus pesos de siempre, con tres cuartos de las series y sin sumar reps."
+              on={settings.adaptacionTrasDescarga !== false} onToggle={() => updateSettings({ adaptacionTrasDescarga: !(settings.adaptacionTrasDescarga !== false) })}
+            />
             <div><p className="ajuste-rotulo mb-2">Series en la descarga</p><div className="segmentado">{[{ k: 2, l: "La mitad" }, { k: 3, l: "Un tercio" }, { k: 4, l: "Un cuarto" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ deloadSetDivisor: opt.k })} aria-pressed={settings.deloadSetDivisor === opt.k} className={settings.deloadSetDivisor === opt.k ? "activo" : ""}>{opt.l}</button>)}</div></div>
           </>
         )}
@@ -28685,7 +28865,7 @@ function buildActionPlan(action, ctx) {
     if (typeof action.deloadEnabled === "boolean") { patch.deloadEnabled = action.deloadEnabled; items.push(`Semanas de descarga: ${action.deloadEnabled ? "activadas" : "desactivadas (ciclo continuo)"}`); }
     if (action.trainWeeks) { patch.trainWeeks = Math.min(12, Math.max(2, action.trainWeeks)); items.push(`Semanas de entrenamiento: ${patch.trainWeeks}`); }
     if (action.deloadWeeks) { patch.deloadWeeks = Math.min(4, Math.max(1, action.deloadWeeks)); items.push(`Semanas de descarga: ${patch.deloadWeeks}`); }
-    if (action.deloadPct) { patch.deloadPct = Math.min(0.95, Math.max(0.5, action.deloadPct)); items.push(`Carga en descarga: ${Math.round(patch.deloadPct * 100)}%`); }
+    if (action.deloadPct) { patch.deloadPct = Math.min(1, Math.max(0.5, action.deloadPct)); patch.descargaElegida = true; items.push(`Carga en descarga: ${Math.round(patch.deloadPct * 100)}%`); }
     if (action.deloadSetDivisor) { patch.deloadSetDivisor = action.deloadSetDivisor; items.push(`Reducción de series: ÷${action.deloadSetDivisor}`); }
     if (!items.length) return null;
     return { kind: "settings", title: "Cambiar configuración de ciclo y descarga", items, settingsChanges: buildSettingsChanges(patch), confirmLabel: "Aplicar cambios", confirm: () => onUpdateSettings(patch) };
@@ -29381,7 +29561,7 @@ Tipos disponibles:
 - registrar_marca: {"type":"registrar_marca","exercise":"Press Banca","reps":8,"kg":80,"rpe":8} — carga una serie de HOY para ese ejercicio, como si la hubiera anotado a mano en Rutina. "rpe" es opcional (1-10). Usalo cuando te digan algo tipo "anotá que hice 8x80 en press banca".
 - editar_perfil: {"type":"editar_perfil","sex":"M"|"F","age":30,"bodyWeightKg":80} (incluí sólo los campos que pidió cambiar)
 - agregar_medida: {"type":"agregar_medida","tipo":"waist"|"chest"|"arm"|"leg","valor":80} (en cm; para peso usá editar_perfil con bodyWeightKg, no esto)
-- config_ciclo: {"type":"config_ciclo","deloadEnabled":true,"trainWeeks":5,"deloadWeeks":1,"deloadPct":0.75,"deloadSetDivisor":2} (deloadEnabled apaga/prende la semana de descarga entera; deloadPct es la fracción del peso que viene levantando (su mejor serie del último mes), ej. 0.75 = 75%; deloadSetDivisor: 2 = mitad de series, 3 = un tercio, 4 = un cuarto)
+- config_ciclo: {"type":"config_ciclo","deloadEnabled":true,"trainWeeks":5,"deloadWeeks":1,"deloadPct":0.9,"deloadSetDivisor":2} (deloadEnabled apaga/prende la semana de descarga entera; deloadPct es la fracción del peso que viene levantando (su mejor serie del último mes), entre 0.5 y 1, ej. 0.9 = 90%: en la descarga el peso queda alto y lo que baja son las series y las reps; deloadSetDivisor: 2 = mitad de series, 3 = un tercio, 4 = un cuarto)
 - config_apariencia: {"type":"config_apariencia","theme":"dark"|"light"}
 - config_unidad: {"type":"config_unidad","weightUnit":"kg"|"lbs"}
 - config_descanso: {"type":"config_descanso","alertType":"sound"|"vibration"|"both","restLong":120,"restShort":60,"autoStartRestTimer":true} (segundos; autoStartRestTimer arranca el descanso solo al guardar una serie)
@@ -34533,7 +34713,9 @@ export default function App() {
   }, [haySesionActiva]);
   const sessionProgress = useMemo(() => {
     const dk = profile?.activeSession?.dayKey;
-    const dia = dk ? ROUTINE?.[dk] : null;
+    const diaEntero = dk ? ROUTINE?.[dk] : null;
+    // En la semana de adaptación cuentan las series que quedan (ver RoutineView).
+    const dia = diaEntero && !profile?.activeSession?.deload && esSemanaDeAdaptacion(cycleStart, getProfileSettings(profile), logs) ? diaDeAdaptacion(diaEntero) : diaEntero;
     if (!dia?.exercises?.length) return { done: 0, total: 0 };
     const hoy = todayStr();
     let done = 0, total = 0;

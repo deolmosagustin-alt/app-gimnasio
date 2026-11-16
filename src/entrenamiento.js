@@ -44,31 +44,41 @@ export function siguientePaso(kg, reps, repRange, salto, { rpe = null } = {}) {
 // nunca menos de una.
 export const seriesDeDescarga = (n, divisor = 2) => Math.max(1, Math.ceil((n || 0) / Math.max(1, divisor || 2)));
 
-// La serie de la descarga: las mismas reps con menos peso, redondeado a lo
-// que se puede cargar (el salto de ese ejercicio: el disco chico o lo que
-// marque la máquina). Antes se redondeaba de a medio kilo y salían pesos
-// imposibles de armar (64 kg; en libras, 141,1). A peso corporal, o si el
-// peso ya es el más chico que se puede cargar, bajan las reps.
-export function cargaDeDescarga(base, { pct = 0.75, salto = 2.5, unit = "kg", cardio = false } = {}) {
+// LA SERIE DE LA DESCARGA (16/11, pedido: "mantené el peso alto, recortá sólo
+// el volumen y el esfuerzo": con el 75 % del peso, a la vuelta se sentía
+// débil). Casi todo el peso (90 % de fábrica, hasta 100 %), la mitad de las
+// series (seriesDeDescarga) y menos reps, para cortar a 3 o 4 del fallo. La
+// evidencia: en el consenso Delphi de Bell et al. (2023) hubo acuerdo en que
+// "la intensidad puede quedar igual durante la descarga, pero sólo si baja el
+// volumen" (95 %) y en que se puede bajar el volumen con menos series y menos
+// reps (100 %); su guía práctica (Bell et al., 2024) propone bajar el %RM un
+// 10 % o sacar reps con la misma carga.
+// El peso se redondea a lo que se puede cargar (el salto del ejercicio) y
+// nunca pasa del de siempre. En cardio, menos minutos (a lo sumo el 75 %).
+export const repsDeDescarga = (reps) => Math.max(1, reps - Math.min(4, Math.max(1, Math.round(reps * 0.35))));
+export function cargaDeDescarga(base, { pct = 0.9, salto = 2.5, unit = "kg", cardio = false } = {}) {
   if (!base) return null;
-  if (cardio) return { minutes: Math.max(1, Math.round((base.minutes || 0) * pct)) };
+  if (cardio) return { minutes: Math.max(1, Math.round((base.minutes || 0) * Math.min(pct, 0.75))) };
   const reps = base.reps || 0;
   if (!(reps > 0)) return null;
-  const menosReps = Math.max(1, Math.round(reps * pct));
-  if (!(base.kg > 0)) return { reps: menosReps, kg: 0, kgVista: 0 };
+  const menos = repsDeDescarga(reps);
+  if (!(base.kg > 0)) return { reps: menos, kg: 0, kgVista: 0 };
   const paso = salto > 0 ? salto : unit === "lbs" ? 5 : 2.5;
   const original = kgToDisplay(base.kg, unit);
   const objetivo = original * pct;
-  // Al más cercano y, en un empate (63,75 entre 62,5 y 65), al más liviano:
-  // es una descarga.
+  // Al más cercano y, en un empate, al más liviano: es una descarga.
   let vista = Math.round(objetivo / paso - 1e-6) * paso;
-  if (vista >= original) vista = Math.floor(objetivo / paso) * paso;
-  if (vista <= 0) return { reps: menosReps, kg: base.kg, kgVista: original };
+  if (vista > original) vista = Math.floor(original / paso + 1e-6) * paso;
+  if (vista <= 0) vista = original;
   vista = Math.round(vista * 100) / 100;
-  // Si el redondeo la dejó más pesada que el porcentaje (64 → 65), una rep
-  // menos: la descarga nunca pide más esfuerzo del pensado (05/11).
-  return { reps: equilibrarReps(objetivo, vista, reps, { soloBajar: true }), kg: displayToKg(vista, unit), kgVista: vista };
+  return { reps: menos, kg: Math.abs(vista - original) < 0.005 ? base.kg : displayToKg(vista, unit), kgVista: vista };
 }
+// LA SEMANA DE ADAPTACIÓN, la primera después de una descarga: los pesos de
+// siempre con tres cuartos de las series (4 → 3, 3 → 2) y sin sumar reps, a
+// unas 2 del fallo; el volumen entero vuelve la semana siguiente. En el
+// consenso de Bell et al. (2023), "la intensidad puede ser más baja en la
+// primera semana de un mesociclo nuevo" (84 %).
+export const seriesDeAdaptacion = (n) => ((n || 0) <= 2 ? Math.max(1, n || 0) : Math.max(2, Math.round(n * 0.75)));
 // ¿VENÍS BAJANDO? Para ofrecer adelantar la descarga. La descarga puede ser
 // planeada y también autorregulada (consenso Delphi de Bell et al., 2023), y
 // los atletas la adelantan cuando se estancan o les duelen las articulaciones

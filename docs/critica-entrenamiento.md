@@ -96,6 +96,12 @@ El criterio del ACSM de dos sesiones seguidas no se adoptó. El usuario pidió e
 - **Dónde:** la descarga ahora es Rutina misma, transformada. La barra suelta los discos que sobran, la hoja del plan se pliega, cada tarjeta se queda con sus series de descarga y las demás se tachan. Un selector en el día deja elegir entre entrenamiento y descarga. Desde Progreso se abre la vista previa en Rutina, no otra pestaña. La pantalla aparte (`DeloadView`) se sacó.
 - **La IA:** recomienda la descarga cada 4 a 8 semanas o antes si el rendimiento baja dos o más sesiones seguidas, con la mitad de las series y RIR de 4 o más. Nunca recomienda parar del todo.
 
+**16/11/2026: el peso queda alto y hay una semana de adaptación.**
+- **El problema:** con el 75 % del peso y las mismas reps, al volver de la descarga las cargas de siempre se sentían pesadas.
+- **La evidencia:** en el consenso Delphi (Bell et al., 2023, https://pmc.ncbi.nlm.nih.gov/articles/PMC10511399/) hubo acuerdo en que "la intensidad puede quedar igual durante la descarga, pero sólo si baja el volumen" (95 %), en que el volumen se baja con menos series (100 %) y con menos reps (100 %), y en que "la intensidad puede ser más baja en la primera semana de un mesociclo nuevo" (84 %). La guía práctica de los mismos autores (Bell et al., 2024, "A Practical Approach to Deloading") propone bajar el %RM alrededor de un 10 % o sacar reps con la misma carga, y recortar el volumen entre 25 y 60 % según cuánta recuperación haga falta.
+- **Qué se cambió:** la descarga es el 90 % del peso (configurable hasta 100 %), la mitad de las series y 3 o 4 reps menos por serie (`cargaDeDescarga`, `repsDeDescarga`). La semana siguiente es de adaptación: los pesos de siempre, tres cuartos de las series y sin sumar reps (`seriesDeAdaptacion`); el volumen entero vuelve una semana después.
+- **A quién:** el consenso dice que el volumen y la intensidad de la descarga dependen de la experiencia. La bienvenida recomienda empezar sin descargas a quien recién empieza; es una decisión de producto, no un resultado de un estudio.
+
 ## 6. Aproximaciones y 1RM estimado
 
 - **Aproximaciones:** la rampa es 50 % × 8, 70 % × 5 y 85 % × 3 de tu mejor peso de trabajo. Es una progresión estándar y sólo se muestra si la prendés. Para un aislamiento, o para el segundo ejercicio del mismo músculo, alcanza con una serie de aproximación. **Queda como idea**, no se cambió.

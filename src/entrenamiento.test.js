@@ -2,7 +2,7 @@
 // scripts/probar-logica.mjs, que sacaba las funciones de App.jsx como texto).
 // npm test
 import { describe, expect, it } from "vitest";
-import { siguientePaso, cargaDeDescarga, seriesDeDescarga, ejerciciosEnBaja } from "./entrenamiento.js";
+import { siguientePaso, cargaDeDescarga, repsDeDescarga, seriesDeAdaptacion, seriesDeDescarga, ejerciciosEnBaja } from "./entrenamiento.js";
 
 describe("siguientePaso (doble progresión)", () => {
   it("con el mismo peso, una rep más", () => {
@@ -29,20 +29,35 @@ describe("siguientePaso (doble progresión)", () => {
 });
 
 describe("cargaDeDescarga", () => {
-  it("redondea a un peso que se puede cargar", () => {
-    expect(cargaDeDescarga({ kg: 77.5, reps: 5 }, { pct: 0.75, salto: 2.5, unit: "kg" })).toEqual({ reps: 5, kg: 57.5, kgVista: 57.5 });
-    expect(cargaDeDescarga({ kg: 85, reps: 8 }, { pct: 0.75, salto: 2.5, unit: "kg" })).toEqual({ reps: 8, kg: 62.5, kgVista: 62.5 });
+  it("casi todo el peso, a un peso que se puede cargar, y menos reps", () => {
+    expect(cargaDeDescarga({ kg: 77.5, reps: 5 }, { pct: 0.9, salto: 2.5, unit: "kg" })).toEqual({ reps: 3, kg: 70, kgVista: 70 });
+    expect(cargaDeDescarga({ kg: 85, reps: 8 }, { pct: 0.9, salto: 2.5, unit: "kg" })).toEqual({ reps: 5, kg: 77.5, kgVista: 77.5 });
+  });
+  it("al 100 %, el mismo peso con menos reps (4 x 8 x 100 pasa a 2 x 5 x 100)", () => {
+    expect(cargaDeDescarga({ kg: 100, reps: 8 }, { pct: 1, salto: 2.5, unit: "kg" })).toEqual({ reps: 5, kg: 100, kgVista: 100 });
   });
   it("en libras, de a 5 lb; en una máquina de a 7 kg", () => {
-    expect(cargaDeDescarga({ kg: 85, reps: 8 }, { pct: 0.75, salto: 5, unit: "lbs" }).kgVista).toBe(140);
-    expect(cargaDeDescarga({ kg: 70, reps: 10 }, { pct: 0.75, salto: 7, unit: "kg" }).kgVista).toBe(49);
+    expect(cargaDeDescarga({ kg: 85, reps: 8 }, { pct: 0.9, salto: 5, unit: "lbs" }).kgVista).toBe(170);
+    expect(cargaDeDescarga({ kg: 70, reps: 10 }, { pct: 0.9, salto: 7, unit: "kg" }).kgVista).toBe(63);
   });
-  it("con el peso mínimo o a peso corporal, bajan las reps", () => {
-    expect(cargaDeDescarga({ kg: 2.5, reps: 12 }, { pct: 0.75, salto: 2.5, unit: "kg" })).toEqual({ reps: 9, kg: 2.5, kgVista: 2.5 });
-    expect(cargaDeDescarga({ kg: 0, reps: 10 }, { pct: 0.75 })).toEqual({ reps: 8, kg: 0, kgVista: 0 });
+  it("nunca más pesado que lo de siempre", () => {
+    expect(cargaDeDescarga({ kg: 2.5, reps: 12 }, { pct: 0.9, salto: 2.5, unit: "kg" })).toEqual({ reps: 8, kg: 2.5, kgVista: 2.5 });
+    expect(cargaDeDescarga({ kg: 10, reps: 10 }, { pct: 0.95, salto: 5, unit: "kg" }).kgVista).toBe(10);
+  });
+  it("a peso corporal, menos reps", () => {
+    expect(cargaDeDescarga({ kg: 0, reps: 10 }, { pct: 0.9 })).toEqual({ reps: 6, kg: 0, kgVista: 0 });
   });
   it("en cardio, menos minutos", () => {
-    expect(cargaDeDescarga({ minutes: 20 }, { pct: 0.75, cardio: true })).toEqual({ minutes: 15 });
+    expect(cargaDeDescarga({ minutes: 20 }, { pct: 0.9, cardio: true })).toEqual({ minutes: 15 });
+  });
+});
+
+describe("repsDeDescarga y seriesDeAdaptacion", () => {
+  it("saca 3 o 4 reps en las series largas y menos en las cortas", () => {
+    expect([1, 2, 3, 5, 8, 10, 12, 15, 20].map(repsDeDescarga)).toEqual([1, 1, 2, 3, 5, 6, 8, 11, 16]);
+  });
+  it("tres cuartos de las series al volver de la descarga", () => {
+    expect([1, 2, 3, 4, 5, 6].map(seriesDeAdaptacion)).toEqual([1, 2, 2, 3, 4, 5]);
   });
 });
 
