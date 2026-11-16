@@ -7449,36 +7449,52 @@ label.ajuste-rotulo { display: block; }
 .vista-tema b { font-size: 19px; font-weight: 750; letter-spacing: -.02em; }
 .vista-tema small { font-size: 12px; font-weight: 650; color: var(--text-faint); padding: 3px 7px; border-radius: 999px; background: var(--surface-3); }
 
-/* ══ LA CURVA DEL CICLO (15/11): la fatiga que se acumula semana a semana y la
-   descarga que la baja. Reemplaza a los cajones y a la pared perforada. */
-.curva-ciclo { margin-top: 8px; }
-.curva-ciclo svg { display: block; overflow: visible; }
-.curva-piso { stroke: var(--hairline); stroke-width: 1; }
-.curva-franja { fill: var(--velo); }
-.curva-linea { fill: none; stroke: color-mix(in oklab, var(--tono) 72%, white); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
-.curva-por-venir { fill: none; stroke: var(--text-faint); stroke-width: 1.6; stroke-dasharray: 2 5; stroke-linecap: round; opacity: .75; }
-.curva-punto { fill: var(--surface-1); stroke: var(--text-faint); stroke-width: 1.6; }
-.curva-semana.pasada .curva-punto, .curva-semana.actual .curva-punto { stroke: color-mix(in oklab, var(--tono) 72%, white); }
-.curva-semana.cumplida .curva-punto, .curva-semana.actual .curva-punto { fill: color-mix(in oklab, var(--tono) 72%, white); }
-.curva-halo { fill: var(--tono); opacity: .22; }
-.curva-numero { font-size: 11px; font-weight: 700; fill: var(--text-faint); }
-.curva-semana.actual .curva-numero { fill: var(--text-strong); font-weight: 800; }
-.curva-veces { font-size: 11px; font-weight: 700; fill: var(--text-muted); }
-.curva-semana.cumplida .curva-veces { fill: color-mix(in oklab, var(--tono) 72%, white); }
-.light-mode .curva-linea { stroke: var(--tono); }
-.light-mode .curva-semana.pasada .curva-punto, .light-mode .curva-semana.actual .curva-punto { stroke: var(--tono); }
-.light-mode .curva-semana.cumplida .curva-punto, .light-mode .curva-semana.actual .curva-punto { fill: var(--tono); }
-.light-mode .curva-semana.cumplida .curva-veces { fill: color-mix(in oklab, var(--tono) 75%, black); }
-@keyframes curvaSeDibuja { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
-@keyframes curvaAparece { from { opacity: 0; } }
-.curva-ciclo.se-dibuja .curva-linea { stroke-dasharray: 1; animation: curvaSeDibuja var(--dur-momento, 1.1s) var(--sale, ease-out) backwards; }
-.curva-ciclo.se-dibuja :is(.curva-area, .curva-semana) { animation: curvaAparece .4s ease-out .7s backwards; }
-@media (prefers-reduced-motion: reduce) { .curva-ciclo.se-dibuja :is(.curva-linea, .curva-area, .curva-semana) { animation: none; } }
+/* ══ LA PILA DE PLACAS (15/11): el ciclo como la pila de una máquina de poleas.
+   Las placas de arriba del pasador están en el aire: lo que venís cargando. */
+.pila { --sube: 9px; --guia: linear-gradient(90deg, #6f737a, #d9dce1 45%, #8b8f96);
+  margin-top: 10px; padding: 12px 16px; border-radius: 20px; background: var(--panel-sunken); box-shadow: inset 0 1px 2px rgba(0,0,0,.25); }
+.light-mode .pila { box-shadow: inset 0 1px 2px rgba(20,24,34,.06); }
+.pila-torre { position: relative; display: flex; flex-direction: column; gap: 2px; width: 100%; max-width: 236px; margin: 0 auto; padding: 30px 0 9px; }
+/* El cabezal de la máquina (de donde cuelga el cable) y la base. */
+.pila-cabezal, .pila-base { position: absolute; left: 12%; right: 12%; height: 8px; border-radius: 4px; background: linear-gradient(#4a4d53, #25272b); box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 1px 0 rgba(0,0,0,.4); }
+.pila-cabezal { top: 0; } .pila-base { bottom: 0; height: 6px; left: 6%; right: 6%; }
+.light-mode :is(.pila-cabezal, .pila-base) { background: linear-gradient(#7d8188, #565a61); }
+.pila-guia { position: absolute; top: 6px; bottom: 4px; width: 5px; border-radius: 3px; background: var(--guia); box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
+.pila-guia.izq { left: 21%; } .pila-guia.der { right: 21%; }
+.pila-cable { position: absolute; top: 7px; left: 50%; width: 3px; height: calc(23px - var(--sube)); translate: -50% 0; border-radius: 2px; background: linear-gradient(90deg, #2b2d31, #6d7178, #2b2d31); }
+.pila-placa { --cuerpo: #2b2d32; position: relative; z-index: 1; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; height: var(--placa); padding: 0 8px; border-radius: 4px;
+  background: repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 1px, transparent 1px 3px), linear-gradient(rgba(255,255,255,.16), rgba(255,255,255,0) 38%, rgba(0,0,0,.22)), var(--cuerpo);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.2), inset 0 -1px 0 rgba(0,0,0,.4), 0 1px 0 rgba(0,0,0,.35); }
+.pila-placa.pasada { --cuerpo: color-mix(in oklab, var(--pintura) 46%, #55585e); }
+.pila-placa.actual { --cuerpo: var(--pintura); }
+.pila-placa.descarga { --cuerpo: #1b1c1f; background: repeating-linear-gradient(-45deg, rgba(255,255,255,.07) 0 3px, transparent 3px 7px), linear-gradient(rgba(255,255,255,.08), rgba(0,0,0,.2)), var(--cuerpo); border-radius: 6px; }
+.pila-placa.arriba { translate: 0 calc(var(--sube) * -1); }
+.pila-numero { justify-self: start; min-width: 16px; padding: 1px 3px; border-radius: 3px; font-size: 11px; line-height: 1.1; font-weight: 800; font-stretch: 78%; text-align: center; color: #2a2b30; background: #c9c8c1; box-shadow: inset 0 0 0 1px rgba(0,0,0,.25); }
+.pila-placa.actual .pila-numero { background: #f4f3ee; }
+.pila-placa.futura .pila-numero, .pila-placa.descarga .pila-numero { color: #b9bbc0; background: none; box-shadow: inset 0 0 0 1px rgba(255,255,255,.22); }
+.pila-agujero { width: 7px; height: 7px; border-radius: 50%; background: #0c0d0f; box-shadow: inset 0 1px 1px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.18); }
+/* El pasador: el vástago de acero metido en la placa y su perilla. */
+.pila-pasador { position: relative; display: block; width: 34px; height: 7px; border-radius: 4px; background: linear-gradient(#f1f2f4, #9da1a8 60%, #6a6e75); box-shadow: 0 2px 3px rgba(0,0,0,.5); translate: 8px 0; }
+.pila-pasador i { position: absolute; right: -9px; top: 50%; width: 15px; height: 15px; translate: 0 -50%; border-radius: 50%; background: radial-gradient(circle at 35% 30%, color-mix(in oklab, var(--tono) 60%, white), var(--tono) 55%, color-mix(in oklab, var(--tono) 60%, black)); box-shadow: 0 2px 3px rgba(0,0,0,.55), inset 0 0 0 1px rgba(0,0,0,.25); }
+.pila-veces { justify-self: end; display: flex; align-items: center; }
+.pila-veces .marcas { color: rgba(20,21,24,.78); }
+.pila-placa.pasada .pila-veces .marcas { color: rgba(244,243,238,.82); }
+.light-mode .pila { --guia: linear-gradient(90deg, #8d9198, #eceef1 45%, #a5a9b0); }
+.light-mode .pila-placa { --cuerpo: #c4c7cd; }
+.light-mode .pila-placa.pasada { --cuerpo: color-mix(in oklab, var(--pintura) 52%, #9b9ea5); }
+.light-mode .pila-placa.actual { --cuerpo: var(--pintura); }
+.light-mode .pila-placa.descarga { --cuerpo: #2c2e33; }
+.light-mode .pila-placa.futura .pila-numero { color: #4a4d53; box-shadow: inset 0 0 0 1px rgba(0,0,0,.25); }
+.light-mode .pila-placa.descarga .pila-numero { color: #d5d7db; }
+@keyframes pilaSeLevanta { from { translate: 0 0; } }
+.pila.se-levanta .pila-placa.arriba { animation: pilaSeLevanta .7s var(--resorte, ease-out) .25s backwards; }
+@keyframes pilaCable { from { height: 23px; } }
+.pila.se-levanta .pila-cable { animation: pilaCable .7s var(--resorte, ease-out) .25s backwards; }
+@media (prefers-reduced-motion: reduce) { .pila.se-levanta :is(.pila-placa.arriba, .pila-cable) { animation: none; } }
 .ciclo-pie { display: flex; align-items: center; gap: 4px 14px; flex-wrap: wrap; margin-top: 2px; }
 .ciclo-rotulo span { font-weight: 500; color: var(--text-faint); }
 .ciclo-pie { margin-left: -6px; }
-.ciclo-perfil .curva-ciclo, .guia-cajones .curva-ciclo { margin-top: 0; }
-.ciclo-resumen-pizarra .curva-ciclo { padding: 4px 8px 0; border-radius: 18px; background: var(--panel-sunken); }
+.ciclo-perfil .pila, .guia-cajones .pila { margin-top: 0; }
 
 /* ══ EL SECTOR DEL MUÑECO, pulido (15/11): el rango general de titular, el
    muñeco en su escena hundida con el reparto por rango, y dos botones. */
@@ -7490,8 +7506,6 @@ label.ajuste-rotulo { display: block; }
 .rango-cabeza-rango.sin { font-size: 16px; font-weight: 700; color: var(--text-strong); font-stretch: normal; }
 .rango-escena { display: grid; gap: 6px; padding: 14px 8px 12px; border-radius: 22px; background: var(--panel-sunken); box-shadow: inset 0 1px 2px rgba(0,0,0,.25); }
 .light-mode .rango-escena { box-shadow: inset 0 1px 2px rgba(20,24,34,.06); }
-.rango-reparto { display: flex; justify-content: center; flex-wrap: wrap; gap: 2px 16px; padding-top: 8px; margin: 0 8px; border-top: 1px solid var(--hairline); font-size: 12px; font-weight: 600; }
-.rango-reparto b { font-size: 15px; font-weight: 800; margin-right: 2px; }
 .rango-acciones { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .rango-acciones .boton-tonal { min-height: 44px; padding-inline: 10px; font-size: 13px; text-wrap: balance; }
 .rango-ayuda { text-align: center; font-size: 12px; color: var(--text-faint); }
@@ -13570,8 +13584,8 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
 // La evidencia: el consenso Delphi de Bell et al. (2023) define la descarga
 // como un período más liviano para reducir la fatiga y recuperarse.
 const BIENVENIDA_DESCARGA = {
-  ciclo: { title: "Entrenás por ciclos", text: "Un ciclo son varias semanas seguidas. Cada punto es una semana, y la línea sube con cada una: la carga crece de a poco y el cansancio se acumula. Arriba de cada punto, las veces que fuiste. Lo que viene está punteado." },
-  descarga: { title: "Y al final, la descarga", text: "Después de varias semanas subiendo, el cuerpo junta cansancio. La descarga es la D, donde la línea baja: una semana más liviana para recuperarte y volver a subir con más fuerza. Esa semana Rutina se transforma sola, y si venís bajando, la podés adelantar." },
+  ciclo: { title: "Entrenás por ciclos", text: "Un ciclo son varias semanas seguidas. Cada placa es una semana: cada semana que pasa levantás una más, y el cansancio se acumula. La de esta semana tiene el pasador; al costado de cada una, las veces que fuiste." },
+  descarga: { title: "Y al final, la descarga", text: "Después de varias semanas subiendo, el cuerpo junta cansancio. La descarga es la placa negra de abajo, la de la D: una semana más liviana para recuperarte y volver a subir con más fuerza. Esa semana Rutina se transforma sola, y si venís bajando, la podés adelantar." },
   elegir: { title: "¿Activamos las semanas de descarga?", text: "Te recomendamos dejarlas prendidas. Las podés cambiar cuando quieras en tu perfil." },
 };
 
@@ -16203,67 +16217,45 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
    "actual" | "futura"; sin `sesiones`, no hay tiza. `meta`: las sesiones
    planeadas por semana. `alto`: el alto de la fila, en px.
 ============================================================================ */
-// LA CURVA DEL CICLO (15/11, pedido: "cambiarle el diseño general de los
-// ciclos... algo visual, que se entienda que representa la acumulación de
-// fatiga", y sin la pared de chapa perforada: "tiene como circulitos").
-// Reemplaza a los cajones de salto en todos lados (Progreso, Perfil, el
-// resumen del ciclo, la bienvenida y la guía). Una sola línea: la fatiga
-// sube con cada semana que entrenás (lo que fuiste contra lo planeado: una
-// semana que faltaste no suma), lo que viene sigue punteado, y la descarga
-// la baja. El punto de esta semana, en el tono. Mismas props que antes.
+// LA PILA DE PLACAS (15/11, a la noche). El ciclo es la pila de una máquina
+// de poleas: una placa por semana, colgadas de sus dos guías; cada semana
+// que pasa el pasador baja una placa y levantás una más (lo que cargás, en
+// el aire, separado de lo que falta): el cansancio que se acumula. Las que
+// pasaron, con la pintura gastada; la de esta semana, con su color entero y
+// el pasador; las que vienen, de hierro sin pintar; la descarga, la placa de
+// goma negra de abajo. A la derecha de cada placa, las veces que fuiste.
+// Historia: los cajones de salto contra la pared perforada ("no me gusta la
+// pared, tiene como circulitos", "que represente la acumulación de fatiga")
+// y, el mismo día, una curva de fatiga ("no me gustó... mantené la estética,
+// como de adaptar algo del gimnasio"). No vuelvas a la curva ni a la pared.
+// Conserva el nombre y las props de los cajones. `alto`: el alto pedido, en px.
+const PINTURA_CAJON = ["#ECECE6", "#2BA35F", "#F4C430", "#2F6FED", "#E5383B"];
 function CajonesCiclo({ semanas = [], trainWeeks = TRAIN_WEEKS, alto = 100, animar = false, meta = null }) {
-  const uid = `cc${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   const n = semanas.length;
   if (!n) return null;
-  const W = 320, H = Math.max(84, alto + 26), izq = 6, der = 14, arriba = 14, abajo = 24;
-  const paso = (W - izq - der) / n;
-  const suma = (x) => (x.sesiones == null ? 1 : meta ? Math.min(1.15, x.sesiones / meta) : x.sesiones > 0 ? 1 : 0);
-  // El valor de cada semana: lo real hasta hoy; después, lo que vendría.
-  const valores = [];
-  let v = 0, pico = 0;
-  semanas.forEach((x) => {
-    if (x.descarga) v = pico * 0.3;
-    else { v += x.estado === "futura" ? 1 : suma(x); pico = v; }
-    valores.push(v);
-  });
-  const tope = Math.max(trainWeeks, ...valores, 1) * 1.08;
-  const X = (k) => izq + (k + 1) * paso;
-  const Y = (val) => arriba + (1 - val / tope) * (H - arriba - abajo);
-  const piso = Y(0);
-  const pts = [[izq, piso], ...valores.map((val, k) => [X(k), Y(val)])];
+  const pintura = (wi) => PINTURA_CAJON[Math.round((trainWeeks > 1 ? Math.min(wi, trainWeeks - 1) / (trainWeeks - 1) : 1) * (PINTURA_CAJON.length - 1))];
+  const placa = Math.max(14, Math.min(22, Math.round((alto + 70) / n) - 2));
   const iAct = semanas.findIndex((x) => x.estado === "actual");
-  const hasta = iAct >= 0 ? iAct + 1 : semanas.every((x) => x.estado === "pasada") ? n : 0;
-  const linea = (a) => a.map(([x, y], k) => `${k ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
-  const hecho = pts.slice(0, hasta + 1), porVenir = pts.slice(hasta);
-  const iDesc = semanas.findIndex((x) => x.descarga);
+  const cargadas = iAct >= 0 ? iAct + 1 : semanas.every((x) => x.estado === "pasada") ? n : 0;
   return (
-    <div className={`curva-ciclo ${animar ? "se-dibuja" : ""}`} aria-hidden="true">
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="presentation">
-        <defs>
-          <linearGradient id={`${uid}-a`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="var(--tono)" stopOpacity=".3" />
-            <stop offset="1" stopColor="var(--tono)" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        {/* La franja de la descarga: donde la fatiga baja. */}
-        {iDesc >= 0 && <rect className="curva-franja" x={X(iDesc) - paso / 2} y={arriba - 6} width={paso * (n - iDesc) - paso / 2 + der} height={piso - arriba + 6} rx="8" />}
-        <line className="curva-piso" x1={izq} x2={W - der + 8} y1={piso} y2={piso} />
-        {hecho.length > 1 && <path className="curva-area" d={`${linea(hecho)} L${hecho[hecho.length - 1][0].toFixed(1)} ${piso} L${izq} ${piso} Z`} fill={`url(#${uid}-a)`} />}
-        {porVenir.length > 1 && <path className="curva-por-venir" d={linea(porVenir)} />}
-        {hecho.length > 1 && <path className="curva-linea" d={linea(hecho)} pathLength="1" />}
-        {semanas.map((x, k) => {
-          const [cx, cy] = pts[k + 1];
-          const cumplida = !!meta && !x.descarga && x.estado !== "futura" && (x.sesiones || 0) >= meta;
-          return (
-            <g key={x.n} className={`curva-semana ${x.estado} ${x.descarga ? "descarga" : ""} ${cumplida ? "cumplida" : ""}`}>
-              {x.estado === "actual" && <circle className="curva-halo" cx={cx} cy={cy} r="9" />}
-              <circle className="curva-punto" cx={cx} cy={cy} r={x.estado === "actual" ? 5 : 3.2} />
-              {x.sesiones != null && x.estado !== "futura" && !x.descarga && <text className="curva-veces" x={cx} y={cy - 9} textAnchor="middle">{x.sesiones}</text>}
-              <text className="curva-numero" x={cx} y={H - 6} textAnchor="middle">{x.descarga ? "D" : x.n}</text>
-            </g>
-          );
-        })}
-      </svg>
+    <div className={`pila ${animar ? "se-levanta" : ""}`} style={{ "--placa": `${placa}px` }} aria-hidden="true">
+      <div className="pila-torre">
+      <i className="pila-cabezal" />
+      <i className="pila-guia izq" /><i className="pila-guia der" />
+      <i className="pila-cable" />
+      {semanas.map((x, wi) => {
+        const cumplida = !!meta && !x.descarga && x.estado !== "futura" && (x.sesiones || 0) >= meta;
+        return (
+          <div key={x.n} className={`pila-placa ${x.estado} ${x.descarga ? "descarga" : ""} ${wi < cargadas ? "arriba" : ""} ${cumplida ? "cumplida" : ""}`}
+            style={x.descarga ? null : { "--pintura": pintura(wi) }}>
+            <b className="pila-numero">{x.descarga ? "D" : x.n}</b>
+            {x.estado === "actual" ? <span className="pila-pasador"><i /></span> : <i className="pila-agujero" />}
+            <span className="pila-veces">{x.sesiones != null && x.estado !== "futura" && x.sesiones > 0 && <MarcasTiza dias={x.sesiones} max={7} alto={Math.min(10, placa - 6)} decorativa />}</span>
+          </div>
+        );
+      })}
+      <i className="pila-base" />
+      </div>
     </div>
   );
 }
@@ -16444,7 +16436,7 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
     <section className="tarjeta-tonal escalera-ciclo ciclo-cajones" aria-label={`Ciclo ${weekInfo.cycleNumber}, semana ${weekInfo.weekInCycle} de ${cycleWeeks}: ${falta}. ${estaSemana} ${estaSemana === 1 ? "sesión" : "sesiones"} esta semana.`}>
       <div className="escalera-cabeza" aria-hidden="true">
         <div className="min-w-0">
-          <p className="ciclo-rotulo">Tu ciclo <span>· fatiga acumulada</span></p>
+          <p className="ciclo-rotulo">Tu ciclo</p>
           <p className="ciclo-semana num-display"><b>{weekInfo.weekInCycle}</b><span>/{cycleWeeks}</span></p>
         </div>
         <div className={`ciclo-esta-semana ${cumplida ? "cumplida" : ""}`}>
@@ -20277,19 +20269,8 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
   }, [logs, mode, bodyWeightKg, sex, age, dumbbellDouble]);
 
   const selInfo = selected ? ranks[selected] : null;
-  // La cabecera: el rango general (tu mejor músculo) y el reparto por rango.
+  // La cabecera: el rango general (tu mejor músculo).
   const general = useMemo(() => computeTopRankFromRanks(ranks), [ranks]);
-  const reparto = useMemo(() => {
-    const por = new Map();
-    MUSCLE_GROUPS.forEach((g) => {
-      const x = ranks[g.key];
-      if (!x?.hasData) return;
-      const a = por.get(x.tier) || { tier: x.tier, color: x.color, n: 0, idx: x.levelIdx };
-      a.n += 1; a.idx = Math.max(a.idx, x.levelIdx);
-      por.set(x.tier, a);
-    });
-    return [...por.values()].sort((a, b) => b.idx - a.idx);
-  }, [ranks]);
   // Para mostrar "te faltan X kg a tus mismas reps para llegar a {rango}"
   // en vez de hablar de 1RM o de "el siguiente rango" en abstracto:
   // a partir del 1RM objetivo (el umbral del próximo nivel) se despeja,
@@ -20385,12 +20366,6 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
 
       <div className="rango-escena">
         <MuscleHighlighterBody ranks={ranks} selected={selected} onMuscleClick={goToMuscle} frontRef={frontBodyRef} backRef={backBodyRef} rankMode={mode} pulseMuscles={musculosQueSubieron} sex={sex} />
-        {/* Qué quiere decir cada color: los rangos que tenés, y en cuántos músculos. */}
-        {reparto.length > 0 && (
-          <p className="rango-reparto" aria-label={`Tus músculos por rango: ${reparto.map((x) => `${x.n} en ${x.tier}`).join(", ")}`}>
-            {reparto.map((x) => <span key={x.tier} className="tinta-rango" style={{ "--rango-c": x.color }} aria-hidden="true"><b className="num-display">{x.n}</b> {x.tier}</span>)}
-          </p>
-        )}
       </div>
       <div className="rango-acciones">
         <button onClick={() => setShowAnalysis(true)} className="boton-tonal"><BarChart3 size={15} /> Análisis</button>
