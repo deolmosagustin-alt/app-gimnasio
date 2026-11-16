@@ -6600,23 +6600,26 @@ label.ajuste-rotulo { display: block; }
 .dia-hero.escena-completa .dia-chip { background: rgba(13,14,16,.55); color: #eef0f2; }
 .light-mode .dia-hero.escena-completa .dia-chip { background: rgba(255,255,255,.7); color: #1d2433; }
 /* Rutinas: el rack dibujado entero, contra la pared de cemento liso. */
-/* La pared del rack: revoque pintado en dos tonos, como la de un gimnasio
-   de barrio; abajo, la franja del color de la pestaña, apagada, con su
-   filete (16/11, pedido: "cambiá también el de las kettlebells, pero sin
-   repetir": en Rutina es chapa cepillada y en Progreso, tablas de madera).
-   Antes fue cemento liso y, ese mismo día, ladrillo a la vista ("no me
-   gustó la pared de los kettlebell"): no vuelvas al ladrillo. La primera
-   capa es el piso, que sigue debajo de los botones. */
+/* La pared del rack: hormigón visto, con las juntas del encofrado (16/11,
+   elegida entre ocho: https://claude.ai/artifact/Fi6gddGYcV2goGmFDwRTki).
+   En Rutina es chapa cepillada y en Progreso, tablas de madera. Antes fue
+   cemento liso y, el mismo 16/11, ladrillo a la vista ("no me gustó") y
+   revoque pintado en dos tonos ("cambiá la pared"): no vuelvas a ésos. La
+   primera capa es el piso, que sigue debajo de los botones. */
 .rutina-activa.rack-nuevo { background:
     linear-gradient(to top, #2a2b2e 0 138px, transparent 139px),
-    linear-gradient(to top, color-mix(in oklab, var(--c, #3B82F6) 30%, #2b2d31) 0 262px, color-mix(in oklab, var(--c, #3B82F6) 45%, #a9acb2) 262px 265px, transparent 265px),
-    radial-gradient(ellipse 70% 45% at 22% 0%, rgba(255,255,255,.08), transparent 70%), radial-gradient(ellipse at 85% 40%, rgba(0,0,0,.14), transparent 55%),
-    linear-gradient(#45474c, #3b3d42) !important; }
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='150'%3E%3Cpath d='M0 0.5H240M0.5 0V150' fill='none' stroke='%23000' stroke-opacity='.4'/%3E%3Cpath d='M0 1.5H240M1.5 0V150' fill='none' stroke='%23fff' stroke-opacity='.06'/%3E%3C/svg%3E") 0 0 / 240px 150px,
+    radial-gradient(ellipse 75% 50% at 22% 0%, rgba(255,255,255,.1), transparent 70%),
+    radial-gradient(ellipse at 70% 30%, rgba(255,255,255,.05), transparent 40%), radial-gradient(ellipse at 30% 70%, rgba(0,0,0,.16), transparent 45%),
+    repeating-linear-gradient(0deg, rgba(0,0,0,.03) 0 1px, transparent 1px 6px),
+    linear-gradient(#4a4b4d, #3e3f41) !important; }
 .light-mode .rutina-activa.rack-nuevo { background:
     linear-gradient(to top, #b6b7b5 0 138px, transparent 139px),
-    linear-gradient(to top, color-mix(in oklab, var(--c, #3B82F6) 26%, #cfd2d7) 0 262px, color-mix(in oklab, var(--c, #3B82F6) 45%, #f4f5f7) 262px 265px, transparent 265px),
-    radial-gradient(ellipse 70% 45% at 22% 0%, rgba(255,255,255,.6), transparent 70%), radial-gradient(ellipse at 85% 40%, rgba(0,0,0,.04), transparent 55%),
-    linear-gradient(#ecebe7, #e2e1dd) !important; }
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='150'%3E%3Cpath d='M0 0.5H240M0.5 0V150' fill='none' stroke='%23000' stroke-opacity='.2'/%3E%3Cpath d='M0 1.5H240M1.5 0V150' fill='none' stroke='%23fff' stroke-opacity='.55'/%3E%3C/svg%3E") 0 0 / 240px 150px,
+    radial-gradient(ellipse 75% 50% at 22% 0%, rgba(255,255,255,.5), transparent 70%),
+    radial-gradient(ellipse at 70% 30%, rgba(255,255,255,.3), transparent 40%), radial-gradient(ellipse at 30% 70%, rgba(0,0,0,.05), transparent 45%),
+    repeating-linear-gradient(0deg, rgba(0,0,0,.018) 0 1px, transparent 1px 6px),
+    linear-gradient(#dcdcd9, #cfcfcb) !important; }
 .rack-kb { position: relative; width: 100%; aspect-ratio: 360 / 290; }
 .rack-kb-fondo, .rack-kb-frente { position: absolute; inset: 0; width: 100%; height: 100%; }
 .rack-kb-frente { pointer-events: none; z-index: 2; }
@@ -21208,12 +21211,13 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
           quedaba una caja llenando exactamente otra caja. Acá no hace falta
           ningún contenedor extra: el lavado del color va sobre la tarjeta
           que YA existía en cada sección (ver los `background` de abajo). */}
-      <div key={activeSection} className="tab-fade-in space-y-3">
-        {/* EL CICLO, en Rango: los cajones iban arriba de las cuatro secciones
-            y en Ejercicios, Historial y Medidas empujaban la gráfica y el
-            calendario a la mitad de la pantalla. Ahora el riel va primero y
-            el ciclo es parte de tu rango. */}
-        {activeSection === "rank" && (cycleStart ? (
+      {/* EL CICLO, fijo debajo del riel (16/11, pedido: "que el recuadro del
+          ciclo no se vaya si cambiás de Rango a Historial, Ejercicios o
+          Medidas"). Va afuera del bloque de abajo, que se rearma con cada
+          sección: así no parpadea ni se vuelve a animar. Antes estaba sólo
+          en Rango, porque arriba de las cuatro secciones empujaba la gráfica
+          y el calendario; el pedido de ahora manda. */}
+      {(cycleStart ? (
           <WeekCalendar cycleStart={cycleStart} logs={logs} sessions={sessions} settings={settings} onGoToDeload={onGoToDeload} metaSemanal={weekSchedule ? Object.values(weekSchedule).filter(Boolean).length || null : null} />
         ) : (
           <button onClick={onGoToProfile} className="w-full flex items-center gap-3 bg-amber-500/10 border border-amber-500/25 rounded-2xl px-4 py-3.5 text-left hover:bg-amber-500/15 transition">
@@ -21222,6 +21226,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
             <ChevronRight size={16} className="text-amber-400 shrink-0" />
           </button>
         ))}
+      <div key={activeSection} className="tab-fade-in space-y-3">
         {activeSection === "chart" && (() => {
           const colorEj = selEx?.color || EVOLUTION_CHART_COLOR;
           // Qué es "mejor" en este ejercicio: el 1RM estimado; si es sin peso
