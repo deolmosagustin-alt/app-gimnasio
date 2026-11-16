@@ -1443,6 +1443,26 @@ function getRoutineWeekSchedule(routineDef) {
   return routineDef.weekSchedule || defaultWeekSchedule(routineDef.dayOrder || []);
 }
 
+// EL CRONOGRAMA DE VERDAD (16/11, reporte: "el widget de 'Hoy, lunes,
+// descanso' anda mal, porque hoy lunes me toca push"). El cronograma vive en
+// la rutina activa (profile.routines[id].weekSchedule); `profile.weekSchedule`
+// es un campo viejo que ya no escribe nadie, y los widgets, el recordatorio
+// de entrenar, el resumen del domingo y dos datos del Entrenador IA lo
+// seguían leyendo: a quien lo tenía de antes le decían el cronograma de
+// entonces, y a quien no, que descansaba todos los días. Fuera de la pantalla
+// (donde App ya usa getRoutineWeekSchedule), pedilo siempre por acá. Devuelve
+// { mon: "push", tue: null, ... }: sólo días que existen en la rutina.
+function cronogramaDe(profile) {
+  const id = profile?.activeRoutineId;
+  const def = resolveRoutineDef(profile?.routines?.[id] || null, id);
+  if (!def) return null;
+  const sched = getRoutineWeekSchedule(def);
+  const dias = def.dayOrder || Object.keys(def.days || {});
+  const out = {};
+  WEEKDAY_KEYS.forEach((wk) => { out[wk] = dias.includes(sched?.[wk]) ? sched[wk] : null; });
+  return out;
+}
+
 function todayWeekdayKey(date = new Date()) {
   const jsDay = date.getDay(); // 0=domingo .. 6=sábado
   return WEEKDAY_KEYS[(jsDay + 6) % 7]; // reordenado a 0=lunes .. 6=domingo
@@ -6580,10 +6600,19 @@ label.ajuste-rotulo { display: block; }
 .dia-hero.escena-completa .dia-chip { background: rgba(13,14,16,.55); color: #eef0f2; }
 .light-mode .dia-hero.escena-completa .dia-chip { background: rgba(255,255,255,.7); color: #1d2433; }
 /* Rutinas: el rack dibujado entero, contra la pared de cemento liso. */
+/* La pared del rack es de ladrillo a la vista, a soga (16/11, pedido:
+   "cambiá también el de las kettlebells, pero sin repetir"): en Rutina es
+   chapa cepillada y en Progreso, tablas de madera. Antes era cemento liso. */
 .rutina-activa.rack-nuevo { background:
-    radial-gradient(ellipse at 20% 25%, rgba(255,255,255,.035), transparent 45%), radial-gradient(ellipse at 80% 70%, rgba(0,0,0,.18), transparent 50%),
-    linear-gradient(#2b2c2f, #232427) !important; }
-.light-mode .rutina-activa.rack-nuevo { background: radial-gradient(ellipse at 20% 25%, rgba(255,255,255,.5), transparent 45%), radial-gradient(ellipse at 80% 70%, rgba(0,0,0,.06), transparent 50%), linear-gradient(#e2e2e0, #d6d6d3) !important; }
+    linear-gradient(to top, #2a2b2e 0 138px, transparent 139px),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='124' height='80'%3E%3Crect x='2' y='2' width='60' height='18' fill='%23fff' fill-opacity='.035'/%3E%3Crect x='64' y='42' width='60' height='18' fill='%23fff' fill-opacity='.035'/%3E%3Crect x='33' y='22' width='60' height='18' fill='%23000' fill-opacity='.07'/%3E%3Crect x='2' y='42' width='60' height='18' fill='%23000' fill-opacity='.07'/%3E%3Crect x='95' y='62' width='29' height='18' fill='%23fff' fill-opacity='.035'/%3E%3Crect x='0' y='62' width='31' height='18' fill='%23000' fill-opacity='.07'/%3E%3Cpath d='M0 1H124M0 21H124M0 41H124M0 61H124M1 2V20M63 2V20M32 22V40M94 22V40M1 42V60M63 42V60M32 62V80M94 62V80' fill='none' stroke='%23000' stroke-opacity='.38' stroke-width='2'/%3E%3Cpath d='M0 2.5H124M0 22.5H124M0 42.5H124M0 62.5H124' fill='none' stroke='%23fff' stroke-opacity='.05'/%3E%3C/svg%3E") 0 0 / 124px 80px,
+    radial-gradient(ellipse at 20% 15%, rgba(255,255,255,.07), transparent 50%), radial-gradient(ellipse at 80% 75%, rgba(0,0,0,.2), transparent 55%),
+    linear-gradient(#54433d, #45372f) !important; }
+.light-mode .rutina-activa.rack-nuevo { background:
+    linear-gradient(to top, #b6b7b5 0 138px, transparent 139px),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='124' height='80'%3E%3Crect x='2' y='2' width='60' height='18' fill='%23fff' fill-opacity='.2'/%3E%3Crect x='64' y='42' width='60' height='18' fill='%23fff' fill-opacity='.2'/%3E%3Crect x='33' y='22' width='60' height='18' fill='%23000' fill-opacity='.035'/%3E%3Crect x='2' y='42' width='60' height='18' fill='%23000' fill-opacity='.035'/%3E%3Crect x='95' y='62' width='29' height='18' fill='%23fff' fill-opacity='.2'/%3E%3Crect x='0' y='62' width='31' height='18' fill='%23000' fill-opacity='.035'/%3E%3Cpath d='M0 1H124M0 21H124M0 41H124M0 61H124M1 2V20M63 2V20M32 22V40M94 22V40M1 42V60M63 42V60M32 62V80M94 62V80' fill='none' stroke='%23000' stroke-opacity='.2' stroke-width='2'/%3E%3Cpath d='M0 2.5H124M0 22.5H124M0 42.5H124M0 62.5H124' fill='none' stroke='%23fff' stroke-opacity='.45'/%3E%3C/svg%3E") 0 0 / 124px 80px,
+    radial-gradient(ellipse at 20% 15%, rgba(255,255,255,.4), transparent 50%), radial-gradient(ellipse at 80% 75%, rgba(0,0,0,.05), transparent 55%),
+    linear-gradient(#d9c2b3, #cfb5a4) !important; }
 .rack-kb { position: relative; width: 100%; aspect-ratio: 360 / 290; }
 .rack-kb-fondo, .rack-kb-frente { position: absolute; inset: 0; width: 100%; height: 100%; }
 .rack-kb-frente { pointer-events: none; z-index: 2; }
@@ -21635,7 +21664,7 @@ function tramosDeAnio(porFecha) {
 function estadoDeWidgets({ profile, logs, cycleStart }) {
   const hoy = new Date();
   const hoyStr = todayStr();
-  const sched = profile.weekSchedule || {};
+  const sched = cronogramaDe(profile) || {};
   const idx = buildSessionsIndex(logs || {}, profile.trainingSessions || []);
   const porFecha = {};
   idx.forEach((x) => { porFecha[x.date] = x; });
@@ -29953,7 +29982,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
         // instrucción que apunta a la nada la deja dando vueltas.
         analisisEntrenamiento: sinAnalisis
           ? "(no incluido en este pedido por tamaño — deducí lo que necesites de logs)"
-          : buildTrainingInsights(logs, profile?.trainingSessions || [], profile?.weekSchedule || null, settings?.dumbbellDouble || null),
+          : buildTrainingInsights(logs, profile?.trainingSessions || [], cronogramaDe(profile), settings?.dumbbellDouble || null),
         // Lo demás que la app sabe (medidas, rango por músculo, series por
         // semana, metas cumplidas, RPE, duración, en baja, ciclo): pesa poco.
         resumenExtra: resumenParaIA({ profile, logs, settings, routineDef: activeRoutineId ? resolveRoutineDef(profile?.routines?.[activeRoutineId], activeRoutineId) : null, weekInfo: weekInfoForAI }),
@@ -30369,7 +30398,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
     const ranks = computeAllMuscleRanks(logs, st, profile?.sex, edadDe(profile));
     const conDatos = MUSCLE_GROUPS.map((g) => ranks[g.key]).filter((r) => r?.hasData);
     const flojo = conDatos.length >= 2 ? conDatos.reduce((x, r) => (r.levelIdx < x.levelIdx ? r : x)) : null;
-    const dk = profile?.weekSchedule?.[todayWeekdayKey()] || null;
+    const dk = cronogramaDe(profile)?.[todayWeekdayKey()] || null;
     const yaEntreno = (profile?.trainingSessions || []).some((s) => s.date === todayStr());
     const dia = dk && ROUTINE[dk] ? { label: ROUTINE[dk].label, color: ROUTINE[dk].color } : null;
     return { flojo, dia, yaEntreno };
@@ -34145,7 +34174,7 @@ export default function App() {
     (async () => {
       try {
         await LocalNotifications.cancel({ notifications: ids.map((id) => ({ id })) }).catch(() => {});
-        const sched = profile?.weekSchedule || null;
+        const sched = cronogramaDe(profile);
         if (!st.reminderEnabled || !sched) return;
         await LocalNotifications.createChannel({ id: "modusfit-reminder-v1", name: "Recordatorio de entrenamiento", description: "Aviso los días que te toca entrenar", importance: 4, vibration: true }).catch(() => {});
         // El botón del recordatorio: abre la app con la sesión iniciada.
@@ -34190,7 +34219,7 @@ export default function App() {
       } catch (e) { console.warn("[notif] recordatorio:", e); }
     })();
     // eslint-disable-next-line
-  }, [profile?.settings?.reminderEnabled, profile?.settings?.reminderTime, profile?.weekSchedule, activeProfile]);
+  }, [profile?.settings?.reminderEnabled, profile?.settings?.reminderTime, profile?.routines, profile?.activeRoutineId, activeProfile]);
 
   // RESUMEN SEMANAL — aviso nativo de RESPALDO: si domingo es día de
   // entrenar según tu agenda, lo programamos tarde (22:00) por si no abrís
@@ -34206,7 +34235,7 @@ export default function App() {
       try {
         await LocalNotifications.cancel({ notifications: [{ id: 9300 }] }).catch(() => {});
         if (!st.weeklyRecapEnabled) return;
-        const sched = profile?.weekSchedule || null;
+        const sched = cronogramaDe(profile);
         const now = new Date();
         const dow = (now.getDay() + 6) % 7; // 0=lunes .. 6=domingo
         const sunday = new Date(now);
@@ -34252,7 +34281,7 @@ export default function App() {
       } catch (e) { console.warn("[notif] resúmenes de mes/año:", e); }
     })();
     // eslint-disable-next-line
-  }, [profile?.settings?.weeklyRecapEnabled, profile?.settings?.reminderTime, profile?.weekSchedule, activeProfile]);
+  }, [profile?.settings?.weeklyRecapEnabled, profile?.settings?.reminderTime, profile?.routines, profile?.activeRoutineId, activeProfile]);
 
   // BUG FIX (reporte: "el resumen semanal manda la notificación pero al
   // clickearla no aparece nada"). No había NINGÚN listener de notificaciones
@@ -34346,7 +34375,7 @@ export default function App() {
     }, 1500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.weekSchedule, profile?.trainingSessions, profile?.suplementos, profile?.suplementosTomas, profile?.activeSession, profile?.settings?.restShort, profile?.settings?.restLong, activeProfile, logs, cycleStart]);
+  }, [profile?.routines, profile?.activeRoutineId, profile?.trainingSessions, profile?.suplementos, profile?.suplementosTomas, profile?.activeSession, profile?.settings?.restShort, profile?.settings?.restLong, activeProfile, logs, cycleStart]);
 
   // LO QUE SE TOCÓ EN UN WIDGET (plugin v3). "Empezar" abre la app y arranca
   // la sesión del día; un suplemento se anota en el teléfono con la app
