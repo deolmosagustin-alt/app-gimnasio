@@ -70,7 +70,7 @@ import {
 // orden, con errores de tipeo, en inglés o con el apodo del gimnasio).
 import { buscarEjercicios, mejorEjercicio, nombreCoincide, partesResaltadas, REGIONES_BUSCADOR, alternativasDe } from "./buscar-ejercicios.js";
 import { FORMAS, NOMBRE_DE_FORMA, COLORES_SUPLEMENTO, SUGERIDOS, MAX_SUPLEMENTOS, MAX_DOSIS, listaDeSuplementos, nuevoSuplemento, sanearSuplemento, tomadas, tomar, unirTomas, rachaDe, ultimosDias, recortarTomas, suplementosParaWidget } from "./suplementos.js";
-import { rangoDeReps, siguientePaso, seriesDeDescarga, seriesDeAdaptacion, cargaDeDescarga, ejerciciosEnBaja, planDeEntrenador, equilibrarReps, redondearConReps, resumenDeCiclo } from "./entrenamiento.js";
+import { rangoDeReps, siguientePaso, seriesDeDescarga, seriesDeAdaptacion, cargaDeDescarga, ejerciciosEnBaja, planDeEntrenador, equilibrarReps, redondearConReps, resumenDeCiclo, esDelDia, porFecha } from "./entrenamiento.js";
 // Modus Fit Premium: preparada y con el cobro apagado por bandera (ver
 // src/suscripcion.js y docs/suscripcion.md).
 import {
@@ -11905,9 +11905,19 @@ function esUnilateral(ex) {
   const lib = EXERCISE_LIBRARY_BY_ID[ex.id];
   return /unilateral|a una (mano|pierna)|una mano|una pierna|un brazo|zancada|b[uú]lgara|scott con mancuerna|concentrado|kroc|estocada/i.test(`${ex.id || ""} ${ex.name || ""} ${lib?.nota || ""}`);
 }
-function EntreLados({ exercise, accent, timerId, settings, onUpdateSettings }) {
+// Desde el 23/11 (pedidos: "que el botón de cambiar de lado sea para todas
+// las series, no sólo al final" y "si hacés unilateral con descanso entre
+// series, que no se cierre solo"): va debajo de la serie que estás haciendo,
+// así sale en cada una, y su reloj es otro que el del descanso entre series
+// (`lado:<id>`): antes compartían el mismo, así que el cambio de lado pisaba
+// el descanso que corría y guardar la serie lo cerraba. El reloj del lado
+// terminado queda a la vista como cualquiera, hasta que lo cierres o arranque
+// otro.
+const relojDeLado = (timerId) => (timerId ? `lado:${timerId}` : null);
+function EntreLados({ exercise, accent, timerId, serie = null, series = null, settings, onUpdateSettings }) {
   const [eligiendo, setEligiendo] = useState(false);
-  const { estado } = useRelojDescanso(timerId || "__sin__");
+  const idLado = relojDeLado(timerId);
+  const { estado } = useRelojDescanso(idLado || "__sin__");
   const seg = Number(settings?.entreLados?.[exercise.id]) || 0;
   if (!timerId || (!seg && !esUnilateral(exercise))) return null;
   const guardar = (v) => {
@@ -11918,13 +11928,14 @@ function EntreLados({ exercise, accent, timerId, settings, onUpdateSettings }) {
     haptic(10);
     setEligiendo(false);
   };
+  const corriendo = estado === "running" || estado === "paused";
   return (
     <div className="entre-lados" style={{ "--c": accent }}>
       {seg > 0 ? (
         <div className="entre-lados-fila">
-          <button className="entre-lados-iniciar" disabled={estado === "running"}
-            onClick={() => { haptic(15); iniciarDescanso(timerId, { segundos: seg, ejercicio: exercise.name || null, siguiente: "el otro lado", color: accent }); }}>
-            <ArrowLeftRight size={15} /> Cambio de lado
+          <button className="entre-lados-iniciar" disabled={corriendo}
+            onClick={() => { haptic(15); iniciarDescanso(idLado, { segundos: seg, ejercicio: exercise.name || null, siguiente: "el otro lado", color: accent, serie, series }); }}>
+            <ArrowLeftRight size={15} /> {corriendo ? "Cambiando de lado" : "Cambio de lado"}
           </button>
           {onUpdateSettings && <button className="entre-lados-tiempo num-display" onClick={() => setEligiendo((v) => !v)} aria-expanded={eligiendo} aria-label={`Descanso entre lados: ${relojCorto(seg)}. Cambiar`}>{relojCorto(seg)}</button>}
         </div>
@@ -14448,6 +14459,9 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     // la notificación del sistema (antes sólo lo hacía el cronómetro de una
     // tarjeta abierta) y avisa al dock de abajo.
     if (fieldSettings.autoStartRestTimer === true && restTimerId && restSeconds && !isLastSet) {
+      // El descanso entre series toma el lugar de un cambio de lado que
+      // siguiera corriendo (ver EntreLados): si no, sonaría después.
+      terminarDescanso(relojDeLado(restTimerId));
       iniciarDescanso(restTimerId, { segundos: restSeconds, ejercicio: exerciseName || null, color: accent, serie: setIndex + 2, series: totalSets, objetivo: objetivoSiguiente });
       return;
     }
@@ -15987,7 +16001,49 @@ const RESORTE_LISTA = { type: "spring", bounce: 0.16, duration: 0.5 };
 // `descarga`: la semana de descarga (ver RoutineView): la misma tarjeta, con
 // sus series de descarga adentro (SeriesDescarga) y las rayitas que sobran
 // saliendo de la cabecera.
-function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, autoCollapse = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, routineHasPlan = false, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null, supersetRestTimerId = null, supersetRestSeconds = null, orden = null, nextObjetivo = null, cicloActual = null, descarga = null }) {
+// CADA DÍA CON SUS MARCAS (23/11, pedido: "que diferencie lo que registraste
+// del mismo ejercicio en distintos días: si hago búlgaras el día 1 y el 2 de
+// piernas, que lleven distintas marcas"). Las series se guardan con la misma
+// clave por ejercicio (`id_serie`), así Progreso, el rango y Social siguen
+// viendo el ejercicio entero; cuando un ejercicio está en más de un día de la
+// rutina, cada serie nueva anota `dia`, y la tarjeta de ese día lee y escribe
+// sólo las suyas (useLogsDelDia): la vez pasada, el récord, la progresión, la
+// meta y la descarga salen de ese día. Lo anotado antes, sin `dia`, se
+// reparte por las sesiones (`fechasPorDia`: qué día entrenaste cada fecha);
+// lo que no se puede ubicar queda en los dos días, como antes. El récord
+// cargado a mano (`_pr_override`) sigue siendo uno solo por serie.
+function useLogsDelDia(exercise, logs, setLogs, dia, fechasPorDia) {
+  const id = exercise?.id, n = exercise?.sets?.length || 0;
+  const vista = useMemo(() => {
+    if (!dia || !id) return logs;
+    const v = { ...logs };
+    for (let i = 0; i < n; i++) {
+      const k = `${id}_${i}`;
+      if (Array.isArray(logs[k])) v[k] = logs[k].filter((h) => esDelDia(h, dia, fechasPorDia));
+    }
+    return v;
+  }, [logs, dia, fechasPorDia, id, n]);
+  const escribir = useCallback((sig) => {
+    if (!dia || !id) { setLogs(sig); return; }
+    setLogs((prev) => {
+      const nuevo = typeof sig === "function" ? sig(vista) : sig;
+      const out = { ...nuevo };
+      const hoy = todayStr();
+      for (let i = 0; i < n; i++) {
+        const k = `${id}_${i}`;
+        const otros = (prev[k] || []).filter((h) => !esDelDia(h, dia, fechasPorDia));
+        const mios = (nuevo[k] || []).map((h) => (!h.dia && h.date === hoy ? { ...h, dia } : h));
+        const todo = [...otros, ...mios].sort(porFecha);
+        if (todo.length) out[k] = todo; else delete out[k];
+      }
+      return out;
+    });
+  }, [dia, id, n, fechasPorDia, setLogs, vista]);
+  return [vista, escribir];
+}
+
+function ExerciseCard({ exercise, accent, logs: logsTodos, setLogs: setLogsTodos, diaPropio = null, fechasPorDia = null, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, autoCollapse = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, routineHasPlan = false, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null, supersetRestTimerId = null, supersetRestSeconds = null, orden = null, nextObjetivo = null, cicloActual = null, descarga = null }) {
+  const [logs, setLogs] = useLogsDelDia(exercise, logsTodos, setLogsTodos, diaPropio, fechasPorDia);
   const [open, setOpen] = useState(false);
   const [showWarmup, setShowWarmup] = useState(false);
   // Pedido: "que no se abran más automáticamente los ejercicios, sí que se
@@ -16274,13 +16330,13 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
           {setsToShow.map((s, i) => <React.Fragment key={`${exercise.id}:frag:${i}`}>
             <m.div layout="position" layoutDependency={`${foco}|${timerSlot}`} transition={RESORTE_LISTA}>
             <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} restTimerId={restTimerId} restSeconds={restSeconds} isLastSet={i === setsToShow.length - 1} totalSets={setsToShow.length} weekInCycle={weekInCycle} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} nextExerciseName={nextExerciseName} activa={i === foco} onEnfocar={() => setFocoElegido(i)} objetivoSiguiente={objetivoDeSerie(exercise, i + 1, logs, weekInCycle, settings, planUnit, cicloActual)} objetivoProximo={i === setsToShow.length - 1 ? nextObjetivo : null} cicloActual={cicloActual} adaptacion={!!exercise.adaptacion} />
+            {i === foco && hasActiveSession && <EntreLados exercise={exercise} accent={accent} timerId={restTimerId} serie={i + 1} series={setsToShow.length} settings={settings} onUpdateSettings={onUpdateSettings} />}
             </m.div>
             {timerSlot === i + 1 && settings.autoStartRestTimer !== true && (
               <m.div layout="position" layoutDependency={`${foco}|${timerSlot}`} transition={RESORTE_LISTA}><div className="timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} timerId={restTimerId} exerciseName={exercise.name} /></div></m.div>
             )}
           </React.Fragment>)}
         </div>
-        {!descarga && hasActiveSession && <EntreLados exercise={exercise} accent={accent} timerId={restTimerId} settings={settings} onUpdateSettings={onUpdateSettings} />}
         </div>
         )}
         {exercise.video && (
@@ -17379,7 +17435,7 @@ function HojaDelPlan({ dia = null, semana = null, filas = [], hayPlan = false, e
 // entrenar normal), `descargaPrevia` (la mirás antes de tiempo, desde
 // Progreso o desde el aviso de que venís bajando) y lo que guarda las series
 // de descarga (`deloadProgress`, `setDeloadProgress`, `onFinishDeloadSession`).
-function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onDisableAutoShowPrShare, onUpdateSettings = null, onSetPlanPaused = null, onRemovePlan = null, onGoToFieldSettings = null, sex = null, age = null, activeRoutineDef = null, onApplyOwnProgression = null, goToDaySignal = { id: null, n: 0 }, onSignalConsumed = null, semanaDescarga = false, descargaApagada = false, descargaPrevia = false, onModoDescarga = null, onPreviaDescarga = null, onAdelantarDescarga = null, deloadProgress = {}, setDeloadProgress = null, onFinishDeloadSession = null, descargaTerminadaHoy = false }) {
+function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onDisableAutoShowPrShare, onUpdateSettings = null, onSetPlanPaused = null, onRemovePlan = null, onGoToFieldSettings = null, sex = null, age = null, activeRoutineDef = null, onApplyOwnProgression = null, goToDaySignal = { id: null, n: 0 }, onSignalConsumed = null, semanaDescarga = false, descargaApagada = false, descargaPrevia = false, sesiones = null, onModoDescarga = null, onPreviaDescarga = null, onAdelantarDescarga = null, deloadProgress = {}, setDeloadProgress = null, onFinishDeloadSession = null, descargaTerminadaHoy = false }) {
   // Semana actual del ciclo — sólo hace falta el número (weekInCycle), para
   // que SetRow sepa si hay una meta cargada (modo "planned", ver
   // getPlannedTargetForWeek) para ESTA semana puntual.
@@ -17507,6 +17563,20 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
     return () => clearTimeout(limpiar);
   }, [sessionForThisDay]);
   const weekInfo = getWeekInfo(cycleStart, settings), isDeload = weekInfo?.isDeload;
+  // Los ejercicios que están en más de un día de la rutina llevan sus marcas
+  // por día (ver useLogsDelDia), y qué día entrenaste cada fecha, para
+  // repartir lo anotado antes.
+  const repetidos = useMemo(() => {
+    const cuenta = {};
+    Object.values(ROUTINE || {}).forEach((d) => new Set((d?.exercises || []).map((e) => e.id)).forEach((id) => { cuenta[id] = (cuenta[id] || 0) + 1; }));
+    return new Set(Object.keys(cuenta).filter((id) => cuenta[id] > 1));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRoutineDef]);
+  const fechasPorDia = useMemo(() => {
+    const m = {};
+    (sesiones || []).forEach((x) => { if (x?.dayKey && x?.date) (m[x.dayKey] || (m[x.dayKey] = new Set())).add(String(x.date).slice(0, 10)); });
+    return m;
+  }, [sesiones]);
   // La semana de adaptación (ver esSemanaDeAdaptacion): el día, con tres
   // cuartos de las series.
   const adaptacion = !semanaDescarga && !descargaPrevia && esSemanaDeAdaptacion(cycleStart, settings, logs);
@@ -17909,6 +17979,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
       <div ref={gridRef} className="dia-ejercicios grid grid-cols-1 lg:grid-cols-2 gap-3">
         {(() => {
           const groups = groupExercisesIntoSupersets(day.exercises);
+          const diaDe = (ex) => (repetidos.has(ex.id) ? activeDay : null);
           const estaCompleto = (g) => g.every((ex) => ex.sets.every((_, i) => (logs[`${ex.id}_${i}`] || []).some((h) => h.date === today && !h.deload)));
           // Id del cronómetro PROPIO de un grupo — el mismo que ya usa su
           // tarjeta (o la superserie entera). Es lo que permite que el
@@ -17946,7 +18017,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             const plegar = !!sessionForThisDay && (modoDescarga ? grupoDescargaCompleto(group) : estaCompleto(group));
             if (group.length === 1) {
               const ex = group[0];
-              return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} cicloActual={cicloActual} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} nextExerciseName={nextExerciseName} nextObjetivo={nextObjetivo} orden={primeroDe[gi]} descarga={descargaParaTarjetas} />;
+              return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} diaPropio={diaDe(ex)} fechasPorDia={fechasPorDia} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} cicloActual={cicloActual} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} nextExerciseName={nextExerciseName} nextObjetivo={nextObjetivo} orden={primeroDe[gi]} descarga={descargaParaTarjetas} />;
             }
             // Superserie: varios ejercicios encadenados comparten un solo
             // cronómetro al final del grupo, en vez de uno por ejercicio —
@@ -17958,7 +18029,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             return (
               <div key={`${activeDay}:${group.map((e) => e.id).join("-")}`} className="superserie space-y-2" style={{ "--c": day.color, borderColor: tint(day.color, "45") }}>
                 <div className="flex items-center gap-1.5 px-1 pt-0.5"><Link size={12} style={{ color: day.color }} /><span className="text-[11px] font-black uppercase" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
-                {group.map((ex, xi) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} cicloActual={cicloActual} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={xi === group.length - 1 ? nextRestTimerId : null} nextRestSeconds={nextRestSeconds} nextExerciseName={xi === group.length - 1 ? nextExerciseName : null} nextObjetivo={xi === group.length - 1 ? nextObjetivo : null} supersetRestTimerId={xi === group.length - 1 ? grupoTimerId : null} supersetRestSeconds={grupoSegundos} orden={primeroDe[gi] + xi} descarga={descargaParaTarjetas} />)}
+                {group.map((ex, xi) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} diaPropio={diaDe(ex)} fechasPorDia={fechasPorDia} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} cicloActual={cicloActual} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={xi === group.length - 1 ? nextRestTimerId : null} nextRestSeconds={nextRestSeconds} nextExerciseName={xi === group.length - 1 ? nextExerciseName : null} nextObjetivo={xi === group.length - 1 ? nextObjetivo : null} supersetRestTimerId={xi === group.length - 1 ? grupoTimerId : null} supersetRestSeconds={grupoSegundos} orden={primeroDe[gi] + xi} descarga={descargaParaTarjetas} />)}
                 {settings.autoStartRestTimer !== true && <RestTimer seconds={grupoSegundos} accent={day.color} timerId={grupoTimerId} exerciseName={group.map((g) => g.name).filter(Boolean).join(" + ")} />}
                 <p className="text-[11px] text-slate-500 px-1 pb-0.5">Descansá recién al completar la vuelta de los {group.length}.{settings.autoStartRestTimer === true ? " Arranca solo al guardar la serie del último." : ""}</p>
               </div>
@@ -35540,7 +35611,7 @@ export default function App() {
             }} /></PestanaGuardada>}
             {verPestana("rutina") && <PestanaGuardada activa={tab === "rutina"} clase={tabSlideClass}>{!enDescarga && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
             {/* La semana de descarga es Rutina en modo descarga (ver RoutineView). */}
-            <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} semanaDescarga={isDeloadWeek} descargaApagada={deloadDismissed} descargaPrevia={descargaPrevia} onModoDescarga={(on) => { setDeloadDismissed(!on); if (on) setDescargaPrevia(false); }} onPreviaDescarga={setDescargaPrevia} onAdelantarDescarga={handleAdelantarDescarga} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} descargaTerminadaHoy={(profile?.trainingSessions || []).some((s) => s.date === todayStr() && s.deload)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} sex={profile?.sex} age={edadDe(profile)} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={handleApplyOwnProgression} onSetPlanPaused={handleSetPlanPaused} onRemovePlan={handleRemovePlan} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} /></PestanaGuardada>}
+            <RoutineView sesiones={profile?.trainingSessions || null} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} semanaDescarga={isDeloadWeek} descargaApagada={deloadDismissed} descargaPrevia={descargaPrevia} onModoDescarga={(on) => { setDeloadDismissed(!on); if (on) setDescargaPrevia(false); }} onPreviaDescarga={setDescargaPrevia} onAdelantarDescarga={handleAdelantarDescarga} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} descargaTerminadaHoy={(profile?.trainingSessions || []).some((s) => s.date === todayStr() && s.deload)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} sex={profile?.sex} age={edadDe(profile)} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={handleApplyOwnProgression} onSetPlanPaused={handleSetPlanPaused} onRemovePlan={handleRemovePlan} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} /></PestanaGuardada>}
             {verPestana("progreso") && <PestanaGuardada activa={tab === "progreso"} clase={tabSlideClass}><ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={edadDe(profile)} onGoToDeload={irADescarga} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} /></PestanaGuardada>}
             {verPestana("entrenador_ia") && <PestanaGuardada activa={tab === "entrenador_ia"} clase={tabSlideClass}><EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} cycleStart={cycleStart} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onDeleteRoutine={handleDeleteRoutine} onNavigate={irAPestana} onStartSession={(dk) => handleStartSession(dk, enDescarga)} onEndSession={handleEndSession} /></PestanaGuardada>}
             {verPestana("perfil") && <PestanaGuardada activa={tab === "perfil"} clase={tabSlideClass}><ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profileName={activeProfile} profiles={profiles} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} onGoToSocial={() => setTab("social")} /></PestanaGuardada>}

@@ -2,7 +2,7 @@
 // scripts/probar-logica.mjs, que sacaba las funciones de App.jsx como texto).
 // npm test
 import { describe, expect, it } from "vitest";
-import { siguientePaso, cargaDeDescarga, repsDeDescarga, seriesDeAdaptacion, seriesDeDescarga, ejerciciosEnBaja } from "./entrenamiento.js";
+import { siguientePaso, cargaDeDescarga, repsDeDescarga, seriesDeAdaptacion, seriesDeDescarga, ejerciciosEnBaja, esDelDia } from "./entrenamiento.js";
 
 describe("siguientePaso (doble progresión)", () => {
   it("con el mismo peso, una rep más", () => {
@@ -154,5 +154,21 @@ describe("resumenDeCiclo", () => {
     expect(r.filas.find((f) => f.id === "fondos")).toMatchObject({ nuevo: true, corporal: true });
     expect(r.records).toBe(1);
     expect(r.filas[0].id).toBe("press");
+  });
+});
+
+describe("esDelDia", () => {
+  const fechas = { piernas1: new Set(["2026-11-02"]), piernas2: new Set(["2026-11-05"]) };
+  it("una serie nueva va con su día", () => {
+    expect(esDelDia({ date: "2026-11-09", dia: "piernas1" }, "piernas1", fechas)).toBe(true);
+    expect(esDelDia({ date: "2026-11-09", dia: "piernas1" }, "piernas2", fechas)).toBe(false);
+  });
+  it("una de antes se ubica por la sesión de esa fecha", () => {
+    expect(esDelDia({ date: "2026-11-05" }, "piernas2", fechas)).toBe(true);
+    expect(esDelDia({ date: "2026-11-05" }, "piernas1", fechas)).toBe(false);
+  });
+  it("la que no se puede ubicar cuenta para los dos", () => {
+    expect(esDelDia({ date: "2026-10-01" }, "piernas1", fechas)).toBe(true);
+    expect(esDelDia({ date: "2026-10-01" }, "piernas2", fechas)).toBe(true);
   });
 });

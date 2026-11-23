@@ -203,3 +203,17 @@ export function resumenDeCiclo(logs, desde, hasta) {
   }).sort((x, y) => (y.esRecord - x.esRecord) || ((y.cambio ?? -999) - (x.cambio ?? -999)));
   return { filas, records: filas.filter((f) => f.esRecord).length, nuevos: filas.filter((f) => f.nuevo).length };
 }
+
+// DE QUÉ DÍA ES UNA SERIE (23/11): un ejercicio que está en dos días de la
+// rutina lleva marcas aparte en cada uno (ver useLogsDelDia en App.jsx). Las
+// series nuevas anotan `dia`; las de antes se ubican por las sesiones
+// (`fechasPorDia`: { día: Set de fechas }), y las que no se pueden ubicar
+// cuentan para los dos días.
+export function esDelDia(h, dia, fechasPorDia) {
+  if (!h) return false;
+  if (h.dia) return h.dia === dia;
+  if (fechasPorDia?.[dia]?.has(h.date)) return true;
+  for (const k in fechasPorDia || {}) if (k !== dia && fechasPorDia[k].has(h.date)) return false;
+  return true;
+}
+export const porFecha = (a, b) => ((a?.date || "") < (b?.date || "") ? -1 : (a?.date || "") > (b?.date || "") ? 1 : 0);
