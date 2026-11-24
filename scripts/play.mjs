@@ -113,7 +113,7 @@ const ordenes = {
     // server.url (quedó de un APK de prueba), la app sale con la web vieja.
     const config = JSON.parse(readFileSync(join(RAIZ, "android", "app", "src", "main", "assets", "capacitor.config.json"), "utf8"));
     if (!config.server?.url) throw new Error("android/app/src/main/assets/capacitor.config.json no tiene server.url: corré `npx cap sync android` antes.");
-    const gradle = spawnSync(process.platform === "win32" ? "gradlew.bat" : "./gradlew", ["bundleRelease"], { cwd: join(RAIZ, "android"), stdio: "inherit", shell: true, env: { ...process.env, JAVA_HOME: JAVA } });
+    const gradle = spawnSync(process.platform === "win32" ? `"${join(RAIZ, "android", "gradlew.bat")}"` : "./gradlew", ["bundleRelease"], { cwd: join(RAIZ, "android"), stdio: "inherit", shell: true, env: { ...process.env, JAVA_HOME: JAVA } });
     if (gradle.status !== 0) throw new Error("gradle bundleRelease falló");
     const v = spawnSync(join(JAVA, "bin", "jarsigner"), ["-verify", AAB], { encoding: "utf8" });
     if (!/jar verified/.test(v.stdout || "")) throw new Error(`El AAB no quedó firmado: ${(v.stdout || v.stderr || "").slice(0, 300)}`);

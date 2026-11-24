@@ -18,8 +18,8 @@ android {
         applicationId "com.modusfit.fitness"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 30
-        versionName "1.0.29"
+        versionCode 31
+        versionName "1.0.30"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -40,8 +40,17 @@ android {
     buildTypes {
         release {
             if (hayFirma) signingConfig signingConfigs.subida
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // R8 achica y ofusca el código (24/11/2026, aviso de Play: "la
+            // optimización de código DEX está por debajo de nuestro umbral,
+            // ofuscación 2 %", corregir antes de feb 2027). Las reglas de los
+            // plugins vienen con cada librería (Capacitor deja enteras las
+            // clases de los plugins, también RestTimerPlugin y TodayWidgetPlugin);
+            // los receptores y widgets del manifiesto se guardan solos. Los
+            // recursos no se achican (shrinkResources): Descanso busca el ícono
+            // de la notificación por su nombre. El AAB lleva el mapa de R8, así
+            // Play muestra los cierres con los nombres de verdad.
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 }
