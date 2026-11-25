@@ -7397,6 +7397,10 @@ label.ajuste-rotulo { display: block; }
 .foco-ajustes.con-salto .foco-salto { flex: none; width: 46px; background: transparent; box-shadow: none; }
 .foco-ajustes.con-salto .foco-salto.abierto { background: var(--velo); }
 .foco-ref.record b { color: var(--record); }
+/* La vez pasada ⇄ el récord, en la serie con plan: chico como el "kg ⇄". */
+button.foco-ref.alterna { padding: 3px 7px 3px 8px; margin-right: -7px; border-radius: 999px; }
+button.foco-ref.alterna:active { background: var(--velo); opacity: 1; }
+.foco-ref-alterna { align-self: center; opacity: .65; }
 
 /* ── LA LISTA DE EJERCICIOS (13/11): a la derecha, qué cargar; las rayitas de
    las series un poco más grandes y la flecha más callada. El ejercicio
@@ -15029,9 +15033,26 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           // Menos texto (13/11, pedido): el visor ya trae escrita la meta de
           // hoy (lo dice la ficha "meta" al lado del rango), así que acá va lo
           // que hiciste la vez pasada, y se fue el renglón de abajo.
-          lastSession && !cardio
-            ? <span className="foco-ref" aria-label={`La vez pasada: ${lastSession.reps} por ${conComa(kgToDisplay(lastSession.kg, unit))} ${u}. Hoy, la meta: ${plannedTarget.reps} por ${conComa(kgToDisplay(plannedTarget.kg, unit))} ${u}`}>antes <b>{lastSession.reps} × {conComa(kgToDisplay(lastSession.kg, unit))}</b></span>
-            : <span className="foco-ref">primera vez</span>
+          // La vez pasada o el récord (25/11, pedido: "poder elegir si quiero
+          // que me muestre lo que hice la vez pasada o el récord", "con tener
+          // una mala semana ya no podés seguir bien eso", "un botón chiquito
+          // como el de alternar kg y lbs"): se alterna tocándolo, para todas
+          // las series (`settings.refDelPlan`).
+          (() => {
+            if (cardio || (!lastSession && !currentPR)) return <span className="foco-ref">primera vez</span>;
+            const verRecord = (fieldSettings?.refDelPlan === "record" && currentPR) || !lastSession;
+            const ref = verRecord ? currentPR : lastSession;
+            const texto = `${ref.reps} × ${conComa(kgToDisplay(ref.kg, unit))}`;
+            const puede = !!(onUpdateSettings && lastSession && currentPR);
+            const Tag = puede ? "button" : "span";
+            return (
+              <Tag className={`foco-ref ${verRecord ? "record" : ""} ${puede ? "alterna" : ""}`}
+                {...(puede ? { onClick: () => { haptic(8); onUpdateSettings({ refDelPlan: verRecord ? "antes" : "record" }); } } : {})}
+                aria-label={`${verRecord ? "Tu récord" : "La vez pasada"}: ${ref.reps} por ${conComa(kgToDisplay(ref.kg, unit))} ${u}.${puede ? ` Tocá para ver ${verRecord ? "la vez pasada" : "tu récord"}` : ""}`}>
+                {verRecord ? "récord" : "antes"} <b>{texto}</b>{puede && <ArrowLeftRight size={11} className="foco-ref-alterna" aria-hidden="true" />}
+              </Tag>
+            );
+          })()
         ) : currentPR ? (
           <button onClick={abrirCorreccion} className="foco-ref record" aria-label={`Tu récord: ${currentPR.reps}×${kgToDisplay(currentPR.kg, unit)}${u}. Tocá para corregirlo`}>
             récord <b>{currentPR.reps} × {conComa(kgToDisplay(currentPR.kg, unit))}</b>{override?.manual && <Edit3 size={11} className="opacity-60 self-center" />}
@@ -17593,6 +17614,8 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   // reemplazaba a Rutina de golpe.
   const hayDescarga = settings.deloadEnabled !== false && !!weekInfo;
   const esSemanaDescarga = hayDescarga && (semanaDescarga || !!isDeload);
+  // El sello sale todas las semanas (ver LA DESCARGA A PEDIDO en App).
+  const conSello = hayDescarga && !!onModoDescarga;
   const previa = hayDescarga && descargaPrevia && !esSemanaDescarga;
   const pideDescarga = previa || (esSemanaDescarga && !descargaApagada);
   const [transformada, setTransformada] = useState(() => !pideDescarga || descargaYaVistaHoy() || (typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches));
@@ -17776,19 +17799,19 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           <div className="escena-placa">
           {(() => { const { larga, total } = etiquetaDeDia(day.label); return <h2 className="dia-titulo barra-protagonista-titulo" style={{ "--largo": larga, "--total": total }}>{day.label}</h2>; })()}
           {/* En la semana de descarga el sello ya dice qué semana es. */}
-          {modoDescarga && (previa || !(esSemanaDescarga && onModoDescarga)) ? (
+          {modoDescarga && (previa || !conSello) ? (
             <span className="dia-chip descarga"><Zap size={12} /> {previa ? "Así va a ser tu descarga" : "Semana de descarga"}</span>
-          ) : !modoDescarga && !(esSemanaDescarga && onModoDescarga) && activeDay === suggestedDay && (
+          ) : !modoDescarga && !conSello && activeDay === suggestedDay && (
             <span className="dia-chip"><Calendar size={12} /> {scheduledDay === activeDay ? "Programado para hoy" : "Sugerido para hoy"}</span>
           )}
-          {(day.description || (esSemanaDescarga && onModoDescarga)) && (
+          {(day.description || (conSello && !previa)) && (
             <div className="cinta-con-sello">
               {day.description && <p className="tarima-cinta a-mano">{day.description}</p>}
               {/* EL SELLO (04/11, elegido entre seis propuestas): en la semana
                   de descarga, un sello de goma sobre la cinta dice qué hacés
                   esta semana, como si el profe te la hubiera marcado; tocarlo
                   estampa el otro encima. */}
-              {esSemanaDescarga && onModoDescarga && (
+              {conSello && !previa && (
                 <button
                   key={pideDescarga ? "descarga" : "entrenamiento"}
                   onClick={() => { haptic([0, 18, 40, 12]); onModoDescarga(!pideDescarga); }}
@@ -34321,7 +34344,14 @@ export default function App() {
   useEffect(() => { iniciarSuscripcion(profile?.googleUid || null); }, [profile?.googleUid]);
   // El Premium de regalo (un código canjeado en Perfil) cuenta como Premium.
   useEffect(() => { aplicarRegalo(profile?.premiumRegalo || null); }, [profile?.premiumRegalo]);
-  const isDeloadWeek = !!(profile && cycleStart && getWeekInfo(cycleStart, getProfileSettings(profile))?.isDeload);
+  // LA DESCARGA A PEDIDO (25/11, pedido: "no está más el sello para alternar
+  // descarga y plan normal"): el sello sale todas las semanas, no sólo en la
+  // de descarga del ciclo, así una mala semana la podés pasar a descarga sin
+  // correr el ciclo. Se recuerda la semana (`descargaManual`, el número de
+  // semana desde el inicio, `totalWeek`); la semana siguiente vuelve sola.
+  const infoSemana = profile && cycleStart ? getWeekInfo(cycleStart, getProfileSettings(profile)) : null;
+  const descargaAPedido = !!infoSemana && !infoSemana.isDeload && getProfileSettings(profile).descargaManual === infoSemana.totalWeek;
+  const isDeloadWeek = !!infoSemana?.isDeload || descargaAPedido;
   // El ciclo en curso: con él se sella cada plan nuevo (ver metaDeHoy).
   const cicloEnCurso = profile && cycleStart ? getWeekInfo(cycleStart, getProfileSettings(profile))?.cycleNumber ?? null : null;
   useEffect(() => { CICLO_ACTUAL = cicloEnCurso; }, [cicloEnCurso]);
@@ -35611,7 +35641,11 @@ export default function App() {
             }} /></PestanaGuardada>}
             {verPestana("rutina") && <PestanaGuardada activa={tab === "rutina"} clase={tabSlideClass}>{!enDescarga && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
             {/* La semana de descarga es Rutina en modo descarga (ver RoutineView). */}
-            <RoutineView sesiones={profile?.trainingSessions || null} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} semanaDescarga={isDeloadWeek} descargaApagada={deloadDismissed} descargaPrevia={descargaPrevia} onModoDescarga={(on) => { setDeloadDismissed(!on); if (on) setDescargaPrevia(false); }} onPreviaDescarga={setDescargaPrevia} onAdelantarDescarga={handleAdelantarDescarga} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} descargaTerminadaHoy={(profile?.trainingSessions || []).some((s) => s.date === todayStr() && s.deload)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} sex={profile?.sex} age={edadDe(profile)} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={handleApplyOwnProgression} onSetPlanPaused={handleSetPlanPaused} onRemovePlan={handleRemovePlan} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} /></PestanaGuardada>}
+            <RoutineView sesiones={profile?.trainingSessions || null} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} semanaDescarga={isDeloadWeek} descargaApagada={deloadDismissed} descargaPrevia={descargaPrevia} onModoDescarga={(on) => {
+              if (on) setDescargaPrevia(false);
+              if (infoSemana && !infoSemana.isDeload) { handleUpdateSettings({ descargaManual: on ? infoSemana.totalWeek : null }); setDeloadDismissed(false); return; }
+              setDeloadDismissed(!on);
+            }} onPreviaDescarga={setDescargaPrevia} onAdelantarDescarga={handleAdelantarDescarga} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} descargaTerminadaHoy={(profile?.trainingSessions || []).some((s) => s.date === todayStr() && s.deload)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} sex={profile?.sex} age={edadDe(profile)} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={handleApplyOwnProgression} onSetPlanPaused={handleSetPlanPaused} onRemovePlan={handleRemovePlan} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} /></PestanaGuardada>}
             {verPestana("progreso") && <PestanaGuardada activa={tab === "progreso"} clase={tabSlideClass}><ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={edadDe(profile)} onGoToDeload={irADescarga} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} /></PestanaGuardada>}
             {verPestana("entrenador_ia") && <PestanaGuardada activa={tab === "entrenador_ia"} clase={tabSlideClass}><EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} cycleStart={cycleStart} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onDeleteRoutine={handleDeleteRoutine} onNavigate={irAPestana} onStartSession={(dk) => handleStartSession(dk, enDescarga)} onEndSession={handleEndSession} /></PestanaGuardada>}
             {verPestana("perfil") && <PestanaGuardada activa={tab === "perfil"} clase={tabSlideClass}><ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profileName={activeProfile} profiles={profiles} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} onGoToSocial={() => setTab("social")} /></PestanaGuardada>}
