@@ -1905,11 +1905,29 @@ function sellarPlanesViejos(routines, ciclo) {
   return cambio ? nuevas : null;
 }
 // Cumplir una meta: los kilos Y las reps pedidas (o los minutos, en cardio).
+// Desde el 26/11 (reporte: "un bug que me reduce la rutina en un 10 %"):
+// con MÁS peso que la meta también se cumple si el esfuerzo es el mismo o
+// mayor (el 1RM estimado): 8 × 66 kg contra una meta de 15 × 40,75 kg contaba
+// como "no llegaste" y, a la segunda, bajaba un 10 %.
 function cumpleMeta(hecho, meta) {
   if (!hecho || !meta) return false;
   if (meta.minutes != null) return (hecho.minutes || 0) >= meta.minutes;
-  return (hecho.kg || 0) + 0.001 >= (meta.kg || 0) && (hecho.reps || 0) >= (meta.reps || 0);
+  if ((hecho.kg || 0) + 0.001 >= (meta.kg || 0) && (hecho.reps || 0) >= (meta.reps || 0)) return true;
+  return (meta.kg || 0) > 0 && (hecho.kg || 0) > (meta.kg || 0) && estimate1RM(hecho.kg, hecho.reps) + 0.05 >= estimate1RM(meta.kg, meta.reps);
 }
+// Cuánto faltó para la meta, por el 1RM estimado (1 = la cumpliste). Quedarse
+// a una rep (11 × 45 contra 12 × 45 es 0,98) no es lo mismo que quedarse a la
+// mitad (2 × 115 contra 4 × 115 es 0,94).
+function cercaniaAMeta(hecho, meta) {
+  if (!hecho || !meta) return 0;
+  if (meta.minutes != null) return meta.minutes > 0 ? (hecho.minutes || 0) / meta.minutes : 1;
+  if (!(meta.kg > 0)) return meta.reps > 0 ? (hecho.reps || 0) / meta.reps : 1;
+  const m = estimate1RM(meta.kg, meta.reps);
+  return m > 0 ? estimate1RM(hecho.kg || 0, hecho.reps || 0) / m : 1;
+}
+// Bajar un 10 % es para cuando la meta quedó lejos dos veces seguidas; si te
+// quedaste cerca (a una o dos reps), la repetís hasta salir.
+const QUEDO_LEJOS = 0.95;
 // Una meta más liviana que otra: menos kilos, o los mismos con menos reps (o
 // menos minutos). Así una semana suave del plan (una ola, una descarga) se
 // distingue del paso de subir el peso: 8 × 82,5 después de 10 × 80 no es más
@@ -1943,7 +1961,8 @@ function metaDeHoy(setDef, history, weekInCycle, trainingMode = "planned", { hoy
   // No llegaste. Una semana más liviana del plan se respeta tal cual.
   if (masLiviana(base, ultima.meta)) return { ...base, paso: semana, ajuste: null };
   const anterior = previas[1];
-  if (anterior && !cumpleMeta(anterior, anterior.meta) && mismaMeta(anterior.meta, ultima.meta)) {
+  if (anterior && !cumpleMeta(anterior, anterior.meta) && mismaMeta(anterior.meta, ultima.meta)
+    && cercaniaAMeta(ultima, ultima.meta) < QUEDO_LEJOS && cercaniaAMeta(anterior, anterior.meta) < QUEDO_LEJOS) {
     const m = ultima.meta;
     if (m.minutes != null) return { week: pasoUltima, minutes: Math.max(1, Math.round(m.minutes * 0.9)), paso: pasoUltima, ajuste: "baja" };
     const salto = saltoKg > 0 ? saltoKg : 2.5;
@@ -7398,9 +7417,17 @@ label.ajuste-rotulo { display: block; }
 .foco-ajustes.con-salto .foco-salto.abierto { background: var(--velo); }
 .foco-ref.record b { color: var(--record); }
 /* La vez pasada ⇄ el récord, en la serie con plan: chico como el "kg ⇄". */
-button.foco-ref.alterna { padding: 3px 7px 3px 8px; margin-right: -7px; border-radius: 999px; }
-button.foco-ref.alterna:active { background: var(--velo); opacity: 1; }
-.foco-ref-alterna { align-self: center; opacity: .65; }
+button.foco-ref.alterna { align-items: center; padding: 0; border-radius: 999px; }
+button.foco-ref.alterna:active { opacity: 1; }
+button.foco-ref.alterna:active .ref-interruptor { transform: scale(.94); }
+/* 26/11: el reloj (la vez pasada) y la copa (el récord), en un riel chico
+   como el de las pestañas: lo elegido va lleno; la copa, en dorado. */
+.ref-interruptor { display: inline-flex; gap: 2px; padding: 2px; border-radius: 999px; background: var(--panel-sunken); box-shadow: inset 0 0 0 1px var(--hairline); transition: transform var(--dur-toque, 100ms); }
+.ref-interruptor > span { display: grid; place-items: center; width: 24px; height: 20px; border-radius: 999px; color: var(--text-faint); transition: background var(--dur-chico, 240ms), color var(--dur-chico, 240ms); }
+.ref-interruptor > span.on { background: var(--surface-3); color: var(--text-strong); box-shadow: inset 0 1px 0 var(--brillo), inset 0 0 0 1px var(--hairline); }
+.foco-ref.record .ref-interruptor > span.on { color: var(--record); }
+.foco-ref-icono { align-self: center; flex: none; opacity: .8; }
+.foco-ref.record .foco-ref-icono { color: var(--record); opacity: 1; }
 
 /* ── LA LISTA DE EJERCICIOS (13/11): a la derecha, qué cargar; las rayitas de
    las series un poco más grandes y la flecha más callada. El ejercicio
@@ -15049,7 +15076,17 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
               <Tag className={`foco-ref ${verRecord ? "record" : ""} ${puede ? "alterna" : ""}`}
                 {...(puede ? { onClick: () => { haptic(8); onUpdateSettings({ refDelPlan: verRecord ? "antes" : "record" }); } } : {})}
                 aria-label={`${verRecord ? "Tu récord" : "La vez pasada"}: ${ref.reps} por ${conComa(kgToDisplay(ref.kg, unit))} ${u}.${puede ? ` Tocá para ver ${verRecord ? "la vez pasada" : "tu récord"}` : ""}`}>
-                {verRecord ? "récord" : "antes"} <b>{texto}</b>{puede && <ArrowLeftRight size={11} className="foco-ref-alterna" aria-hidden="true" />}
+                {/* 26/11 (pedido: "cambiando las palabras por la copita y un
+                    reloj"): en vez de "antes" y "récord", un interruptor con el
+                    reloj (la vez pasada) y la copa (tu récord); lo elegido,
+                    lleno. Con uno solo de los dos, va sólo su ícono. */}
+                {puede ? (
+                  <span className="ref-interruptor" aria-hidden="true">
+                    <span className={verRecord ? "" : "on"}><History size={12} /></span>
+                    <span className={verRecord ? "on" : ""}><Trophy size={12} /></span>
+                  </span>
+                ) : verRecord ? <Trophy size={12} className="foco-ref-icono" aria-hidden="true" /> : <History size={12} className="foco-ref-icono" aria-hidden="true" />}
+                <b>{texto}</b>
               </Tag>
             );
           })()
@@ -33608,6 +33645,9 @@ const RECORRIDOS = {
     { sel: ".dia-hero .barra-cargada", titulo: "La barra del día", texto: "Cada serie que anotás le carga un disco. Cuando está llena, terminaste." },
     { sel: '[data-recorrido="iniciar"]', titulo: "Iniciá la sesión", texto: "Al llegar al gimnasio: cuenta el tiempo y anota tu hora de entrada.", accion: "Tocalo cuando entres al gimnasio." },
     { sel: ".ejercicio", titulo: "Anotá cada serie", texto: "Tocá un ejercicio: las reps y los kilos ya vienen escritos con lo que toca hoy. Lo guardás con el ✓ y el descanso arranca solo.", accion: "Ajustá con − y + sin abrir el teclado." },
+    // Sale sólo con un ejercicio abierto que sigue un plan y tiene las dos
+    // marcas (si no, el paso se saltea, como cualquiera sin su pieza).
+    { sel: ".foco-ref.alterna", titulo: "La vez pasada o tu récord", texto: "Con el reloj ves lo que hiciste la vez pasada; con la copa, tu récord. Lo que elijas queda para todas las series.", accion: "Tocalo para cambiar entre el reloj y la copa." },
     { sel: "nav.barra-pestanas", titulo: "Todo lo demás, abajo", texto: "Tu progreso, tus amigos, tus rutinas y el entrenador con IA." },
   ],
   progreso: [
