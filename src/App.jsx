@@ -7444,7 +7444,7 @@ button.foco-ref.alterna:active .ref-interruptor { transform: scale(.94); }
    teléfono muy angosto el peso se esconde, para no partir el nombre. */
 .ejercicio-derecha { display: grid; grid-template-columns: auto auto; align-items: center; justify-items: end; column-gap: 10px; row-gap: 5px; }
 .ejercicio-derecha .ejercicio-flecha { grid-column: 2; grid-row: 1 / span 2; }
-.ejercicio-derecha .ejercicio-carga, .ejercicio-derecha .series-discos { grid-column: 1; }
+.ejercicio-derecha .ejercicio-carga, .ejercicio-derecha .series-discos { grid-column: 1; } .ejercicio-derecha .chip-plan { grid-column: 1; height: 22px; width: 22px; background: transparent; } .ejercicio-derecha .chip-plan.sigue { color: color-mix(in oklab, var(--c, var(--tono)) 72%, white); } .light-mode .ejercicio-derecha .chip-plan.sigue { color: color-mix(in oklab, var(--c, var(--tono)) 70%, black); } .ejercicio-sub:empty { display: none; }
 @media (max-width: 359px) { .ejercicio-carga { display: none; } }
 .series-discos { gap: 3px; }
 .series-discos i { width: 5px; height: 16px; border-radius: 2.5px; }
@@ -16216,16 +16216,6 @@ function ExerciseCard({ exercise, accent, logs: logsTodos, setLogs: setLogsTodos
   // Misma unidad que muestra cada serie (ver SetRow): el plan se guarda
   // siempre en kg, pero quien entrena en libras tiene que leerlo en libras.
   const planUnit = useWeightUnit();
-  // El peso más alto entre lo último anotado en cada serie (sin descargas).
-  const cargaCerrada = (() => {
-    if (exercise.cardio || descarga) return null;
-    let kg = 0;
-    setsToShow.forEach((_, i) => {
-      const h = (logs[`${exercise.id}_${i}`] || []).filter((x) => !x.deload && x.kg > 0);
-      if (h.length) kg = Math.max(kg, h[h.length - 1].kg);
-    });
-    return kg > 0 ? Math.round(kgToDisplay(kg, planUnit) * 100) / 100 : null;
-  })();
   // BUG FIX (encontrado auditando el modo planificado): el aviso de
   // "ESTANCADO" mira si hace STAGNATION_DAYS que no superás tu récord en
   // este ejercicio y sugiere "cambiá reps, descanso o variante". Bajo un
@@ -16272,36 +16262,6 @@ function ExerciseCard({ exercise, accent, logs: logsTodos, setLogs: setLogsTodos
                   ("¿Con cuántas mancuernas?"), no acá: durante el
                   entrenamiento sumaba ruido y ya está definido. */}
               {!descarga && stagnant && settings.showStagnation === true && !siguiendoPlan && <span className="chip-plan estancado" title={`Hace ${STAGNATION_DAYS} días o más que no superás tu récord`}><AlertTriangle size={12} /> Estancado</span>}
-              {/* Con la tarjeta cerrada ya se ve cuáles ejercicios siguen el
-                  plan y cuáles persiguen tu récord — antes había que abrir
-                  cada uno para enterarte. Y el chip ES el interruptor: un
-                  toque acá lo pasa a récord, sin abrir la tarjeta. La vuelta
-                  al plan se hace desde "Plan actual", que es donde se
-                  gobierna el plan entero.
-                  Es un <span> con onClick y no un <button>: esta cabecera ya
-                  es un botón (abre/cierra la tarjeta) y un botón adentro de
-                  otro es HTML inválido. stopPropagation evita que el toque
-                  además despliegue el ejercicio. */}
-              {/* El chip lo llevan TODOS los ejercicios, no sólo los que
-                  tienen metas: si sólo lo tenían esos, la mitad de la lista
-                  no decía nada y no se entendía contra qué estabas
-                  entrenando en cada uno. Un ejercicio sin plan persigue tu
-                  récord igual que uno pausado — la diferencia (si hay algo
-                  guardado o no) va en el title. Sólo aparece en modo
-                  planificado y con al menos una meta en la rutina: sin plan
-                  en ningún lado, repetir "POR RÉCORD" en cada tarjeta es
-                  ruido que no informa nada. */}
-              {!descarga && settings.trainingMode === "planned" && (planInfo || routineHasPlan) && (
-                // Sólo informa (pedido: "sacar eso de que si tocás el botoncito
-                // de plan cambie a récord"): pausar un ejercicio se hace desde
-                // el planificador.
-                planInfo && !planInfo.paused && !planInfo.terminado
-                  ? <span className="chip-plan sigue solo-icono" title="Este ejercicio sigue tu plan" aria-label="Sigue tu plan"><ClipboardCheck size={13} /></span>
-                  // "Tiene un plan, pausado" (contorno punteado: está ahí pero
-                  // inactivo) y "nunca tuvo metas" (liso): los dos persiguen tu
-                  // récord, pero sólo el primero vuelve con "Devolver al plan".
-                  : <span className={`chip-plan solo-icono ${planInfo ? "pausado" : ""}`} title={planInfo?.terminado ? "Su plan era del ciclo pasado y terminó: persigue tu récord" : planInfo ? "Tiene un plan guardado, pero ahora persigue tu récord" : "Este ejercicio no tiene metas cargadas: persigue tu récord"} aria-label="Persigue tu récord"><Trophy size={13} /></span>
-              )}
               {/* Las notas ahora son POR SERIE (ver SetRow): cada serie tiene
                   su propio "Agregar nota". Acá ya no va nada. */}
             </div>
@@ -16311,11 +16271,42 @@ function ExerciseCard({ exercise, accent, logs: logsTodos, setLogs: setLogsTodos
         <div className="ejercicio-derecha shrink-0">
           {/* Un disquito por serie, con los colores de la barra cargada:
               lleno = hecha hoy. Con la tarjeta cerrada sabés por dónde ibas. */}
-          {/* QUÉ CARGAR, sin abrir (13/11, pedido: "pulí la lista"): el peso
-              más alto de la última vez (o el de hoy, si ya anotaste). Es lo
-              que querés saber antes de ir a buscar los discos. */}
-          {!open && cargaCerrada != null && (
-            <span className="ejercicio-carga num-display" aria-label={`La última vez, ${conComa(cargaCerrada)} ${weightLabel(planUnit)}`}>{conComa(cargaCerrada)}<small>{weightLabel(planUnit)}</small></span>
+          {/* El peso de arriba de las rayitas ("qué cargar", 13/11) se sacó el 26/11
+              (pedido: "sacá la previsualización del peso que aparece a la
+              derecha"): quedan sólo las rayitas de las series. */}
+          {/* El ícono de plan o récord va acá, arriba de las rayitas, donde
+              estaba el peso (26/11, pedido: "si no está marcado que se muestre
+              el músculo, que la libretita aparezca en otro lado, no sola ahí
+              abajo"): así no queda un ícono suelto debajo del nombre. */}
+          {/* Con la tarjeta cerrada ya se ve cuáles ejercicios siguen el
+              plan y cuáles persiguen tu récord — antes había que abrir
+              cada uno para enterarte. Y el chip ES el interruptor: un
+              toque acá lo pasa a récord, sin abrir la tarjeta. La vuelta
+              al plan se hace desde "Plan actual", que es donde se
+              gobierna el plan entero.
+              Es un <span> con onClick y no un <button>: esta cabecera ya
+              es un botón (abre/cierra la tarjeta) y un botón adentro de
+              otro es HTML inválido. stopPropagation evita que el toque
+              además despliegue el ejercicio. */}
+          {/* El chip lo llevan TODOS los ejercicios, no sólo los que
+              tienen metas: si sólo lo tenían esos, la mitad de la lista
+              no decía nada y no se entendía contra qué estabas
+              entrenando en cada uno. Un ejercicio sin plan persigue tu
+              récord igual que uno pausado — la diferencia (si hay algo
+              guardado o no) va en el title. Sólo aparece en modo
+              planificado y con al menos una meta en la rutina: sin plan
+              en ningún lado, repetir "POR RÉCORD" en cada tarjeta es
+              ruido que no informa nada. */}
+          {!descarga && settings.trainingMode === "planned" && (planInfo || routineHasPlan) && (
+            // Sólo informa (pedido: "sacar eso de que si tocás el botoncito
+            // de plan cambie a récord"): pausar un ejercicio se hace desde
+            // el planificador.
+            planInfo && !planInfo.paused && !planInfo.terminado
+              ? <span className="chip-plan sigue solo-icono" title="Este ejercicio sigue tu plan" aria-label="Sigue tu plan"><ClipboardCheck size={13} /></span>
+              // "Tiene un plan, pausado" (contorno punteado: está ahí pero
+              // inactivo) y "nunca tuvo metas" (liso): los dos persiguen tu
+              // récord, pero sólo el primero vuelve con "Devolver al plan".
+              : <span className={`chip-plan solo-icono ${planInfo ? "pausado" : ""}`} title={planInfo?.terminado ? "Su plan era del ciclo pasado y terminó: persigue tu récord" : planInfo ? "Tiene un plan guardado, pero ahora persigue tu récord" : "Este ejercicio no tiene metas cargadas: persigue tu récord"} aria-label="Persigue tu récord"><Trophy size={13} /></span>
           )}
           {!exercise.cardio && seriesHechas.length > 0 && (descarga ? (
             <span className="series-discos" role="img" aria-label={allSetsDoneToday ? "Completaste las series de descarga" : `${hechasEnDescarga.filter(Boolean).length} de ${quedanEnDescarga} series de descarga`}>
