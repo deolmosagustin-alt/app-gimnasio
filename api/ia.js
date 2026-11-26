@@ -456,6 +456,7 @@ async function callGemini(body, { soloRespaldo = false } = {}) {
 
   const e = new Error(ranOutOfTime ? "Se agotó el tiempo disponible probando modelos" : `Todos los modelos fallaron (último: ${lastStatus})`);
   e.detalle = `${chain.join(", ")}: ${String(lastDetail || "").slice(0, 300)}`;
+  e.seAcaboElTiempo = ranOutOfTime;
   if (ranOutOfTime) e.userMessage = "La IA está respondiendo lento ahora mismo. Probá de nuevo en un momento.";
   else if (sawQuotaExhausted) {
     // SIN CUPO PARA TODOS (03/11, el lanzamiento con la cuota gratis): se
@@ -477,6 +478,90 @@ async function callGemini(body, { soloRespaldo = false } = {}) {
   // la función en Vercel sin tener que instrumentar nada de nuevo.
   else e.userMessage = `La IA no está disponible en este momento (código ${lastStatus}). Probá de nuevo en unos minutos.`;
   throw e;
+}
+
+// EL RESPALDO DE GROQ (26/11, pedido: "hay mejores alternativas para el
+// chatbot gratis"; "sí, sumalo"; "pero no reemplaza a Gemini, ¿no?": no).
+// Gemini sigue primero; sólo cuando no puede contestar (sin cupo gratis,
+// caído o colgado) el pedido va a Groq, que tiene su propio cupo gratis: con
+// gpt-oss-120b, 1.000 pedidos por día pero sólo 8.000 tokens por minuto y
+// 200.000 por día (console.groq.com/docs/rate-limits, 26/11/2026). Sólo
+// texto: las fotos de una importación no van. Groq no entrena con lo que se
+// le manda. Sin GROQ_API_KEY en Vercel no hace nada. `probarGroq: true` va
+// directo a Groq, para ver que ande.
+const GROQ_MODELOS = (process.env.GROQ_MODELOS || "openai/gpt-oss-120b,llama-3.3-70b-versatile,openai/gpt-oss-20b")
+  .split(",").map((m) => m.trim()).filter(Boolean);
+const esSoloTexto = (body) => !(body?.contents || []).some((c) => (c?.parts || []).some((p) => p?.inlineData));
+function aMensajesDeGroq(body) {
+  const mensajes = [];
+  const sistema = (body?.systemInstruction?.parts || []).map((p) => p?.text || "").join("\n").trim();
+  if (sistema) mensajes.push({ role: "system", content: sistema });
+  (body?.contents || []).forEach((c) => {
+    const texto = (c?.parts || []).map((p) => p?.text || "").join("\n");
+    if (texto.trim()) mensajes.push({ role: c?.role === "model" ? "assistant" : "user", content: texto });
+  });
+  return mensajes;
+}
+async function callGroq(body, tiempoMs) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return null;
+  const hasta = Date.now() + tiempoMs;
+  const messages = aMensajesDeGroq(body);
+  let ultimo = "";
+  for (const model of GROQ_MODELOS) {
+    const quedan = hasta - Date.now();
+    if (quedan < 5000) break;
+    const ctrl = new AbortController();
+    const reloj = setTimeout(() => ctrl.abort(), quedan);
+    try {
+      const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+        body: JSON.stringify({ model, messages, temperature: 0.6, max_completion_tokens: 4096, ...(/gpt-oss/.test(model) ? { reasoning_effort: "low" } : {}) }),
+        signal: ctrl.signal,
+      });
+      if (r.ok) {
+        const d = await r.json();
+        const text = d?.choices?.[0]?.message?.content || "";
+        if (text.trim()) return { candidates: [{ content: { parts: [{ text }] }, finishReason: "STOP" }], modelo: `groq:${model}` };
+        ultimo = `${model}: respuesta vacía`;
+      } else {
+        ultimo = `${model} ${r.status}: ${(await r.text()).slice(0, 200)}`;
+        console.error("[ia] groq", ultimo);
+        // 401/403: la clave no sirve; no tiene sentido probar otro modelo.
+        if (r.status === 401 || r.status === 403) break;
+      }
+    } catch (err) {
+      ultimo = `${model}: ${String(err?.message || err)}`;
+      console.error("[ia] groq", ultimo);
+    } finally { clearTimeout(reloj); }
+  }
+  const e = new Error(`Groq no pudo: ${ultimo}`);
+  e.detalle = ultimo;
+  throw e;
+}
+// Gemini primero; si no pudo por cupo, caída o cuelgue, Groq con lo que
+// queda de los 60 s de Vercel.
+async function callIA(body, { soloRespaldo = false, soloGroq = false } = {}) {
+  const inicio = Date.now();
+  if (soloGroq) {
+    const r = await callGroq(body, 50000);
+    if (!r) { const e = new Error("Falta GROQ_API_KEY"); e.userMessage = "Groq no está configurado (falta GROQ_API_KEY en Vercel)."; throw e; }
+    return r;
+  }
+  try {
+    return await callGemini(body, { soloRespaldo });
+  } catch (err) {
+    const recuperable = err.sinCupoGlobal || err.seAcaboElTiempo || /fallaron \(último: (0|429|500|503)\)/.test(err.message || "");
+    const quedan = 57000 - (Date.now() - inicio);
+    if (!recuperable || !process.env.GROQ_API_KEY || !esSoloTexto(body) || quedan < 6000) throw err;
+    try {
+      return await callGroq(body, quedan);
+    } catch (e2) {
+      console.error("[ia] tampoco Groq:", e2?.detalle || e2);
+      throw err;
+    }
+  }
 }
 
 // Vercel: permitir hasta 60s de ejecución (el máximo del plan Hobby).
@@ -526,10 +611,10 @@ export default async function handler(req, res) {
       if (systemPrompt.length > 400000 || JSON.stringify(history).length > 100000) {
         res.status(400).json({ error: "El mensaje es demasiado largo." }); return;
       }
-      const data = await callGemini({
+      const data = await callIA({
         systemInstruction: { parts: [{ text: systemPrompt }] },
         contents: history,
-      }, { soloRespaldo: body.probarRespaldo === true });
+      }, { soloRespaldo: body.probarRespaldo === true, soloGroq: body.probarGroq === true });
       const candidate = data?.candidates?.[0];
       // Se unen TODAS las partes: Gemini parte las respuestas largas en
       // varios `parts` y leer sólo el primero dejaba la respuesta cortada a
@@ -618,7 +703,7 @@ export default async function handler(req, res) {
       if (hasText) { promptLines.push("", "Texto:", '"""', truncated, '"""'); }
       const parts = [{ text: promptLines.join("\n") }];
       safeImages.forEach((img) => { parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } }); });
-      const data = await callGemini({ contents: [{ parts }] }, { soloRespaldo: body.probarRespaldo === true });
+      const data = await callIA({ contents: [{ parts }] }, { soloRespaldo: body.probarRespaldo === true, soloGroq: body.probarGroq === true && !safeImages.length });
       // Ídem: las rutinas largas vienen en varias partes (ver arriba).
       const rawText = (data?.candidates?.[0]?.content?.parts || []).map((p) => p?.text || "").join("");
       res.status(200).json({ text: rawText, modelo: data.modelo });
@@ -629,6 +714,6 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error("Error en /api/ia:", err);
     if (err.sinCupoGlobal) { res.status(503).json({ error: err.userMessage, sinCupoGlobal: true, vuelve: err.vuelve }); return; }
-    res.status(500).json({ error: err.userMessage || "Error en el servidor.", ...(body?.probarRespaldo === true ? { detalle: err.detalle } : {}) });
+    res.status(500).json({ error: err.userMessage || "Error en el servidor.", ...(body?.probarRespaldo === true || body?.probarGroq === true ? { detalle: err.detalle } : {}) });
   }
 }
