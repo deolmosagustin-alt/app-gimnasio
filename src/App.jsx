@@ -4061,6 +4061,10 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .foco-titulo .foco-rango { font-size: 0.9375rem; font-weight: 650; color: color-mix(in oklab, var(--c, var(--tono)) 50%, white); }
 .light-mode .foco-titulo .foco-rango { color: color-mix(in oklab, var(--c, var(--tono)) 62%, black); }
 .foco-fuerza { color: var(--text-faint); align-self: center; flex: none; }
+/* 26/11: "reps" chico al lado del rango, como la unidad de un número. */
+.foco-titulo .foco-rango small, .serie-linea-meta small { margin-left: 3px; font-size: 0.75rem; font-weight: 500; color: var(--text-faint); }
+.serie-linea-meta small { margin-left: -3px; }
+.chip-plan.solo-icono { gap: 0; width: 26px; height: 22px; padding: 0; justify-content: center; }
 .foco-pasada { margin: 4px 6px 0; font-size: 0.8125rem; color: var(--text-faint); }
 .foco-pasada b { font-weight: 600; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .foco-ref { margin-left: auto; display: inline-flex; align-items: baseline; gap: 5px; flex: none; font-size: 0.8125rem; color: var(--text-faint); white-space: nowrap; }
@@ -14973,11 +14977,11 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     // A la derecha de una serie que falta, el número contra el que vas: la
     // meta, tu récord o lo de la vez pasada (en ese orden).
     const referencia = !hechaHoy && (isPlannedMode && plannedTarget.kg != null
-      ? { icono: <ClipboardCheck size={13} />, texto: `${plannedTarget.reps}×${kgToDisplay(plannedTarget.kg, unit)}` }
+      ? { icono: null, texto: `${plannedTarget.reps}×${conComa(kgToDisplay(plannedTarget.kg, unit))}` }
       : currentPR
-        ? { icono: <Trophy size={13} />, texto: `${currentPR.reps}×${kgToDisplay(currentPR.kg, unit)}` }
+        ? { icono: <Trophy size={13} />, texto: `${currentPR.reps}×${conComa(kgToDisplay(currentPR.kg, unit))}` }
         : lastSession
-          ? { icono: <History size={13} />, texto: `${lastSession.reps}×${kgToDisplay(lastSession.kg, unit)}` }
+          ? { icono: <History size={13} />, texto: `${lastSession.reps}×${conComa(kgToDisplay(lastSession.kg, unit))}` }
           : null);
     const alTocar = hechaHoy ? editarGuardada : onEnfocar;
     return (
@@ -15002,8 +15006,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             </span>
           ) : (
             <span className="serie-linea-meta">
-              {rango} reps
-              {pesada && <Zap size={12} className="foco-fuerza" aria-label="Serie de fuerza" />}
+              {rango}<small aria-hidden="true">reps</small>
               {setDef.type === "dropset" && <span className="foco-tipo">drop-set</span>}
               {setDef.type === "restpause" && <span className="foco-tipo">rest-pause</span>}
             </span>
@@ -15048,11 +15051,15 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           el visor (ver `sugerido`), y repetirlo era la mitad del ruido. */}
       <div className="foco-cabecera">
         <p className="foco-titulo">
-          <span className="foco-rango">{rango} reps</span>
-          {pesada && <Zap size={13} className="foco-fuerza" aria-label="Serie de fuerza" />}
+          {/* Menos texto (26/11, pedido: "eso de 3-5 reps y meta, busquemos
+              reducirlo para que no sature tanto"): el rango con "reps" chico,
+              sin el rayo de las series de fuerza y sin la ficha "meta" (el
+              visor ya trae escrita la meta); la ficha sale sólo cuando la
+              meta cambió (repetís, −10 %). */}
+          <span className="foco-rango" aria-label={`${rango} repeticiones${pesada ? ", serie de fuerza" : ""}${isPlannedMode && !cardio ? ", con la meta de hoy" : ""}`}>{rango}<small aria-hidden="true">reps</small></span>
           {setDef.type === "dropset" && <span className="foco-tipo">drop-set</span>}
           {setDef.type === "restpause" && <span className="foco-tipo">rest-pause</span>}
-          {isPlannedMode && !cardio && !draft.editing && <span className="foco-hoy" title={AJUSTE_DE_META[plannedTarget.ajuste] ? `La vez pasada${AJUSTE_DE_META[plannedTarget.ajuste]}` : "Lo que viene escrito es la meta de hoy"}>{NOTA_DE_AJUSTE[plannedTarget.ajuste] || "meta"}</span>}
+          {isPlannedMode && !cardio && !draft.editing && NOTA_DE_AJUSTE[plannedTarget.ajuste] && <span className="foco-hoy" title={`La vez pasada${AJUSTE_DE_META[plannedTarget.ajuste]}`}>{NOTA_DE_AJUSTE[plannedTarget.ajuste]}</span>}
         </p>
         {draft.editing ? (
           <button onClick={cancelarEdicion} className="foco-cancelar">Cancelar</button>
@@ -16246,7 +16253,7 @@ function ExerciseCard({ exercise, accent, logs: logsTodos, setLogs: setLogsTodos
                 bajaba a un tercer renglón. Ahora no se parte: el músculo
                 largo se acomoda en su lugar y las fichas quedan a su lado. */}
             <div className="ejercicio-sub">
-              <span className="ejercicio-musculo">{exercise.muscle}</span>
+              {settings.showMuscle !== false && <span className="ejercicio-musculo">{exercise.muscle}</span>}
               {/* Si el músculo ya dice "Cardio", el chip de cardio repetía la palabra. */}
               {exercise.cardio && String(exercise.muscle || "").toLowerCase() !== "cardio" && <span className="text-[11px] bg-rose-400/15 text-rose-300 rounded-md px-1.5 py-0.5 font-bold flex items-center gap-1"><Footprints size={9} /> CARDIO</span>}
               {!open && restTimerId && <ChipDescansoEnCurso timerId={restTimerId} color={accent} />}
@@ -16280,11 +16287,11 @@ function ExerciseCard({ exercise, accent, logs: logsTodos, setLogs: setLogsTodos
                 // de plan cambie a récord"): pausar un ejercicio se hace desde
                 // el planificador.
                 planInfo && !planInfo.paused && !planInfo.terminado
-                  ? <span className="chip-plan sigue" title="Este ejercicio sigue tu plan"><ClipboardCheck size={12} /> Plan</span>
+                  ? <span className="chip-plan sigue solo-icono" title="Este ejercicio sigue tu plan" aria-label="Sigue tu plan"><ClipboardCheck size={13} /></span>
                   // "Tiene un plan, pausado" (contorno punteado: está ahí pero
                   // inactivo) y "nunca tuvo metas" (liso): los dos persiguen tu
                   // récord, pero sólo el primero vuelve con "Devolver al plan".
-                  : <span className={`chip-plan ${planInfo ? "pausado" : ""}`} title={planInfo?.terminado ? "Su plan era del ciclo pasado y terminó: persigue tu récord" : planInfo ? "Tiene un plan guardado, pero ahora persigue tu récord" : "Este ejercicio no tiene metas cargadas: persigue tu récord"}><Trophy size={12} /> Récord</span>
+                  : <span className={`chip-plan solo-icono ${planInfo ? "pausado" : ""}`} title={planInfo?.terminado ? "Su plan era del ciclo pasado y terminó: persigue tu récord" : planInfo ? "Tiene un plan guardado, pero ahora persigue tu récord" : "Este ejercicio no tiene metas cargadas: persigue tu récord"} aria-label="Persigue tu récord"><Trophy size={13} /></span>
               )}
               {/* Las notas ahora son POR SERIE (ver SetRow): cada serie tiene
                   su propio "Agregar nota". Acá ya no va nada. */}
@@ -23427,7 +23434,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-white">Qué ves al registrar</p>
           <p className="text-[12px] text-slate-500 mt-0.5 leading-snug">
-            {(() => { const flags = [settings.showGeneralWarmup !== false, settings.showRpe !== false, settings.showWarmup !== false, settings.show1RMPercent !== false, settings.showCoaching !== false, settings.showExerciseNote !== false, settings.showPersonalNote !== false, settings.showStagnation === true, settings.showProgressionSuggestion === true, settings.showLastSession === true]; const on = flags.filter(Boolean).length; return on === flags.length ? "Todo prendido" : `${on} de ${flags.length} prendidas`; })()}
+            {(() => { const flags = [settings.showGeneralWarmup !== false, settings.showRpe !== false, settings.showWarmup !== false, settings.show1RMPercent !== false, settings.showCoaching !== false, settings.showExerciseNote !== false, settings.showPersonalNote !== false, settings.showStagnation === true, settings.showProgressionSuggestion === true, settings.showLastSession === true, settings.showMuscle !== false]; const on = flags.filter(Boolean).length; return on === flags.length ? "Todo prendido" : `${on} de ${flags.length} prendidas`; })()}
           </p>
         </div>
         <ChevronRight size={16} className="text-slate-600 shrink-0" />
@@ -29032,7 +29039,7 @@ function buildActionPlan(action, ctx) {
   // ("Personalizá tu ficha"), expuestos acá para poder prenderlos/apagarlos
   // por chat en vez de tener que ir a buscarlos.
   if (action.type === "config_ficha") {
-    const FICHA_FIELDS = { showGeneralWarmup: "Calentamiento general", showRpe: "Esfuerzo (RPE/RIR)", showWarmup: "Aproximaciones", show1RMPercent: "Porcentaje de 1RM", showCoaching: "Consejos al guardar", showExerciseNote: "Consejos del ejercicio", showPersonalNote: "Notas por serie", showStagnation: "Aviso de estancamiento", showProgressionSuggestion: "Progresión sugerida", showLastSession: "La vez pasada, ya escrita", compactSetRow: "Filas compactas" };
+    const FICHA_FIELDS = { showGeneralWarmup: "Calentamiento general", showRpe: "Esfuerzo (RPE/RIR)", showWarmup: "Aproximaciones", show1RMPercent: "Porcentaje de 1RM", showCoaching: "Consejos al guardar", showExerciseNote: "Consejos del ejercicio", showPersonalNote: "Notas por serie", showStagnation: "Aviso de estancamiento", showProgressionSuggestion: "Progresión sugerida", showLastSession: "La vez pasada, ya escrita", showMuscle: "El músculo de cada ejercicio", compactSetRow: "Filas compactas" };
     const patch = {}; const items = [];
     Object.keys(FICHA_FIELDS).forEach((key) => {
       if (typeof action[key] === "boolean") { patch[key] = action[key]; items.push(`${FICHA_FIELDS[key]}: ${action[key] ? "activado" : "desactivado"}`); }
@@ -33907,6 +33914,7 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
       { key: "showProgressionSuggestion", icon: <Target size={17} />, label: "Progresión de entrenador", desc: "Una rep más que la vez pasada y, al llegar al tope del rango, el salto de peso de esa máquina." },
     ] },
     { titulo: "En cada ejercicio", opciones: [
+      { key: "showMuscle", icon: <Dumbbell size={17} />, label: "El músculo que trabaja", desc: "Debajo del nombre de cada ejercicio." },
       { key: "showExerciseNote", icon: <Info size={17} />, label: "Consejo de técnica", desc: "Un tip debajo del nombre del ejercicio." },
       { key: "showWarmup", icon: <Flame size={17} />, label: "Aproximaciones", desc: "Las series de entrada al 50, 70 y 85 % de tu mejor serie." },
       { key: "showStagnation", icon: <AlertTriangle size={17} />, label: "Aviso de estancamiento", desc: `Si llevás ${STAGNATION_DAYS} días o más sin mejorar la marca.` },
@@ -33941,7 +33949,7 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
                 <span className="galleta ejercicio-numero">01</span>
                 <div className="min-w-0 flex-1">
                   <p className="ejercicio-nombre">Press Banca</p>
-                  <span className="ejercicio-musculo">Pectoral</span>
+                  {on("showMuscle") && <span className="ejercicio-musculo">Pectoral</span>}
                   {on("showExerciseNote") && <p className="ficha-consejo bounce-in">Bajá la barra al pecho sin rebotar y mantené los omóplatos juntos.</p>}
                 </div>
               </div>
