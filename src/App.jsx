@@ -16107,6 +16107,15 @@ function useLogsDelDia(exercise, logs, setLogs, dia, fechasPorDia) {
   return [vista, escribir];
 }
 
+// Debajo del nombre, sólo el músculo principal (26/11, pedido: "cuando dice
+// más de un músculo o la palabra es muy larga queda raro; que sólo mencione el
+// músculo principal y nada de cosas entre paréntesis"): "Cuádriceps / Glúteo"
+// es "Cuádriceps"; "Antebrazo (flexores)", "Antebrazo". El nombre entero queda
+// en el title y en todo lo demás (la IA, los filtros, el rango).
+function musculoPrincipal(m) {
+  const sinParentesis = String(m || "").replace(/\s*\([^)]*\)/g, "");
+  return sinParentesis.split(/\s*(?:\/|,|·|\+|\sy\s)\s*/)[0].trim();
+}
 function ExerciseCard({ exercise, accent, logs: logsTodos, setLogs: setLogsTodos, diaPropio = null, fechasPorDia = null, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, autoCollapse = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, routineHasPlan = false, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null, supersetRestTimerId = null, supersetRestSeconds = null, orden = null, nextObjetivo = null, cicloActual = null, descarga = null }) {
   const [logs, setLogs] = useLogsDelDia(exercise, logsTodos, setLogsTodos, diaPropio, fechasPorDia);
   const [open, setOpen] = useState(false);
@@ -16253,7 +16262,7 @@ function ExerciseCard({ exercise, accent, logs: logsTodos, setLogs: setLogsTodos
                 bajaba a un tercer renglón. Ahora no se parte: el músculo
                 largo se acomoda en su lugar y las fichas quedan a su lado. */}
             <div className="ejercicio-sub">
-              {settings.showMuscle !== false && <span className="ejercicio-musculo">{exercise.muscle}</span>}
+              {settings.showMuscle !== false && musculoPrincipal(exercise.muscle) && <span className="ejercicio-musculo" title={exercise.muscle}>{musculoPrincipal(exercise.muscle)}</span>}
               {/* Si el músculo ya dice "Cardio", el chip de cardio repetía la palabra. */}
               {exercise.cardio && String(exercise.muscle || "").toLowerCase() !== "cardio" && <span className="text-[11px] bg-rose-400/15 text-rose-300 rounded-md px-1.5 py-0.5 font-bold flex items-center gap-1"><Footprints size={9} /> CARDIO</span>}
               {!open && restTimerId && <ChipDescansoEnCurso timerId={restTimerId} color={accent} />}
