@@ -2795,6 +2795,149 @@ const ANIMATION_CSS = letraEscalable(`
 @media (prefers-reduced-motion: reduce) {
   .tu-anio-formas i, .tu-anio-ceja, .tu-anio-gigante, .tu-anio-grande, .tu-anio-texto, .tu-anio-tiza, .tu-anio-medalla, .tu-anio-podio li, .tu-anio-tarjeta { animation: none; }
 }
+/* LOS DIBUJOS DE LAS HISTORIAS (27/11): las piezas del gimnasio en la tinta
+   de cada historia. Los discos de fondo giran despacio sobre su eje, como
+   en la manga; el grano de papel impreso va encima de todo. */
+.historias.tu-anio, .historias.historias-mes { --disco-raya: rgba(0,0,0,.16); --disco-hueco: var(--fondo-anio, var(--fondo)); overflow: hidden; }
+.historias.tu-anio::after { content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: .22; mix-blend-mode: overlay; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E"); }
+.historias.historias-mes { background: radial-gradient(110% 60% at 50% 12%, color-mix(in oklab, var(--luz, #fff) 26%, var(--fondo)), var(--fondo) 55%, #0b0c0e 120%); }
+.historias.historias-mes > .historias-barras, .historias.historias-mes > .historias-cerrar, .historias.historias-mes > .historias-escena, .historias.historias-mes > .historias-pie { position: relative; z-index: 1; }
+.disco-fondo { position: absolute; color: rgba(255,255,255,.12); animation: discoGira 40s linear infinite, tuAnioAparece .9s var(--sale, ease-out) both; }
+.tu-anio.tinta-oscura .disco-fondo { color: rgba(0,0,0,.07); }
+.historias-mes .disco-fondo { color: color-mix(in oklab, var(--luz) 10%, transparent); --disco-raya: rgba(0,0,0,.25); }
+.disco-fondo.uno { width: 115vmax; max-width: 760px; right: -48%; bottom: -26%; }
+.disco-fondo.dos { width: 52vmax; max-width: 420px; left: -34%; top: -8%; animation-duration: 26s, 1.1s; animation-direction: reverse, normal; }
+@keyframes discoGira { to { rotate: 360deg; } }
+.tu-anio-dibujo { display: flex; justify-content: center; }
+.tu-anio-dibujo.reloj svg { width: min(56vw, 220px); }
+
+/* La barra que se carga. */
+.ilus-barra { width: 100%; max-width: 380px; overflow: visible; color: inherit; }
+.ilus-barra-disco { fill: currentColor; stroke: var(--disco-raya); stroke-width: 1.2; animation: discoALaManga .55s cubic-bezier(.2, 1.3, .4, 1) both; }
+@keyframes discoALaManga { from { transform: translateX(var(--desde)); opacity: 0; } }
+.ilus-barra-cuerpo { animation: barraSeLevanta .7s cubic-bezier(.3, 1.5, .5, 1) var(--fin) both; }
+@keyframes barraSeLevanta { 0% { transform: none; } 45% { transform: translateY(-12px); } 100% { transform: translateY(-4px); } }
+
+/* El año entero en casilleros. */
+.ilus-anio { display: grid; gap: 2px; width: 100%; max-width: 420px; }
+.ilus-anio-semana { display: grid; grid-template-rows: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.ilus-anio i { display: block; aspect-ratio: 1; border-radius: 1.5px; background: currentColor; opacity: .16; }
+.ilus-anio i.fuera { opacity: 0; }
+.ilus-anio i.si { opacity: 1; animation: casilleroSePrende .35s cubic-bezier(.2, 1.6, .4, 1) both; }
+@keyframes casilleroSePrende { from { opacity: .16; transform: scale(.2); } }
+.tu-anio-tarjeta .ilus-anio { color: var(--fondo-anio); }
+.tu-anio-tarjeta .ilus-anio i { opacity: .14; }
+.tu-anio-tarjeta .ilus-anio i.si { opacity: 1; }
+.tu-anio-tarjeta .ilus-anio i.fuera { opacity: 0; }
+
+/* El mes en casilleros. */
+.ilus-mes { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; width: 100%; max-width: 340px; margin-top: 6px; }
+.ilus-mes b { font-size: 12px; font-weight: 650; text-align: center; color: rgba(243,243,239,.55); }
+.ilus-mes span { aspect-ratio: 1; display: grid; place-items: center; border-radius: 9px; font-size: 13px; font-weight: 650; color: rgba(243,243,239,.45); background: rgba(255,255,255,.06); }
+.ilus-mes span.fuera { background: none; }
+.ilus-mes span.si { color: #121316; background: color-mix(in oklab, var(--luz) 78%, white); animation: casilleroSePrende .4s cubic-bezier(.2, 1.6, .4, 1) both; }
+
+/* La pila de discos. */
+.ilus-pila { width: min(62vw, 240px); overflow: visible; }
+.historia .ilus-pila { color: color-mix(in oklab, var(--luz, #fff) 70%, white); }
+.ilus-pila-disco { animation: discoCaeALaPila .6s cubic-bezier(.3, 1.35, .5, 1) both; }
+@keyframes discoCaeALaPila { 0% { transform: translateY(-260px); opacity: 0; } 30% { opacity: 1; } }
+.historia-dibujo { display: flex; justify-content: center; margin-bottom: 4px; }
+
+/* Los elefantes. */
+.ilus-elefantes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.ilus-elefantes span { width: 44px; animation: elefanteLlega .5s cubic-bezier(.2, 1.5, .4, 1) both; }
+.ilus-elefantes b { font-size: 26px; font-weight: 850; font-stretch: 75%; }
+.elefante { display: block; width: 100%; height: auto; }
+@keyframes elefanteLlega { from { opacity: 0; transform: translateY(14px) scale(.6); } }
+
+/* El reloj de pared. */
+.ilus-reloj { overflow: visible; animation: tuAnioRebota .8s cubic-bezier(.2, 1.6, .35, 1) both; }
+.ilus-reloj-hora, .ilus-reloj-minuto { transform-box: view-box; transform-origin: 100px 100px; }
+.ilus-reloj-hora { animation: agujaHora 1.8s cubic-bezier(.3, 1.2, .4, 1) .3s both; }
+.ilus-reloj-minuto { animation: agujaMinuto 1.8s cubic-bezier(.3, 1.1, .4, 1) .3s both; }
+@keyframes agujaHora { from { transform: rotate(-360deg); } to { transform: rotate(var(--a)); } }
+@keyframes agujaMinuto { from { transform: rotate(-1800deg); } to { transform: rotate(var(--a)); } }
+.ilus-reloj-tramo { animation: tuAnioAparece .5s ease-out 1.6s both; transform-origin: 100px 100px; }
+
+/* Los rayos detrás de la medalla y la campana. */
+.tu-anio-medalla, .historia-medalla, .historia-campana { position: relative; isolation: isolate; }
+.ilus-rayos { position: absolute; z-index: -1; left: 50%; top: 50%; width: 420px; height: 420px; margin: -210px 0 0 -210px; border-radius: 999px; background: repeating-conic-gradient(currentColor 0deg 7deg, transparent 7deg 20deg); opacity: .22; -webkit-mask: radial-gradient(circle, #000 18%, transparent 68%); mask: radial-gradient(circle, #000 18%, transparent 68%); animation: discoGira 24s linear infinite, tuAnioAparece .8s ease-out both; pointer-events: none; }
+.historias-mes .ilus-rayos { color: var(--luz); opacity: .3; }
+.historia-campana { width: 96px; margin: 4px auto 10px; }
+.historia-campana .ilus-rayos { width: 300px; height: 300px; margin: -150px 0 0 -150px; }
+
+/* La marquesina del ejercicio del año. */
+.tu-anio-marquesina { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 4px; transform: rotate(-12deg) scale(1.25); }
+.tu-anio-marquesina p { display: flex; width: max-content; white-space: nowrap; font-size: clamp(3.4rem, 17vw, 5.5rem); line-height: 1; font-weight: 900; font-stretch: 70%; color: transparent; -webkit-text-stroke: 2px var(--tinta-marquesina, #f3f3ef); opacity: .28; animation: marquesina 18s linear infinite; }
+.tu-anio-marquesina p.vuelve { animation-direction: reverse; opacity: .18; }
+.tu-anio-marquesina p:nth-child(3) { color: var(--tinta-marquesina, #f3f3ef); -webkit-text-stroke: 0; opacity: .1; }
+.tu-anio.tinta-oscura .tu-anio-marquesina { --tinta-marquesina: #121316; }
+@keyframes marquesina { to { transform: translateX(-50%); } }
+.tu-anio-sello-nombre { padding: 10px 14px 12px; margin-left: -6px; width: fit-content; max-width: 100%; border-radius: 18px; background: currentColor; }
+.tu-anio-sello-nombre { color: var(--fondo-anio); background: #f6f4ec; transform: rotate(-3deg); box-shadow: 0 16px 34px rgba(0,0,0,.25); }
+
+/* El podio de cajones de salto. */
+.ilus-podio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: 8px; height: 240px; margin-top: 6px; }
+.ilus-cajon { display: flex; flex-direction: column; align-items: center; gap: 6px; transform-origin: bottom; animation: cajonSube .7s cubic-bezier(.2, 1.4, .4, 1) both; }
+.ilus-cajon > b { font-size: clamp(1.7rem, 9vw, 2.4rem); line-height: 1; font-weight: 900; font-stretch: 72%; }
+.ilus-cajon > b small { font-size: .55em; font-weight: 750; }
+.ilus-cajon-caja { position: relative; width: 100%; border-radius: 12px 12px 4px 4px; background: #f6f4ec; box-shadow: inset 0 -10px 0 rgba(0,0,0,.08), inset 0 0 0 2px rgba(0,0,0,.06); }
+.ilus-cajon.p1 .ilus-cajon-caja { height: 150px; }
+.ilus-cajon.p2 .ilus-cajon-caja { height: 108px; }
+.ilus-cajon.p3 .ilus-cajon-caja { height: 74px; }
+.ilus-cajon-agarre { position: absolute; left: 30%; right: 30%; top: 14px; height: 10px; border-radius: 6px; background: rgba(0,0,0,.22); }
+.ilus-cajon-plaqueta { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); min-width: 38px; padding: 2px 8px; border-radius: 8px; text-align: center; font-size: 24px; font-weight: 900; color: #f6f4ec; background: var(--fondo-anio); }
+.ilus-cajon.p1 .ilus-cajon-plaqueta { font-size: 34px; }
+@keyframes cajonSube { from { opacity: 0; transform: translateY(80px) scaleY(.4); } }
+.tu-anio-podio-nombres { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.tu-anio-podio-nombres li { display: flex; align-items: baseline; gap: 10px; font-size: 17px; font-weight: 650; animation: tuAnioSube .5s var(--sale, ease-out) both; }
+.tu-anio-podio-nombres b { font-size: 22px; font-weight: 900; min-width: 1ch; }
+
+/* La pizarra de la racha. */
+.ilus-pizarra { position: relative; align-self: flex-start; max-width: 100%; padding: 18px 22px 26px; border-radius: 10px; color: #ecebe4; background: #262a2d; box-shadow: 0 0 0 8px #8a6a48, 0 0 0 9px rgba(0,0,0,.25), 0 24px 40px rgba(0,0,0,.3); transform: rotate(-2deg); animation: tuAnioCae .9s cubic-bezier(.2, 1.4, .4, 1) .3s both; overflow: hidden; }
+.ilus-pizarra .marcas { display: flex; max-width: 100%; }
+.ilus-pizarra .marcas svg { max-width: 100%; }
+.ilus-pizarra .marcas line { stroke-dasharray: 30; animation: tizaEscribe .3s ease-out both; }
+.ilus-pizarra-bandeja { position: absolute; left: 10px; right: 10px; bottom: 6px; height: 6px; display: flex; gap: 8px; }
+.ilus-pizarra-bandeja i { width: 26px; height: 6px; border-radius: 3px; background: #ecebe4; }
+.ilus-pizarra-bandeja i + i { width: 34px; background: #5d4630; }
+@keyframes tizaEscribe { from { stroke-dashoffset: 30; } to { stroke-dashoffset: 0; } }
+
+/* La tarjeta final: el sello del año y el código de barras. */
+.tu-anio-tarjeta { position: relative; }
+.tu-anio-sello { position: absolute; right: 14px; top: 14px; display: grid; place-items: center; width: 84px; height: 84px; border-radius: 999px; border: 3px solid currentColor; font-size: 24px; font-weight: 900; color: var(--fondo-anio); transform: rotate(14deg); opacity: .85; animation: selloEstampa .5s cubic-bezier(.3, 1.6, .5, 1) 1s both; }
+.tu-anio-sello::before { content: ""; position: absolute; inset: 5px; border-radius: 999px; border: 1.5px dashed currentColor; }
+@keyframes selloEstampa { from { opacity: 0; transform: rotate(14deg) scale(2.4); } }
+.codigo-barras { width: 100%; height: 34px; color: #121316; margin-top: 4px; }
+.tu-anio-tarjeta { padding-bottom: 18px; }
+
+/* Las barras de los músculos del mes. */
+.ilus-musculos { list-style: none; margin: 6px 0 4px; padding: 0; display: grid; gap: 10px; width: 100%; max-width: 380px; }
+.ilus-musculos li { display: grid; grid-template-columns: minmax(0, 7.5em) minmax(0, 1fr) auto; align-items: center; gap: 10px; font-size: 15px; font-weight: 650; animation: tuAnioSube .5s var(--sale, ease-out) both; animation-delay: inherit; }
+.ilus-musculos li span { overflow-wrap: anywhere; }
+.ilus-musculos li i { height: 14px; border-radius: 999px; background: rgba(255,255,255,.08); position: relative; overflow: hidden; }
+.ilus-musculos li i::after { content: ""; position: absolute; inset: 0; width: calc(var(--f) * 100%); border-radius: inherit; background: color-mix(in oklab, var(--luz) 78%, white); transform-origin: left; animation: barraCrece .9s cubic-bezier(.2, 1.2, .4, 1) both; animation-delay: inherit; }
+.ilus-musculos li:first-child { font-size: 17px; }
+.ilus-musculos li:first-child i { height: 20px; }
+.ilus-musculos li b { font-size: 18px; font-weight: 850; }
+@keyframes barraCrece { from { transform: scaleX(0); } }
+
+/* La portada de las historias en el resumen del mes. */
+.resumen-portada { position: relative; overflow: hidden; display: flex; align-items: center; gap: 14px; width: 100%; min-height: 76px; padding: 12px 16px; margin: 6px 0 2px; border-radius: 22px; text-align: left; color: #f3f3ef; background: radial-gradient(120% 140% at 0% 0%, #2f5a50, #1d2747 70%); box-shadow: var(--placa-canto); }
+.resumen-portada .disco-fondo { width: 160px; right: -40px; top: -50px; color: rgba(255,255,255,.1); --disco-raya: rgba(0,0,0,.2); --disco-hueco: #1d2747; }
+.resumen-portada-texto { position: relative; display: grid; gap: 1px; flex: 1; min-width: 0; }
+.resumen-portada-texto b { font-size: 16px; font-weight: 750; }
+.resumen-portada-texto small { font-size: 13px; color: rgba(243,243,239,.72); }
+.resumen-portada-play { position: relative; width: 44px; height: 44px; flex: none; display: grid; place-items: center; border-radius: 999px; color: #121316; background: #f3f3ef; }
+.resumen-portada-barras { position: relative; display: flex; gap: 3px; width: 46px; flex: none; }
+.resumen-portada-barras i { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,.35); }
+.resumen-portada-barras i:first-child { background: #f3f3ef; }
+
+@media (prefers-reduced-motion: reduce) {
+  .disco-fondo, .ilus-barra-disco, .ilus-barra-cuerpo, .ilus-anio i.si, .ilus-mes span.si, .ilus-pila-disco, .ilus-elefantes span, .ilus-reloj, .ilus-reloj-hora, .ilus-reloj-minuto, .ilus-reloj-tramo, .ilus-rayos, .tu-anio-marquesina p, .ilus-cajon, .tu-anio-podio-nombres li, .ilus-pizarra, .ilus-pizarra .marcas line, .tu-anio-sello, .ilus-musculos li, .ilus-musculos li i::after { animation: none; }
+  .ilus-reloj-hora, .ilus-reloj-minuto { transform: rotate(var(--a)); }
+}
 /* Los dos puntajes de la semana (PuntajesSemana). */
 .puntajes-semana { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 14px 0 4px; }
 .puntaje { display: grid; gap: 6px; align-content: start; padding: 14px 14px 12px; border-radius: 20px; background: var(--surface-2); box-shadow: var(--placa-canto); }
@@ -13204,6 +13347,241 @@ function VitrinaMedallas({ logs, trainingSessions }) {
   );
 }
 
+// LOS DIBUJOS DE LAS HISTORIAS (27/11, pedido: "metele más diseño al wrap,
+// imágenes o cosas que llamen la atención y que vayan con el estilo de la
+// app; además metele al mensual"). Las piezas del gimnasio, dibujadas en el
+// color de la tinta de cada historia (currentColor), para Tu año y Tu mes:
+// la barra que se carga, el año entero en casilleros, la pila de discos, el
+// reloj de pared con tu horario, los cajones del podio, la pizarra de la
+// racha y los discos que giran de fondo. Todo respeta "reducir movimiento".
+function DiscoDeFondo({ className = "" }) {
+  return (
+    <svg viewBox="0 0 200 200" className={`disco-fondo ${className}`} aria-hidden="true">
+      <circle cx="100" cy="100" r="98" fill="currentColor" />
+      <circle cx="100" cy="100" r="86" fill="none" stroke="var(--disco-raya)" strokeWidth="3" />
+      <circle cx="100" cy="100" r="62" fill="none" stroke="var(--disco-raya)" strokeWidth="1.5" strokeDasharray="2 6" />
+      <circle cx="100" cy="100" r="30" fill="var(--disco-raya)" />
+      <circle cx="100" cy="100" r="14" fill="var(--disco-hueco)" />
+      <rect x="92" y="20" width="16" height="22" rx="4" fill="var(--disco-raya)" />
+    </svg>
+  );
+}
+
+// La barra que se carga: los discos entran desde la punta de cada manga, el
+// más pesado primero, y al final la barra sube un poco, como al sacarla.
+const DISCOS_DE_LA_BARRA = [118, 118, 98, 78, 56];
+function IlusBarra({ discos = DISCOS_DE_LA_BARRA, demora = 0 }) {
+  const W = 360, cy = 70, ancho = 13;
+  const lado = (sentido) => discos.map((h, k) => {
+    const x = sentido < 0 ? 96 - k * (ancho + 2) - ancho : 264 + k * (ancho + 2);
+    return (
+      <rect key={`${sentido}-${k}`} className="ilus-barra-disco" x={x} y={cy - h / 2} width={ancho} height={h} rx="3.5"
+        style={{ "--desde": `${sentido * (130 - k * 14)}px`, animationDelay: `${demora + 120 + k * 130}ms`, opacity: 1 - k * 0.1 }} />
+    );
+  });
+  return (
+    <svg viewBox={`0 0 ${W} 140`} className="ilus-barra" aria-hidden="true" style={{ "--fin": `${demora + 120 + discos.length * 130 + 200}ms` }}>
+      <g className="ilus-barra-cuerpo">
+        <rect x="4" y={cy - 4} width={W - 8} height="8" rx="4" fill="currentColor" opacity=".55" />
+        <rect x="100" y={cy - 9} width="8" height="18" rx="2" fill="currentColor" />
+        <rect x="252" y={cy - 9} width="8" height="18" rx="2" fill="currentColor" />
+        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((k) => <rect key={k} x={140 + k * 7} y={cy - 4} width="2" height="8" fill="var(--disco-hueco)" opacity=".35" />)}
+        {lado(-1)}
+        {lado(1)}
+      </g>
+    </svg>
+  );
+}
+
+// El año entero en casilleros, una columna por semana: los días que fuiste
+// se prenden de enero a diciembre.
+function IlusAnioGrilla({ anio, dias = [] }) {
+  const fui = new Set(dias.map((d) => d.date));
+  const columnas = [];
+  const d = new Date(anio, 0, 1, 12);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  while (d.getFullYear() <= anio && columnas.length < 54) {
+    const semana = [];
+    for (let k = 0; k < 7; k++) {
+      const iso = d.getFullYear() === anio ? localDateStr(d) : null;
+      semana.push(iso ? (fui.has(iso) ? "si" : "no") : "fuera");
+      d.setDate(d.getDate() + 1);
+    }
+    columnas.push(semana);
+  }
+  return (
+    <div className="ilus-anio" aria-hidden="true" style={{ gridTemplateColumns: `repeat(${columnas.length}, minmax(0, 1fr))` }}>
+      {columnas.map((s, c) => (
+        <span key={c} className="ilus-anio-semana">
+          {s.map((x, k) => <i key={k} className={x} style={x === "si" ? { animationDelay: `${300 + c * 28}ms` } : undefined} />)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// El mes en casilleros, de lunes a domingo, con los días que fuiste.
+function IlusMesGrilla({ prefijo, dias = [] }) {
+  const [a, m] = String(prefijo).split("-").map(Number);
+  const fui = new Set(dias.map((d) => d.date));
+  const primero = new Date(a, (m || 1) - 1, 1, 12);
+  const vacios = (primero.getDay() + 6) % 7;
+  const total = new Date(a, m || 1, 0).getDate();
+  return (
+    <div className="ilus-mes" aria-hidden="true">
+      {LETRAS_SEMANA.map((l, k) => <b key={`l${k}`}>{l}</b>)}
+      {Array.from({ length: vacios }, (_, k) => <span key={`v${k}`} className="fuera" />)}
+      {Array.from({ length: total }, (_, k) => {
+        const iso = `${a}-${String(m).padStart(2, "0")}-${String(k + 1).padStart(2, "0")}`;
+        const si = fui.has(iso);
+        return <span key={iso} className={si ? "si" : "no"} style={si ? { animationDelay: `${250 + k * 45}ms` } : undefined}>{k + 1}</span>;
+      })}
+    </div>
+  );
+}
+
+// La pila de discos: caen uno arriba del otro, del más grande al más chico.
+function IlusPilaDiscos({ n = 6 }) {
+  const cant = Math.max(3, Math.min(9, n));
+  const discos = Array.from({ length: cant }, (_, k) => ({ w: 230 - k * (120 / cant), h: 15 - Math.min(5, k * 0.6) }));
+  let y = 196;
+  return (
+    <svg viewBox="0 0 260 200" className="ilus-pila" aria-hidden="true">
+      <rect x="10" y="196" width="240" height="4" rx="2" fill="currentColor" opacity=".35" />
+      {discos.map((x, k) => {
+        y -= x.h + 2;
+        return (
+          <g key={k} className="ilus-pila-disco" style={{ animationDelay: `${250 + k * 170}ms` }}>
+            <rect x={130 - x.w / 2} y={y} width={x.w} height={x.h} rx={x.h / 2} fill="currentColor" opacity={0.95 - (k % 2) * 0.18} />
+            <rect x={130 - x.w / 2 + 10} y={y + x.h / 2 - 1} width={x.w - 20} height="2" rx="1" fill="var(--disco-hueco)" opacity=".25" />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// Un elefante de perfil, para la cuenta de las toneladas.
+function Elefante() {
+  return (
+    <svg viewBox="0 0 48 34" className="elefante" aria-hidden="true">
+      <path fill="currentColor" d="M8 12c0-6 6-10 14-10h8c8 0 13 5 13 12v4c0 2-1 3-2 3v9h-6v-6h-5v6h-6v-6h-5v6H8v-8c-1 0-2-1-2-3z" />
+      <path fill="currentColor" d="M41 10c4 1 6 5 5 10-.5 3-1 7 1 9-3 0-5-2-5-5v-6z" />
+      <path fill="var(--disco-hueco)" opacity=".35" d="M30 7c4 0 7 3 7 7s-2 6-5 6-4-3-4-6 0-7 2-7z" />
+      <circle cx="39" cy="11" r="1.3" fill="var(--disco-hueco)" />
+      <path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" d="M8 13c-3 1-5 4-5 7" />
+    </svg>
+  );
+}
+function IlusElefantes({ n = 1 }) {
+  const ver = Math.max(1, Math.min(6, n));
+  return (
+    <div className="ilus-elefantes" aria-hidden="true">
+      {Array.from({ length: ver }, (_, k) => <span key={k} style={{ animationDelay: `${900 + k * 90}ms` }}><Elefante /></span>)}
+      {n > ver && <b className="num-display">+{numeroAR(n - ver)}</b>}
+    </div>
+  );
+}
+
+// El reloj de pared: tu horario sombreado y las agujas que dan vueltas
+// hasta quedar en el medio de ese horario.
+function IlusReloj({ de = 18, a = 21 }) {
+  const ang = (h) => ((h % 12) / 12) * 360;
+  const punto = (h, r) => {
+    const t = ((ang(h) - 90) * Math.PI) / 180;
+    return [100 + r * Math.cos(t), 100 + r * Math.sin(t)];
+  };
+  const [x1, y1] = punto(de, 80);
+  const [x2, y2] = punto(a, 80);
+  const largo = a - de > 6 ? 1 : 0;
+  const medio = (de + a) / 2;
+  return (
+    <svg viewBox="0 0 200 200" className="ilus-reloj" aria-hidden="true">
+      <circle cx="100" cy="100" r="94" fill="currentColor" opacity=".14" />
+      <circle cx="100" cy="100" r="94" fill="none" stroke="currentColor" strokeWidth="6" />
+      <path className="ilus-reloj-tramo" d={`M100 100 L${x1} ${y1} A80 80 0 ${largo} 1 ${x2} ${y2} Z`} fill="currentColor" opacity=".38" />
+      {Array.from({ length: 12 }, (_, k) => {
+        const [ax, ay] = punto(k, 84);
+        const [bx, by] = punto(k, k % 3 === 0 ? 70 : 76);
+        return <line key={k} x1={ax} y1={ay} x2={bx} y2={by} stroke="currentColor" strokeWidth={k % 3 === 0 ? 5 : 3} strokeLinecap="round" />;
+      })}
+      <g className="ilus-reloj-hora" style={{ "--a": `${ang(medio)}deg` }}>
+        <line x1="100" y1="100" x2="100" y2="54" stroke="currentColor" strokeWidth="8" strokeLinecap="round" />
+      </g>
+      <g className="ilus-reloj-minuto" style={{ "--a": `${(medio % 1) * 360}deg` }}>
+        <line x1="100" y1="100" x2="100" y2="30" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
+      </g>
+      <circle cx="100" cy="100" r="8" fill="currentColor" />
+    </svg>
+  );
+}
+
+// Los rayos que giran detrás de una medalla.
+function Rayos() {
+  return <span className="ilus-rayos" aria-hidden="true" />;
+}
+
+// El podio de cajones de salto: el primero en el medio, el más alto.
+function IlusPodio({ items = [] }) {
+  const orden = [items[1], items[0], items[2]].map((x, k) => (x ? { ...x, puesto: [2, 1, 3][k] } : null));
+  return (
+    <div className="ilus-podio" aria-hidden="true">
+      {orden.map((x, k) => (x ? (
+        <div key={x.puesto} className={`ilus-cajon p${x.puesto}`} style={{ animationDelay: `${200 + [1, 0, 2][k] * 220}ms` }}>
+          <b className="num-display">+{conComa(Math.round(x.cambio))}<small>%</small></b>
+          <span className="ilus-cajon-caja">
+            <i className="ilus-cajon-agarre" />
+            <span className="ilus-cajon-plaqueta num-display">{x.puesto}</span>
+          </span>
+        </div>
+      ) : <div key={k} />))}
+    </div>
+  );
+}
+
+// La pizarra de la racha, con las semanas en palitos de tiza.
+function IlusPizarra({ n = 0 }) {
+  return (
+    <div className="ilus-pizarra" aria-hidden="true">
+      <MarcasTiza dias={n} max={60} alto={56} decorativa />
+      <span className="ilus-pizarra-bandeja"><i /><i /></span>
+    </div>
+  );
+}
+
+// El código de barras del carnet (fijo para cada año).
+function barrasDeCodigo(semilla) {
+  let s = semilla;
+  const anchos = Array.from({ length: 34 }, () => { s = (s * 16807) % 2147483647; return 1 + (s % 3); });
+  const xs = anchos.reduce((acc, w) => [...acc, acc[acc.length - 1] + w * 1.2], [0]);
+  return { anchos, xs, total: xs[xs.length - 1] };
+}
+function CodigoDeBarras({ semilla = 2026 }) {
+  const { anchos, xs, total } = barrasDeCodigo(semilla);
+  return (
+    <svg viewBox={`0 0 ${total} 30`} className="codigo-barras" aria-hidden="true" preserveAspectRatio="none">
+      {anchos.map((w, k) => (k % 2 ? null : <rect key={k} x={xs[k]} y="0" width={w * 0.9} height="30" fill="currentColor" />))}
+    </svg>
+  );
+}
+
+// Las barras de los músculos que más trabajaste en el mes.
+function IlusMusculos({ musculos = [] }) {
+  const top = musculos.slice(0, 4);
+  const max = Math.max(1, ...top.map((m) => m.pct || 0));
+  return (
+    <ol className="ilus-musculos" aria-hidden="true">
+      {top.map((m, k) => (
+        <li key={m.nombre} style={{ "--f": (m.pct || 0) / max, animationDelay: `${200 + k * 150}ms` }}>
+          <span>{m.nombre}</span>
+          <i />
+          <b className="num-display">{m.pct} %</b>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 // TU MES EN EL GIMNASIO, EN HISTORIAS (03/11, el análisis estético: como el
 // Wrapped de Spotify o el Year in Sport de Strava). Cinco pantallas que
 // pasan solas, con las piezas de la app: los días en tiza, el récord con su
@@ -13219,11 +13597,11 @@ function HistoriasDelMes({ data, prefijo, onClose, onResumen }) {
   const nombreMes = capitalizar(NOMBRES_MES[(mes || 1) - 1]);
   const marca = data?.marcas?.[0] || null;
   const pantallas = [
-    { k: "dias", fondo: "#1d2b28" },
-    ...(marca ? [{ k: "record", fondo: "#2d2617" }] : []),
-    { k: "kilos", fondo: "#1c2233" },
-    ...(data?.topMusculo ? [{ k: "musculo", fondo: "#2a1f2e" }] : []),
-    { k: "medalla", fondo: "#24201a" },
+    { k: "dias", fondo: "#1f3a34", luz: "#7fd1b9" },
+    ...(marca ? [{ k: "record", fondo: "#3a2f14", luz: "#f2c45a" }] : []),
+    { k: "kilos", fondo: "#1d2747", luz: "#8fa8ff" },
+    ...(data?.topMusculo ? [{ k: "musculo", fondo: "#37203d", luz: "#d59cf0" }] : []),
+    { k: "medalla", fondo: "#33291a", luz: "#e9c27a" },
   ];
   const ultima = i === pantallas.length - 1;
   useEffect(() => {
@@ -13240,26 +13618,31 @@ function HistoriasDelMes({ data, prefijo, onClose, onResumen }) {
   const p = pantallas[i];
   const kilos = Math.round(data.volumen || 0);
   return createPortal(
-    <div className="historias" role="dialog" aria-modal="true" aria-label={`Tu ${nombreMes.toLowerCase()} en el gimnasio`} style={{ "--fondo": p.fondo }}>
+    <div className="historias historias-mes" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Tu ${nombreMes.toLowerCase()} en el gimnasio`} style={{ "--fondo": p.fondo, "--luz": p.luz }}>
+      <div className="tu-anio-formas" aria-hidden="true" key={`f-${p.k}`}>
+        <DiscoDeFondo className="uno" />
+        <DiscoDeFondo className="dos" />
+      </div>
       <div className="historias-barras" aria-hidden="true">
         {pantallas.map((x, k) => <span key={x.k} className={k < i ? "llena" : k === i ? (pausa ? "corre pausa" : "corre") : ""} style={k === i ? { animationDuration: `${DURA_HISTORIA}ms` } : undefined} />)}
       </div>
       <button onClick={onClose} aria-label="Cerrar" className="historias-cerrar"><X size={20} /></button>
       <div className="historias-escena" onClick={tocar} onPointerDown={() => setPausa(true)} onPointerUp={() => setPausa(false)} onPointerLeave={() => setPausa(false)}>
-        <div key={p.k} className="historia">
+        <div key={p.k} className={`historia de-${p.k}`}>
           {p.k === "dias" && (<>
             <p className="historia-ceja">Tu {nombreMes.toLowerCase()} en el gimnasio</p>
-            <p className="historia-numero num-display">{data.dias}</p>
-            <p className="historia-texto">{data.dias === 1 ? "día entrenado" : "días entrenados"}{data.diasAnterior ? `, ${data.dias >= data.diasAnterior ? `${data.dias - data.diasAnterior} más` : `${data.diasAnterior - data.dias} menos`} que el mes anterior` : ""}.</p>
-            <div className="historia-tiza"><MarcasTiza dias={data.dias} max={30} alto={28} decorativa /></div>
+            <p className="historia-numero num-display">{data.dias} <small>{data.dias === 1 ? "día" : "días"}</small></p>
+            <IlusMesGrilla prefijo={prefijo} dias={data.diasVolumen} />
+            {data.diasAnterior ? <p className="historia-texto">{data.dias >= data.diasAnterior ? `${data.dias - data.diasAnterior} más` : `${data.diasAnterior - data.dias} menos`} que el mes anterior.</p> : null}
           </>)}
           {p.k === "record" && (<>
+            <div className="historia-campana"><Rayos /><CampanaDibujo /></div>
             <p className="historia-ceja">Tu mejor marca</p>
-            <div className="historia-campana"><CampanaDibujo /></div>
             <p className="historia-numero chico num-display">{marca.reps} × {conComa(marca.kg)} <small>kg</small></p>
             <p className="historia-texto">{marca.exercise}{data.records > 1 ? `, y ${data.records - 1} ${data.records === 2 ? "récord más" : "récords más"}` : ""}.</p>
           </>)}
           {p.k === "kilos" && (<>
+            <div className="historia-dibujo"><IlusPilaDiscos n={Math.round(kilos / 2500)} /></div>
             <p className="historia-ceja">Levantaste en total</p>
             <p className="historia-numero num-display">{numeroAR(kilos, 0)} <small>kg</small></p>
             <p className="historia-texto">En {data.series} series{data.minutos ? ` y ${Math.round(data.minutos / 60)} h de entrenamiento` : ""}{data.vsAnterior != null ? `: ${data.vsAnterior >= 0 ? `${data.vsAnterior} % más` : `${-data.vsAnterior} % menos`} que el mes anterior` : ""}.</p>
@@ -13267,11 +13650,12 @@ function HistoriasDelMes({ data, prefijo, onClose, onResumen }) {
           {p.k === "musculo" && (<>
             <p className="historia-ceja">Lo que más trabajaste</p>
             <p className="historia-numero chico">{data.topMusculo.nombre}</p>
-            <p className="historia-texto">El {data.topMusculo.pct} % de tus series.{data.estrella ? ` Tu ejercicio del mes: ${data.estrella.nombre}, ${data.estrella.dias} ${data.estrella.dias === 1 ? "día" : "días"}.` : ""}</p>
+            <IlusMusculos musculos={data.musculos || [data.topMusculo]} />
+            {data.estrella && <p className="historia-texto">Tu ejercicio del mes: {data.estrella.nombre}, {data.estrella.dias} {data.estrella.dias === 1 ? "día" : "días"}.</p>}
           </>)}
           {p.k === "medalla" && (<>
             <p className="historia-ceja">Tu medalla de {nombreMes.toLowerCase()}</p>
-            <div className="historia-medalla"><MedallaMes prefijo={prefijo} numero={data.dias} /></div>
+            <div className="historia-medalla"><Rayos /><MedallaMes prefijo={prefijo} numero={data.dias} /></div>
             <p className="historia-texto">Queda colgada en tu vitrina de Perfil.</p>
           </>)}
         </div>
@@ -13294,7 +13678,7 @@ function HistoriasDelMes({ data, prefijo, onClose, onResumen }) {
 // entrenar, tu mes más fuerte, tu ejercicio, lo que más subiste, tus récords
 // y la tarjeta final. Sale sola una vez, desde la fecha de Spotify (ver
 // fechaDelAnio), y desde la vitrina de Perfil hasta fin de año.
-const DURA_TU_ANIO = 5200;
+const DURA_TU_ANIO = 6200;
 const COLORES_TU_ANIO = ["#ff4f2b", "#2747ff", "#00a86b", "#ffc31f", "#8f3dff", "#ff3d8e", "#00b2c9", "#111216", "#ff7a00", "#e8e6dc"];
 function horaDeEntrenar(sesiones) {
   const horas = (sesiones || []).map((x) => (x?.startedAt ? new Date(x.startedAt).getHours() : null)).filter((h) => h != null);
@@ -13340,7 +13724,7 @@ function TuAnio({ anio, logs, trainingSessions, nombre = "", onClose }) {
     ...(data.progresos?.length ? [{ k: "subiste" }] : []),
     ...(racha >= 2 ? [{ k: "racha" }] : []),
     { k: "final" },
-  ].map((p, n) => ({ ...p, fondo: COLORES_TU_ANIO[n % COLORES_TU_ANIO.length] })) : [];
+  ].map((p, n, todas) => ({ ...p, fondo: n === todas.length - 1 ? "#2747ff" : COLORES_TU_ANIO[n % COLORES_TU_ANIO.length] })) : [];
   const ultima = i === pantallas.length - 1;
   useEffect(() => {
     if (pausa || ultima || !pantallas.length) return undefined;
@@ -13358,31 +13742,43 @@ function TuAnio({ anio, logs, trainingSessions, nombre = "", onClose }) {
   const top3 = (data.progresos || []).slice(0, 3);
   const nombreMes = (m) => capitalizar(NOMBRES_MES[m]);
   return createPortal(
-    <div className={`historias tu-anio ${claro ? "tinta-oscura" : ""}`} role="dialog" aria-modal="true" aria-label={`Tu ${anio} en el gimnasio`} style={{ "--fondo-anio": p.fondo }}>
-      <div className="tu-anio-formas" aria-hidden="true" key={`f-${p.k}`}><i /><i /><i /></div>
+    <div className={`historias tu-anio ${claro ? "tinta-oscura" : ""}`} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Tu ${anio} en el gimnasio`} style={{ "--fondo-anio": p.fondo }}>
+      <div className="tu-anio-formas" aria-hidden="true" key={`f-${p.k}`}>
+        <DiscoDeFondo className="uno" />
+        <DiscoDeFondo className="dos" />
+        {p.k === "estrella" && data.estrella && (
+          <div className="tu-anio-marquesina">
+            {[0, 1, 2, 3, 4].map((f) => <p key={f} className={f % 2 ? "vuelve" : ""}><span>{Array.from({ length: 4 }, () => `${data.estrella.nombre} · `).join("")}</span><span>{Array.from({ length: 4 }, () => `${data.estrella.nombre} · `).join("")}</span></p>)}
+          </div>
+        )}
+      </div>
       <div className="historias-barras" aria-hidden="true">
         {pantallas.map((x, k) => <span key={x.k} className={k < i ? "llena" : k === i ? (pausa ? "corre pausa" : "corre") : ""} style={k === i ? { animationDuration: `${DURA_TU_ANIO}ms` } : undefined} />)}
       </div>
       <button onClick={onClose} aria-label="Cerrar" className="historias-cerrar"><X size={20} /></button>
       <div className="historias-escena" onClick={tocar} onPointerDown={() => setPausa(true)} onPointerUp={() => setPausa(false)} onPointerLeave={() => setPausa(false)}>
-        <div key={p.k} className="historia tu-anio-historia" aria-live="polite">
+        <div key={p.k} className={`historia tu-anio-historia de-${p.k}`} aria-live="polite">
           {p.k === "tapa" && (<>
             <p className="tu-anio-ceja">{nombre ? `${nombre}, este fue` : "Este fue"}</p>
             <p className="tu-anio-gigante num-display">{anio}</p>
+            <div className="tu-anio-dibujo"><IlusBarra demora={500} /></div>
             <p className="tu-anio-texto">Tu año en el gimnasio. Tocá para seguir.</p>
           </>)}
           {p.k === "dias" && (<>
             <p className="tu-anio-ceja">Fuiste al gimnasio</p>
-            <p className="tu-anio-gigante num-display"><ContadorAnio valor={data.dias} /></p>
-            <p className="tu-anio-texto">{data.dias === 1 ? "día" : "días"}{data.minutos ? `, y te quedaste ${numeroAR(Math.round(data.minutos / 60))} horas en total` : ""}. {data.series ? `${numeroAR(data.series)} series, una por una.` : ""}</p>
-            <div className="tu-anio-tiza"><MarcasTiza dias={Math.min(data.dias, 60)} max={60} alto={24} decorativa /></div>
+            <p className="tu-anio-gigante num-display"><ContadorAnio valor={data.dias} /><small>{data.dias === 1 ? "día" : "días"}</small></p>
+            <IlusAnioGrilla anio={anio} dias={data.diasVolumen} />
+            <p className="tu-anio-texto">{data.minutos ? `Te quedaste ${numeroAR(Math.round(data.minutos / 60))} horas en total. ` : ""}{data.series ? `${numeroAR(data.series)} series, una por una.` : ""}</p>
           </>)}
           {p.k === "kilos" && (<>
+            <div className="tu-anio-dibujo"><IlusPilaDiscos n={Math.round(toneladas / 10)} /></div>
             <p className="tu-anio-ceja">Entre todas tus series levantaste</p>
             <p className="tu-anio-gigante num-display"><ContadorAnio valor={Math.round(toneladas)} /><small>toneladas</small></p>
-            <p className="tu-anio-texto">{elefantes >= 1 ? `Es como levantar ${numeroAR(Math.round(elefantes))} ${Math.round(elefantes) === 1 ? "elefante" : "elefantes"} africanos.` : `Es como levantar ${numeroAR(Math.max(1, Math.round(toneladas / 1.2)))} autos.`}</p>
+            <p className="tu-anio-texto">{elefantes >= 1 ? `Es como levantar ${numeroAR(Math.round(elefantes))} ${Math.round(elefantes) === 1 ? "elefante africano" : "elefantes africanos"}.` : `Es como levantar ${numeroAR(Math.max(1, Math.round(toneladas / 1.2)))} autos.`}</p>
+            {elefantes >= 1 && <IlusElefantes n={Math.round(elefantes)} />}
           </>)}
           {p.k === "hora" && (<>
+            <div className="tu-anio-dibujo reloj"><IlusReloj de={hora.de} a={hora.a} /></div>
             <p className="tu-anio-ceja">Tu horario</p>
             <p className="tu-anio-grande">{hora.nombre}</p>
             <p className="tu-anio-texto">El {hora.pct} % de tus sesiones empezó {hora.texto}.</p>
@@ -13390,33 +13786,31 @@ function TuAnio({ anio, logs, trainingSessions, nombre = "", onClose }) {
           {p.k === "mes" && (<>
             <p className="tu-anio-ceja">Tu mes más fuerte</p>
             <p className="tu-anio-grande">{nombreMes(mesTop.mes)}</p>
-            <div className="tu-anio-medalla"><MedallaMes prefijo={mesTop.prefijo} numero={mesTop.dias} /></div>
+            <div className="tu-anio-medalla"><Rayos /><MedallaMes prefijo={mesTop.prefijo} numero={mesTop.dias} /></div>
             <p className="tu-anio-texto">{mesTop.dias} días entrenados. {data.meses.filter((x) => x.dias > 0).length} de 12 meses con medalla.</p>
           </>)}
           {p.k === "estrella" && (<>
             <p className="tu-anio-ceja">Tu ejercicio del año</p>
-            <p className="tu-anio-grande">{data.estrella.nombre}</p>
+            <p className="tu-anio-grande tu-anio-sello-nombre">{data.estrella.nombre}</p>
             <p className="tu-anio-texto">Lo hiciste {data.estrella.dias} {data.estrella.dias === 1 ? "día" : "días"}.{data.topMusculo ? ` Y lo que más trabajaste fue ${data.topMusculo.nombre.toLowerCase()}: el ${data.topMusculo.pct} % de tus series.` : ""}</p>
           </>)}
           {p.k === "subiste" && (<>
             <p className="tu-anio-ceja">Lo que más subiste</p>
-            <ol className="tu-anio-podio">
-              {top3.map((f, k) => (
-                <li key={f.id} style={{ animationDelay: `${250 + k * 220}ms` }}>
-                  <b className="num-display">+{conComa(Math.round(f.cambio))} %</b>
-                  <span>{f.nombre}</span>
-                </li>
-              ))}
+            <IlusPodio items={top3} />
+            <ol className="tu-anio-podio-nombres">
+              {top3.map((f, k) => <li key={f.id} style={{ animationDelay: `${900 + k * 150}ms` }}><b className="num-display">{k + 1}</b><span>{f.nombre}</span></li>)}
             </ol>
             {data.records > 0 && <p className="tu-anio-texto">{numeroAR(data.records)} {data.records === 1 ? "récord nuevo" : "récords nuevos"} en el año.</p>}
           </>)}
           {p.k === "racha" && (<>
             <p className="tu-anio-ceja">Tu mejor racha</p>
-            <p className="tu-anio-gigante num-display"><ContadorAnio valor={racha} /></p>
-            <p className="tu-anio-texto">semanas seguidas sin faltar una.</p>
+            <p className="tu-anio-gigante num-display"><ContadorAnio valor={racha} /><small>semanas</small></p>
+            <IlusPizarra n={racha} />
+            <p className="tu-anio-texto">Seguidas, sin faltar una.</p>
           </>)}
           {p.k === "final" && (
             <div className="tu-anio-tarjeta">
+              <span className="tu-anio-sello num-display" aria-hidden="true">{anio}</span>
               <p className="tu-anio-tarjeta-anio num-display">{anio}</p>
               <p className="tu-anio-tarjeta-titulo">Mi año en Modus Fit</p>
               <dl>
@@ -13425,8 +13819,10 @@ function TuAnio({ anio, logs, trainingSessions, nombre = "", onClose }) {
                 <div><dt>Series</dt><dd className="num-display">{numeroAR(data.series)}</dd></div>
                 <div><dt>Récords</dt><dd className="num-display">{numeroAR(data.records || 0)}</dd></div>
               </dl>
+              <IlusAnioGrilla anio={anio} dias={data.diasVolumen} />
               {data.estrella && <p className="tu-anio-tarjeta-pie">Mi ejercicio: <b>{data.estrella.nombre}</b></p>}
-              {hora && <p className="tu-anio-tarjeta-pie">Mi horario: <b>{hora.nombre.toLowerCase()}</b></p>}
+              {hora && <p className="tu-anio-tarjeta-pie">Soy: <b>{hora.nombre.toLowerCase()}</b></p>}
+              <CodigoDeBarras semilla={anio} />
             </div>
           )}
         </div>
@@ -13883,6 +14279,18 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
           )}
         </header>
 
+        {/* Un mes cerrado abre con la portada de sus historias, como un Wrapped chico. */}
+        {periodo === "mes" && !enCurso && data.prefijo && (
+          <button onClick={() => setHistorias(true)} className="resumen-portada">
+            <DiscoDeFondo />
+            <span className="resumen-portada-texto">
+              <span className="resumen-portada-barras" aria-hidden="true"><i /><i /><i /><i /><i /></span>
+              <b>Tu {NOMBRES_MES[Number(String(data.prefijo).slice(5, 7)) - 1]} en historias</b>
+              <small>{data.dias} {data.dias === 1 ? "día" : "días"}{data.records ? `, ${data.records} ${data.records === 1 ? "marca nueva" : "marcas nuevas"}` : ""} y tu medalla</small>
+            </span>
+            <span className="resumen-portada-play" aria-hidden="true"><Play size={18} fill="currentColor" /></span>
+          </button>
+        )}
         {periodo === "semana" && <PuntajesSemana p={data.puntajes} encendido={encendido} />}
         {periodo === "semana" && data.diasDetalle?.length > 0 && <TarjetaSemana data={data} />}
         {periodo === "semana" && data.rachaSemanas >= 2 && (
@@ -14007,9 +14415,6 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
           {data.minutos > 0 && <li><span>Por sesión</span><b>{data.promedioSeries} series</b></li>}
         </ul>
 
-        {periodo === "mes" && !enCurso && data.prefijo && (
-          <button onClick={() => setHistorias(true)} className="boton-tonal w-full">Verlo en historias</button>
-        )}
         <button onClick={onClose} className="boton-pildora w-full">{est.cta}</button>
       </div>
       {historias && <HistoriasDelMes data={data} prefijo={data.prefijo} onClose={() => setHistorias(false)} onResumen={() => setHistorias(false)} />}
