@@ -1863,7 +1863,7 @@ function getPlannedTargetForWeek(set, weekInCycle, trainingMode = "planned") {
       (antes el plan avanzaba por calendario y faltar te hacía saltar dos);
     · no llegaste: repetís esa meta, salvo que la de esta semana sea más
       liviana (una semana suave del plan se respeta);
-    · no llegaste dos veces seguidas a la misma meta: baja un 10 % para
+    · no llegaste tres veces seguidas a la misma meta: baja un 10 % para
       volver a subir.
    Y el plan es de UN ciclo: cuando empieza el siguiente, termina, en vez de
    volver a las metas de la semana 1 (antes se repetía en cada vuelta: en el
@@ -1925,7 +1925,7 @@ function cercaniaAMeta(hecho, meta) {
   const m = estimate1RM(meta.kg, meta.reps);
   return m > 0 ? estimate1RM(hecho.kg || 0, hecho.reps || 0) / m : 1;
 }
-// Bajar un 10 % es para cuando la meta quedó lejos dos veces seguidas; si te
+// Bajar un 10 % es para cuando la meta quedó lejos tres veces seguidas; si te
 // quedaste cerca (a una o dos reps), la repetís hasta salir.
 const QUEDO_LEJOS = 0.95;
 // Una meta más liviana que otra: menos kilos, o los mismos con menos reps (o
@@ -1948,9 +1948,15 @@ function metaDeHoy(setDef, history, weekInCycle, trainingMode = "planned", { hoy
   if (!base) return null;
   const semana = weekInCycle || 1;
   const entrada = (w) => getPlannedTargetForWeek({ ...setDef, plannedPaused: false }, w, "planned");
-  const previas = (history || [])
-    .filter((h) => h?.meta && h.date && h.date < hoy && !h.deload && (h.planDe ?? null) === (setDef.plannedAt ?? null))
-    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  // Una por día: si la misma serie quedó guardada dos veces el mismo día (una
+  // corrección, un doble toque), cuenta la mejor, no dos fallos.
+  const porDia = new Map();
+  (history || []).forEach((h) => {
+    if (!h?.meta || !h.date || h.date >= hoy || h.deload || (h.planDe ?? null) !== (setDef.plannedAt ?? null)) return;
+    const otra = porDia.get(h.date);
+    if (!otra || cercaniaAMeta(h, h.meta) > cercaniaAMeta(otra, otra.meta)) porDia.set(h.date, h);
+  });
+  const previas = [...porDia.values()].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   const ultima = previas[0];
   if (!ultima) return { ...base, paso: semana, ajuste: null };
   const pasoUltima = ultima.paso || semana;
@@ -1960,9 +1966,13 @@ function metaDeHoy(setDef, history, weekInCycle, trainingMode = "planned", { hoy
   }
   // No llegaste. Una semana más liviana del plan se respeta tal cual.
   if (masLiviana(base, ultima.meta)) return { ...base, paso: semana, ajuste: null };
-  const anterior = previas[1];
-  if (anterior && !cumpleMeta(anterior, anterior.meta) && mismaMeta(anterior.meta, ultima.meta)
-    && cercaniaAMeta(ultima, ultima.meta) < QUEDO_LEJOS && cercaniaAMeta(anterior, anterior.meta) < QUEDO_LEJOS) {
+  // BAJAR, A LA TERCERA (26/11, reporte: "en algunas series sigue el bug del
+  // −10 %"): con dos fallos bajaba, y quedarse dos veces a dos reps es normal
+  // en una serie pesada. Ahora, como StrongLifts y Starting Strength, baja el
+  // 10 % recién con tres veces seguidas sin llegar a la misma meta, y lejos
+  // las tres. Con los datos de Agustín del 22/11, de 7 bajas quedan 0.
+  const fallaLejos = (h) => !!h && !cumpleMeta(h, h.meta) && mismaMeta(h.meta, ultima.meta) && cercaniaAMeta(h, h.meta) < QUEDO_LEJOS;
+  if (fallaLejos(ultima) && fallaLejos(previas[1]) && fallaLejos(previas[2])) {
     const m = ultima.meta;
     if (m.minutes != null) return { week: pasoUltima, minutes: Math.max(1, Math.round(m.minutes * 0.9)), paso: pasoUltima, ajuste: "baja" };
     const salto = saltoKg > 0 ? saltoKg : 2.5;
@@ -1978,7 +1988,7 @@ function metaDeHoy(setDef, history, weekInCycle, trainingMode = "planned", { hoy
 // Lo que dice la serie cuando la meta se corrigió.
 const AJUSTE_DE_META = {
   repite: ": no llegaste a la meta, hoy la repetís",
-  baja: ": dos veces sin llegar, bajamos un 10 % para volver a subir",
+  baja: ": tres veces sin llegar, bajamos un 10 % para volver a subir",
   sigue: ": seguís desde donde quedaste",
 };
 const NOTA_DE_AJUSTE = { repite: "repetís", baja: "−10 %" };
@@ -2734,6 +2744,8 @@ const ANIMATION_CSS = letraEscalable(`
    de todo, y era la mayor parte del corte. */
 .pestana-guardada > * + * { content-visibility: auto; contain-intrinsic-size: auto 420px; }
 .barra-pestanas { view-transition-name: barra-pestanas; }
+/* Con el teclado abierto (ver useTecladoAbierto): sin el dock ni la barra. */
+.teclado-abierto .session-bar-dock, .teclado-abierto .barra-pestanas { visibility: hidden; opacity: 0; pointer-events: none; }
 .app-bar { view-transition-name: barra-arriba; }
 :root[data-vt] .tab-slide-right, :root[data-vt] .tab-slide-left { animation: none; }
 /* Sin "apagón": la pantalla de antes queda entera abajo y la nueva entra por
@@ -13899,7 +13911,7 @@ function capitulosGuia() {
         },
         {
           titulo: "Seguí un plan",
-          texto: "En Tu plan, la hoja de arriba de todo en Rutina, cargás cuánto levantar cada semana del ciclo, o le pedís a la IA que lo arme. Sube de a poco, como con un entrenador: una rep más por semana y, al llegar al tope del rango, un salto de peso con las reps de vuelta abajo. Cada serie viene escrita con la meta de su semana y lo que hiciste la vez pasada. Si no llegás a una meta, la próxima la repetís; si te trabás dos veces, baja un poco para volver a subir. Cuando termina el ciclo, la hoja te ofrece seguir el plan desde donde quedaste.",
+          texto: "En Tu plan, la hoja de arriba de todo en Rutina, cargás cuánto levantar cada semana del ciclo, o le pedís a la IA que lo arme. Sube de a poco, como con un entrenador: una rep más por semana y, al llegar al tope del rango, un salto de peso con las reps de vuelta abajo. Cada serie viene escrita con la meta de su semana y lo que hiciste la vez pasada. Si no llegás a una meta, la próxima la repetís; si te trabás tres veces seguidas, baja un poco para volver a subir. Cuando termina el ciclo, la hoja te ofrece seguir el plan desde donde quedaste.",
           dibujo: (
             <div className="guia-ancho plan-en-tarjeta" style={{ "--tono": verde }} role="img" aria-label="Un plan de siete semanas: 8, 9 y 10 reps con 60 kilos, después 8, 9 y 10 con 62,5, y 8 con 65">
               <div className="plan-mini chico">
@@ -16948,7 +16960,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
       `2. Mirá las últimas sesiones: si viene subiendo, seguí la misma pendiente; si repite el mismo peso hace tres sesiones, está estancado — bajá un escalón y subí las reps en vez del peso.`,
       `3. PROGRESIÓN DE ENTRENADOR, DE A POCO (doble progresión): con el mismo peso, una rep más por semana hasta el tope del rango de reps; recién ahí sube el peso UN salto, el de ese ejercicio, y las reps vuelven al piso del rango. Nunca subas peso y reps a la vez, ni más de un salto por vez, ni armes olas que suban y bajen la carga. Una semana puede repetir la anterior para consolidar, según el nivel de la persona. La app corrige cualquier semana que dé más de un paso.`,
       `3b. SEGÚN EL OBJETIVO: FUERZA → rango de 3 a 6 reps (o el del ejercicio), cerca del fallo técnico (RIR 1-3). HIPERTROFIA → 6 a 15 reps con RIR 1-3. MIXTO → los compuestos grandes en 5-8 reps y los aislados en 10-12. MANTENER → cargas planas. En todos, la misma regla: una rep por vez y el peso de a un salto.`,
-      `3c. La app ya se ajusta sola mientras la persona entrena: si una meta no se cumple, la semana siguiente la repite; si se traba dos veces seguidas en la misma, la baja un 10 %; y al terminar el ciclo ofrece seguir el plan desde donde quedó. No agregues semanas de repetición "por las dudas": planificá la progresión ideal.`,
+      `3c. La app ya se ajusta sola mientras la persona entrena: si una meta no se cumple, la semana siguiente la repite; si se traba tres veces seguidas en la misma, la baja un 10 %; y al terminar el ciclo ofrece seguir el plan desde donde quedó. No agregues semanas de repetición "por las dudas": planificá la progresión ideal.`,
       conRpe ? `4. FATIGA: el RPE tiene que ir subiendo dentro del bloque (empezá en 7 y llegá a 9), no arrancar al máximo.` : `4. FATIGA: no incluyas RPE, dejá ese campo afuera.`,
       semanasReales >= 3
         ? `5. FASES de mesociclo: primeras semanas "Acumulación" (RPE 7-8), después "Intensificación" (RPE 8-9), la última "Realización". La fase cambia el esfuerzo, no el tamaño del paso.`
@@ -26511,6 +26523,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
   const [sentProposals, setSentProposals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [friendSort, setFriendSort] = useState("recientes"); // recientes | nombre | rango
+  const [errorAmigos, setErrorAmigos] = useState(null); // null | sesion | red
 
   // Sin setLoading(true) síncrono acá a propósito: el estado ya arranca en
   // `true` (useState(true) arriba), y las llamadas a refresh() DESPUÉS del
@@ -26526,10 +26539,21 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
       listRoutineProposalsByTrainer(uid),
     ]).then(([f, at, as, pr, sentPr]) => {
       setFriendships(f); setTrainerAsTrainer(at); setTrainerAsStudent(as); setProposals(pr); setSentProposals(sentPr);
+      setErrorAmigos(null);
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch((err) => {
+      // 26/11: antes un error se veía como "no tenés amigos". Ahora se dice.
+      console.warn("[social] no se pudieron leer las amistades:", err?.code || err?.message || err);
+      setErrorAmigos(err?.code === "permission-denied" || !auth.currentUser ? "sesion" : "red");
+      setLoading(false);
+    });
   }, [uid]);
   useEffect(() => { refresh(); }, [refresh]);
+  // Al volver a entrar con Google (AvisoSesionPerdida), se vuelve a leer.
+  useEffect(() => {
+    window.addEventListener(EVENTO_SESION_GOOGLE, refresh);
+    return () => window.removeEventListener(EVENTO_SESION_GOOGLE, refresh);
+  }, [refresh]);
 
   const otherUidOf = (f) => f.users.find((u) => u !== uid);
   // BUG FIX (encontrado probando kudos/chaser): esto era un .filter() sin
@@ -26979,6 +27003,16 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
   const sectionDef = SECTIONS[sectionIdx] || SECTIONS[0];
   return (
     <div className="space-y-4">
+      {errorAmigos && (
+        <div className="tarjeta-tonal p-4 flex items-start gap-3" role="alert">
+          <AlertTriangle size={18} className="icono-suelto aviso shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-white">No pudimos cargar a tus amigos</p>
+            <p className="text-[13px] text-slate-400 mt-0.5">{errorAmigos === "sesion" ? "Se cerró tu sesión de Google. Tus amigos siguen ahí: volvé a entrar desde el aviso de arriba." : "Revisá la conexión y probá de nuevo."}</p>
+            <button onClick={refresh} className="boton-tonal mt-2" style={{ "--c": SOCIAL_COLOR }}><RefreshCw size={14} /> Probar de nuevo</button>
+          </div>
+        </div>
+      )}
       {/* TU CASILLERO — lo primero de Social: la puerta chica de tu casillero
           (ver CasilleroChico). Tocarla abre tu perfil como lo ven tus amigos,
           con la misma puerta en grande. Antes era una credencial. */}
@@ -33331,6 +33365,42 @@ function ActiveSessionBar({ startedAt, dayLabel, color, done, total, conProgreso
 // para que no tape la última tarjeta, y la barra del chat se corre arriba.
 // Antes ese aire era un número fijo según hubiera sesión o no, que con el
 // descanso en el dock ya no alcanzaría.
+// CON EL TECLADO ABIERTO (26/11, reporte: "cuando querés escribir el número
+// se desenfoca"): en Android el teclado achica la pantalla, y el dock de la
+// sesión y la barra de pestañas, que van fijos abajo, subían con él y tapaban
+// el visor de la serie mientras escribías (visto en el emulador). Mientras el
+// teclado está abierto y escribís en un campo de una línea, las dos barras se
+// esconden y el campo se acomoda al medio de lo que queda a la vista. El chat
+// (un textarea, con su barra propia) no cambia.
+function useTecladoAbierto() {
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const raiz = document.documentElement;
+    let alto = window.innerHeight;
+    const esCampo = (el) => el?.tagName === "INPUT" && !["checkbox", "radio", "range", "button", "submit", "file"].includes(el.type);
+    const revisar = () => {
+      const h = window.visualViewport?.height || window.innerHeight;
+      if (!raiz.classList.contains("teclado-abierto")) alto = Math.max(alto, window.innerHeight);
+      const abierto = h < alto * 0.78 && esCampo(document.activeElement);
+      raiz.classList.toggle("teclado-abierto", abierto);
+      if (abierto) requestAnimationFrame(() => document.activeElement?.scrollIntoView?.({ block: "center", behavior: "auto" }));
+    };
+    const alGirar = () => { alto = window.innerHeight; revisar(); };
+    window.addEventListener("resize", revisar);
+    window.visualViewport?.addEventListener("resize", revisar);
+    window.addEventListener("orientationchange", alGirar);
+    document.addEventListener("focusin", revisar);
+    const alSalir = () => setTimeout(revisar, 50);
+    document.addEventListener("focusout", alSalir);
+    return () => {
+      window.removeEventListener("resize", revisar); window.visualViewport?.removeEventListener("resize", revisar);
+      window.removeEventListener("orientationchange", alGirar);
+      document.removeEventListener("focusin", revisar); document.removeEventListener("focusout", alSalir);
+      raiz.classList.remove("teclado-abierto");
+    };
+  }, []);
+}
+
 function DockInferior({ children }) {
   const ref = useRef(null);
   useLayoutEffect(() => {
@@ -33516,6 +33586,7 @@ function useMantenerPantalla(activo) {
 // rótulo pasa a minúscula y más grande, que se lee sin esfuerzo.
 // Cada pestaña conserva su color propio (ver NAV_TABS): la píldora lo toma.
 function BottomBar({ tab, setTab }) {
+  useTecladoAbierto();
   return (
     <nav className="barra-pestanas" aria-label="Secciones de la app">
       <div className="max-w-xl mx-auto flex">
@@ -35647,6 +35718,7 @@ export default function App() {
       <StyleInjector />
       <InstalarEnIosBanner />
       <AvisoAlarmasExactas enSesion={!!profile?.activeSession} />
+      {profile?.googleUid && <AvisoSesionPerdida googleUid={profile.googleUid} profile={profile} nombre={activeProfile} cycleStart={cycleStart} onUpdateProfile={handleUpdateProfile} />}
       {recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}
 
       {importRoutineError && <ImportRoutineErrorBanner onClose={() => setImportRoutineError(false)} />}
@@ -35912,6 +35984,67 @@ function AvisoAlarmasExactas({ enSesion }) {
   return (
     <AvisoArriba icono={<BellRing size={18} />} titulo="Que el descanso avise en el segundo justo" onCerrar={cerrar}
       texto={<>Android puede demorar el aviso del final hasta un minuto. <button onClick={() => { RestTimerNotification.pedirAlarmasExactas().catch(() => {}); }} className="aviso-arriba-accion">Permitir alarmas</button></>} />
+  );
+}
+
+// LA SESIÓN DE GOOGLE PERDIDA (26/11, reporte: "se me borraron los amigos").
+// Las amistades seguían en Firestore, pero el perfil de la nube no se
+// actualizaba desde hacía cuatro días: el teléfono tenía el perfil vinculado
+// (googleUid) y Firebase había perdido la sesión. Así la subida se salteaba
+// en silencio (subirPerfil) y Social no podía leer nada (permiso denegado),
+// y se veía vacío. Ahora, si el perfil está vinculado y Firebase no tiene esa
+// cuenta, se avisa arriba con un botón para volver a entrar; al entrar se
+// une con la nube (como al vincular) y se sube lo que faltaba.
+const EVENTO_SESION_GOOGLE = "modusfit-sesion-google";
+function useSesionGooglePerdida(googleUid) {
+  const [perdida, setPerdida] = useState(false);
+  useEffect(() => {
+    if (!googleUid) return undefined;
+    // Esperar a que Firebase termine de restaurar la sesión: el primer evento
+    // llega en menos de un segundo, pero sin red puede tardar; se mira a los
+    // 6 s y en cada cambio posterior.
+    let listo = false, vivo = true;
+    const mirar = (user) => { if (vivo && listo) setPerdida(!user || user.uid !== googleUid); };
+    const t = setTimeout(() => { listo = true; mirar(auth.currentUser); }, 6000);
+    const unsub = onAuthStateChanged(auth, mirar);
+    return () => { vivo = false; clearTimeout(t); unsub(); };
+  }, [googleUid]);
+  return !!googleUid && perdida;
+}
+function AvisoSesionPerdida({ googleUid, profile, nombre, cycleStart, onUpdateProfile }) {
+  const perdida = useSesionGooglePerdida(googleUid);
+  const [estado, setEstado] = useState(null); // null | entrando | otra | error
+  const [cerrado, setCerrado] = useState(false);
+  if (!perdida || cerrado || import.meta.env.DEV && typeof navigator !== "undefined" && navigator.webdriver) return null;
+  const entrar = async () => {
+    setEstado("entrando");
+    try {
+      const pluginUser = await googleSignIn();
+      const user = auth.currentUser || pluginUser;
+      if (!user || user.uid !== googleUid) {
+        // Entró con otra cuenta: no se mezcla nada con la de este perfil.
+        await signOut(auth).catch(() => {});
+        if (Capacitor.isNativePlatform()) FirebaseAuthentication.signOut().catch(() => {});
+        setEstado("otra");
+        return;
+      }
+      const nube = await fetchProfileFromCloud(googleUid);
+      const unido = nube ? mergeProfiles(profile, nube) : profile;
+      onUpdateProfile({ ...unido, googleUid });
+      await syncProfileToCloud(googleUid, { ...unido, googleUid, name: nombre, cycleStart: cycleStart?.toISOString?.() ?? null }, true);
+      window.dispatchEvent(new Event(EVENTO_SESION_GOOGLE));
+      setEstado(null);
+    } catch (err) {
+      console.warn("[sesion] no se pudo volver a entrar:", err?.message || err);
+      setEstado("error");
+    }
+  };
+  const texto = estado === "otra" ? "Esa es otra cuenta. Entrá con la que usabas en este perfil."
+    : estado === "error" ? "No se pudo entrar. Probá de nuevo con señal."
+    : "Tus datos están en el teléfono, pero no se suben a la nube y Social no puede ver a tus amigos.";
+  return (
+    <AvisoArriba tipo="error" icono={<AlertTriangle size={18} />} titulo="Se cerró tu sesión de Google" onCerrar={() => setCerrado(true)}
+      texto={<>{texto} <button onClick={entrar} disabled={estado === "entrando"} className="aviso-arriba-accion">{estado === "entrando" ? "Entrando…" : "Volver a entrar"}</button></>} />
   );
 }
 
