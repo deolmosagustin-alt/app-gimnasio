@@ -236,6 +236,15 @@ try {
         await page.waitForTimeout(500);
         await capturar("Bienvenida descarga elegir");
         await paso("activar la descarga", () => page.getByRole("button", { name: "Sí, activalas" }).click({ timeout: 8000 }));
+        // Y el formato de la serie (26/11): los tres formatos y personalizar.
+        await page.waitForTimeout(600);
+        await capturar("Bienvenida formato");
+        await paso("elegir el formato completo", () => page.getByRole("radio", { name: /^Completo/ }).click({ timeout: 8000 }));
+        await capturar("Bienvenida formato completo");
+        await paso("personalizar", () => page.getByRole("radio", { name: /^Personalizar/ }).click({ timeout: 8000 }));
+        await capturar("Bienvenida formato personalizar");
+        await paso("volver al recomendado", () => page.getByRole("radio", { name: /^Equilibrado/ }).click({ timeout: 8000 }));
+        await paso("terminar la bienvenida", () => page.getByRole("button", { name: "Listo, a entrenar" }).click({ timeout: 8000 }));
       } else {
         await paso("saltar la bienvenida", () => saltar.first().click({ timeout: 8000 }));
       }

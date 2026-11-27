@@ -2744,6 +2744,23 @@ const ANIMATION_CSS = letraEscalable(`
    de todo, y era la mayor parte del corte. */
 .pestana-guardada > * + * { content-visibility: auto; contain-intrinsic-size: auto 420px; }
 .barra-pestanas { view-transition-name: barra-pestanas; }
+/* Los formatos de la serie (ElegirFormato). */
+.formatos { display: grid; gap: 14px; }
+.formatos-opciones { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.formato { display: grid; align-content: start; gap: 4px; text-align: left; padding: 12px; border-radius: 18px; background: var(--surface-2); box-shadow: var(--placa-canto); min-height: 44px; }
+.formato.elegido { background: var(--accion-fondo); box-shadow: none; }
+.formato-nombre { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-size: 15px; font-weight: 700; color: var(--text-strong); }
+.formato.elegido .formato-nombre { color: var(--accion-tinta); }
+.formato-nombre small { font-size: 11px; font-weight: 600; color: var(--text-muted); }
+.formato.elegido .formato-nombre small, .formato.elegido .formato-bajada { color: color-mix(in oklab, var(--accion-tinta) 78%, transparent); }
+.formato-bajada { font-size: 12px; line-height: 1.35; color: var(--text-muted); }
+.formato-lista { display: grid; gap: 0; list-style: none; padding: 0; margin: 0; }
+.formato-lista li { display: flex; gap: 10px; align-items: flex-start; padding: 9px 2px; border-top: 1px solid var(--hairline); font-size: 13px; line-height: 1.4; color: var(--text-muted); }
+.formato-lista li b { color: var(--text-strong); font-weight: 650; }
+.formato-lista li.no { opacity: .55; }
+.formato-lista li.no b { font-weight: 550; }
+.formato-marca { flex: none; width: 22px; height: 22px; border-radius: 999px; display: grid; place-items: center; margin-top: -1px; background: var(--surface-3); color: var(--text-faint); }
+.formato-lista li.si .formato-marca { background: color-mix(in oklab, var(--tono) 22%, transparent); color: var(--text-strong); }
 /* El ejercicio sumado sólo por hoy. */
 .ejercicio-hoy { font-size: 11px; font-weight: 650; color: var(--text-muted); border: 1px dashed var(--hairline-fuerte); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
 .extra-de-hoy { display: grid; padding-top: 4px; }
@@ -13758,14 +13775,45 @@ const BIENVENIDA_DESCARGA = {
   elegir: { title: "¿Activamos las semanas de descarga?", text: "Sirven si entrenás hace tiempo y venís subiendo las cargas en serio. Si recién empezás, o el tema te resulta nuevo, te recomendamos empezar sin ellas: al principio el cuerpo se recupera bien de una sesión a la otra. Se prenden cuando quieras en tu perfil." },
 };
 
-function WelcomeIntro({ onClose, onOpenTutorial, onUpdateSettings = null }) {
+function WelcomeIntro({ onClose, onOpenTutorial, onUpdateSettings = null, settings = null }) {
   useAndroidBack(onClose);
   const [i, setI] = useState(0);
+  // Último paso: cómo querés ver la serie (ver FORMATOS_FICHA).
+  const [formato, setFormato] = useState(false);
+  const [fichaLocal, setFichaLocal] = useState(() => ({ ...(settings || DEFAULT_SETTINGS), ...FORMATOS_FICHA[1].valores }));
+  const elegirDescarga = (v) => {
+    if (!onUpdateSettings) { onClose(); return; }
+    onUpdateSettings({ deloadEnabled: v, ...FORMATOS_FICHA[1].valores });
+    setFormato(true);
+  };
   // En el paso de la descarga: null (la pregunta), "ciclo", "descarga" o "elegir".
   const [fase, setFase] = useState(null);
   const slide0 = WELCOME_SLIDES[i];
   const isDeloadSlide = slide0.interactive === "deload";
   const slide = isDeloadSlide && fase ? { ...slide0, ...BIENVENIDA_DESCARGA[fase] } : slide0;
+  if (formato) {
+    const cambiarFicha = (v) => { setFichaLocal((x) => ({ ...x, ...v })); onUpdateSettings?.(v); };
+    return (
+      <div className="fixed inset-0 z-[110] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay">
+        <div className="modal-rutina modal-pop-in" role="dialog" aria-modal="true" aria-label="Cómo querés ver la serie">
+          <div className="modal-rutina-cabeza">
+            <div className="min-w-0">
+              <h3 className="ficha-titulo">¿Cómo querés ver la serie?</h3>
+              <p className="ficha-bajada">Se cambia cuando quieras en Perfil › Qué ves al registrar.</p>
+            </div>
+          </div>
+          <div className="modal-rutina-cuerpo">
+            <ElegirFormato settings={fichaLocal} onUpdateSettings={cambiarFicha}>
+              <section aria-label="Así se ve"><FichaEjemplo s={fichaLocal} /></section>
+            </ElegirFormato>
+          </div>
+          <div className="modal-rutina-pie">
+            <button onClick={onClose} className="boton-pildora w-full">Listo, a entrenar</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="fixed inset-0 z-[110] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay">
       <div className="bienvenida modal-pop-in" role="dialog" aria-modal="true" aria-label="Bienvenida a Modus Fit" style={{ "--c": slide.color }}>
@@ -13812,8 +13860,8 @@ function WelcomeIntro({ onClose, onOpenTutorial, onUpdateSettings = null }) {
             // Elegir acá mismo si querés las semanas de descarga (el mismo
             // ajuste que Perfil › Descarga, deloadEnabled).
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => { onUpdateSettings?.({ deloadEnabled: true }); onClose(); }} className="boton-tonal">Sí, activalas</button>
-              <button onClick={() => { onUpdateSettings?.({ deloadEnabled: false }); onClose(); }} className="boton-tonal">Recién empiezo</button>
+              <button onClick={() => elegirDescarga(true)} className="boton-tonal">Sí, activalas</button>
+              <button onClick={() => elegirDescarga(false)} className="boton-tonal">Recién empiezo</button>
             </div>
           ) : (
             <button onClick={() => setI((n) => n + 1)} className="boton-pildora w-full">Siguiente</button>
@@ -34031,14 +34079,71 @@ const SECONDARY_TAB_BACK = { perfil: "rutina" };
 // récord8×80kg" pegado y las repeticiones y los kilos uno debajo del otro.
 // Y "Qué hiciste la vez pasada" no hacía nada: la serie ya venía escrita con
 // eso sin forma de apagarlo. Ahora ese interruptor es justamente eso.
-function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
-  const unit = useWeightUnit();
-  const u = weightLabel(unit);
-  const k = (kg) => conComa(kgToDisplay(kg, unit));
-  useAndroidBack(onClose);
+// LOS FORMATOS DE LA SERIE (26/11, pedido: "en el tutorial, que la persona
+// elija entre tres tipos de formatos de lo que ves en la rutina, que se
+// expliquen todas las opciones y una cuarta de personalizar"). Cada formato
+// fija las trece opciones de Qué ves al registrar, todas explícitas (algunas
+// se leen como "prendida salvo false" y otras como "apagada salvo true").
+const CLAVES_FICHA = ["showGeneralWarmup", "showLastSession", "showRpe", "showPersonalNote", "show1RMPercent", "showProgressionSuggestion", "showMuscle", "showExerciseNote", "showWarmup", "showStagnation", "showCoaching", "autoStartRestTimer", "showKm"];
+const FORMATOS_FICHA = [
+  { key: "justo", nombre: "Lo justo", bajada: "La serie y nada más: viene escrita con la vez pasada y el descanso arranca solo.",
+    valores: { showGeneralWarmup: false, showLastSession: true, showRpe: false, showPersonalNote: false, show1RMPercent: false, showProgressionSuggestion: true, showMuscle: true, showExerciseNote: false, showWarmup: false, showStagnation: false, showCoaching: false, autoStartRestTimer: true, showKm: false } },
+  { key: "equilibrado", nombre: "Equilibrado", bajada: "Lo justo, más el calentamiento, las aproximaciones y cómo te fue en cada serie.", recomendado: true,
+    valores: { showGeneralWarmup: true, showLastSession: true, showRpe: false, showPersonalNote: false, show1RMPercent: false, showProgressionSuggestion: true, showMuscle: true, showExerciseNote: false, showWarmup: true, showStagnation: true, showCoaching: true, autoStartRestTimer: true, showKm: false } },
+  { key: "completo", nombre: "Completo", bajada: "Todo: el esfuerzo de cada serie, notas, el % de tu 1RM, consejos de técnica y los kilómetros del cardio.",
+    valores: Object.fromEntries(CLAVES_FICHA.map((c) => [c, true])) },
+];
+// Qué formato es lo que tenés (o null si es uno propio).
+function formatoDeFicha(s) {
+  const val = (c) => (c === "showLastSession" || c === "showStagnation" || c === "autoStartRestTimer" ? s?.[c] === true : s?.[c] !== false);
+  return FORMATOS_FICHA.find((f) => CLAVES_FICHA.every((c) => f.valores[c] === val(c)))?.key || null;
+}
+function ElegirFormato({ settings, onUpdateSettings, children = null }) {
   const s = settings || DEFAULT_SETTINGS;
+  const actual = formatoDeFicha(s);
+  const [propio, setPropio] = useState(() => actual === null);
+  const elegido = propio ? "propio" : actual;
   const on = (key) => s[key] !== false;
-  const GRUPOS = [
+  return (
+    <div className="formatos">
+      <div className="formatos-opciones" role="radiogroup" aria-label="Formato de la serie">
+        {FORMATOS_FICHA.map((f) => (
+          <button key={f.key} role="radio" aria-checked={elegido === f.key} onClick={() => { setPropio(false); onUpdateSettings({ ...f.valores }); haptic(8); }} className={`formato ${elegido === f.key ? "elegido" : ""}`}>
+            <span className="formato-nombre">{f.nombre}{f.recomendado && <small>recomendado</small>}</span>
+            <span className="formato-bajada">{f.bajada}</span>
+          </button>
+        ))}
+        <button role="radio" aria-checked={elegido === "propio"} onClick={() => { setPropio(true); haptic(8); }} className={`formato ${elegido === "propio" ? "elegido" : ""}`}>
+          <span className="formato-nombre">Personalizar</span>
+          <span className="formato-bajada">Prendés y apagás cada cosa a tu gusto.</span>
+        </button>
+      </div>
+      {children}
+      {elegido !== "propio" ? (
+        <ul className="formato-lista" aria-label="Qué trae este formato">
+          {gruposDeLaFicha().flatMap((g) => g.opciones).map((o) => (
+            <li key={o.key} className={on(o.key) ? "si" : "no"}>
+              <span className="formato-marca" aria-hidden="true">{on(o.key) ? <Check size={13} strokeWidth={3} /> : <Minus size={13} />}</span>
+              <span><b>{o.label}</b><span className="sr-only">{on(o.key) ? ": incluido." : ": no."}</span> {o.desc}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div>
+          {gruposDeLaFicha().map((g) => (
+            <section key={g.titulo} className="ficha-grupo" aria-label={g.titulo}>
+              <p className="ficha-grupo-titulo">{g.titulo}</p>
+              {g.opciones.map((o) => <ToggleRow key={o.key} icon={o.icon} label={o.label} desc={o.desc} on={on(o.key)} onToggle={() => onUpdateSettings({ [o.key]: !on(o.key) })} />)}
+            </section>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function gruposDeLaFicha() {
+  return [
     // El calentamiento general (04/11, pedido: "que sea activable en qué ves
     // al registrar"): la tarjeta de movilidad de arriba de los ejercicios.
     { titulo: "En el día", opciones: [
@@ -34065,20 +34170,16 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
       { key: "showKm", icon: <Footprints size={17} />, label: "Kilómetros", desc: "Un campo para la distancia, además del tiempo." },
     ] },
   ];
+}
+
+function FichaEjemplo({ s }) {
+  const unit = useWeightUnit();
+  const u = weightLabel(unit);
+  const k = (kg) => conComa(kgToDisplay(kg, unit));
+  const on = (key) => s[key] !== false;
   const escrita = on("showLastSession");
-
   return (
-    <div className="fixed inset-0 z-[140] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
-      <div className="modal-rutina modal-pop-in" role="dialog" aria-modal="true" aria-label="Qué ves al registrar" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-rutina-cabeza">
-          <div className="min-w-0">
-            <h3 className="ficha-titulo">Qué ves al registrar</h3>
-            <p className="ficha-bajada">Prendé sólo lo que vas a usar: la serie queda más limpia.</p>
-          </div>
-          <button onClick={onClose} aria-label="Cerrar" className="boton-redondo shrink-0"><X size={17} /></button>
-        </div>
-
-        <div className="modal-rutina-cuerpo">
+    <>
           {/* La serie de ejemplo: las mismas clases que al entrenar. */}
           <section aria-label="Así se ve">
             <p className="ficha-grupo-titulo">Así se ve</p>
@@ -34130,6 +34231,37 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
               </div>
             </div>
           </section>
+    </>
+  );
+}
+
+function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
+  useAndroidBack(onClose);
+  const s = settings || DEFAULT_SETTINGS;
+  const on = (key) => s[key] !== false;
+  const GRUPOS = gruposDeLaFicha();
+
+  return (
+    <div className="fixed inset-0 z-[140] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
+      <div className="modal-rutina modal-pop-in" role="dialog" aria-modal="true" aria-label="Qué ves al registrar" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-rutina-cabeza">
+          <div className="min-w-0">
+            <h3 className="ficha-titulo">Qué ves al registrar</h3>
+            <p className="ficha-bajada">Prendé sólo lo que vas a usar: la serie queda más limpia.</p>
+          </div>
+          <button onClick={onClose} aria-label="Cerrar" className="boton-redondo shrink-0"><X size={17} /></button>
+        </div>
+
+        <div className="modal-rutina-cuerpo">
+          <section aria-label="Formato">
+            <p className="ficha-grupo-titulo">Formato</p>
+            <div className="segmentado chico">
+              {FORMATOS_FICHA.map((f) => (
+                <button key={f.key} onClick={() => onUpdateSettings({ ...f.valores })} aria-pressed={formatoDeFicha(s) === f.key} className={formatoDeFicha(s) === f.key ? "activo" : ""}>{f.nombre}</button>
+              ))}
+            </div>
+          </section>
+          <FichaEjemplo s={s} />
 
           {GRUPOS.map((g) => (
             <section key={g.titulo} className="ficha-grupo" aria-label={g.titulo}>
@@ -35878,7 +36010,7 @@ export default function App() {
       {cicloResumen && cycleStart && !periodRecap && !weeklyRecap && !sessionSummary && (
         <ResumenDeCicloModal numero={cicloResumen.numero} logs={logs} cycleStart={cycleStart} settings={getProfileSettings(profile)} nombres={nombresDeEjercicios} onClose={() => setCicloResumen(null)} />
       )}
-      {showWelcome && <WelcomeIntro onClose={() => setShowWelcome(false)} onOpenTutorial={() => { setHelpStartTab(null); setShowHelp(true); }} onUpdateSettings={handleUpdateSettings} />}
+      {showWelcome && <WelcomeIntro onClose={() => setShowWelcome(false)} onOpenTutorial={() => { setHelpStartTab(null); setShowHelp(true); }} onUpdateSettings={handleUpdateSettings} settings={profile ? getProfileSettings(profile) : null} />}
       {showHelp && <HelpModal startTab={helpStartTab} onClose={() => setShowHelp(false)} onRecorrido={(t) => { setShowHelp(false); setTab(t); setTimeout(() => setRecorrido(t), 450); }} />}
       {bienvenidaRecorrido && bienvenidaRecorrido === tab && <BienvenidaRecorrido tab={bienvenidaRecorrido} onCerrar={() => setBienvenidaRecorrido(null)} onEmpezar={() => { setRecorrido(bienvenidaRecorrido); setBienvenidaRecorrido(null); }} onGuia={() => { setBienvenidaRecorrido(null); setHelpStartTab(tab); setShowHelp(true); }} />}
       {recorrido && recorrido === tab && RECORRIDOS[recorrido] && <Recorrido key={recorrido} pasos={RECORRIDOS[recorrido]} onTerminar={() => setRecorrido(null)} siguiente={siguienteRecorrido(recorrido)} onSeguir={(t) => { setRecorrido(null); setTab(t); setTimeout(() => setRecorrido(t), 450); }} />}
