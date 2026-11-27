@@ -2744,6 +2744,9 @@ const ANIMATION_CSS = letraEscalable(`
    de todo, y era la mayor parte del corte. */
 .pestana-guardada > * + * { content-visibility: auto; contain-intrinsic-size: auto 420px; }
 .barra-pestanas { view-transition-name: barra-pestanas; }
+/* El ejercicio sumado sólo por hoy. */
+.ejercicio-hoy { font-size: 11px; font-weight: 650; color: var(--text-muted); border: 1px dashed var(--hairline-fuerte); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+.extra-de-hoy { display: grid; padding-top: 4px; }
 /* Con el teclado abierto (ver useTecladoAbierto): sin el dock ni la barra. */
 .teclado-abierto .session-bar-dock, .teclado-abierto .barra-pestanas { visibility: hidden; opacity: 0; pointer-events: none; }
 .app-bar { view-transition-name: barra-arriba; }
@@ -4073,6 +4076,20 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .foco-titulo .foco-rango { font-size: 0.9375rem; font-weight: 650; color: color-mix(in oklab, var(--c, var(--tono)) 50%, white); }
 .light-mode .foco-titulo .foco-rango { color: color-mix(in oklab, var(--c, var(--tono)) 62%, black); }
 .foco-fuerza { color: var(--text-faint); align-self: center; flex: none; }
+/* LA TARJETA ABIERTA, SIN COSAS SUELTAS (26/11, pedido: "cuando abrís un
+   ejercicio hay algunas cosas flotando; pulirlo sin sacarle protagonismo a la
+   serie"): los renglones van con el mismo borde izquierdo que el visor, las
+   que faltan llevan su número en el aro, y Técnica es el último renglón de la
+   lista (antes, un botón suelto al medio). */
+.series-lista .serie-linea { padding-left: 10px; padding-right: 12px; }
+.serie-galleta.hueca { font-size: 0.75rem; font-weight: 650; }
+.ejercicio-tecnica {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; margin-top: 4px;
+  padding: 0 12px 0 15px; border-top: 1px solid var(--hairline); color: var(--text-muted);
+  font-size: 0.875rem; font-weight: 600; text-align: left; background: transparent;
+}
+.ejercicio-tecnica:active { background: var(--velo); }
+.ejercicio-tecnica .lucide:first-child { color: var(--text-faint); }
 /* 26/11: "reps" chico al lado del rango, como la unidad de un número. */
 .foco-titulo .foco-rango small, .serie-linea-meta small { margin-left: 3px; font-size: 0.75rem; font-weight: 500; color: var(--text-faint); }
 .serie-linea-meta small { margin-left: -3px; }
@@ -11981,7 +11998,14 @@ function EntreLados({ exercise, accent, timerId, serie = null, series = null, se
       {seg > 0 ? (
         <div className="entre-lados-fila">
           <button className="entre-lados-iniciar" disabled={corriendo}
-            onClick={() => { haptic(15); iniciarDescanso(idLado, { segundos: seg, ejercicio: exercise.name || null, siguiente: "el otro lado", color: accent, serie, series }); }}>
+            onClick={() => {
+              haptic(15);
+              // 26/11 ("ver lo de los descansos en ejercicios unilaterales"):
+              // si tocás el cambio de lado, ya hiciste el primer lado, así que
+              // el descanso entre series terminó. Antes seguía corriendo y el
+              // dock mostraba ése: el reloj del cambio de lado quedaba oculto.
+              Object.keys(ACTIVE_REST_TIMERS).forEach((id) => { if (!id.startsWith("lado:") && !id.startsWith("cardio_")) terminarDescanso(id); });
+              iniciarDescanso(idLado, { segundos: seg, ejercicio: exercise.name || null, siguiente: "el otro lado", color: accent, serie, series }); }}>
             <ArrowLeftRight size={15} /> {corriendo ? "Cambiando de lado" : "Cambio de lado"}
           </button>
           {onUpdateSettings && <button className="entre-lados-tiempo num-display" onClick={() => setEligiendo((v) => !v)} aria-expanded={eligiendo} aria-label={`Descanso entre lados: ${relojCorto(seg)}. Cambiar`}>{relojCorto(seg)}</button>}
@@ -15009,7 +15033,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             : `Serie ${setIndex + 1}: ${rango} reps. Tocá para anotarla`}
         >
           <span className={`galleta serie-galleta ${hechaHoy ? "llena" : "hueca"}`} aria-hidden="true">
-            {hechaHoy ? <Check size={13} strokeWidth={3} className={saved ? "draw-check" : ""} /> : null}
+            {hechaHoy ? <Check size={13} strokeWidth={3} className={saved ? "draw-check" : ""} /> : setIndex + 1}
           </span>
           {hechaHoy ? (
             <span className="serie-linea-valor">
@@ -16128,7 +16152,7 @@ function musculoPrincipal(m) {
   const sinParentesis = String(m || "").replace(/\s*\([^)]*\)/g, "");
   return sinParentesis.split(/\s*(?:\/|,|·|\+|\sy\s)\s*/)[0].trim();
 }
-function ExerciseCard({ exercise, accent, logs: logsTodos, setLogs: setLogsTodos, diaPropio = null, fechasPorDia = null, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, autoCollapse = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, routineHasPlan = false, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null, supersetRestTimerId = null, supersetRestSeconds = null, orden = null, nextObjetivo = null, cicloActual = null, descarga = null }) {
+function ExerciseCard({ exercise, accent, logs: logsTodos, setLogs: setLogsTodos, diaPropio = null, fechasPorDia = null, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, autoCollapse = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, routineHasPlan = false, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null, supersetRestTimerId = null, supersetRestSeconds = null, orden = null, nextObjetivo = null, cicloActual = null, descarga = null, onQuitarExtra = null }) {
   const [logs, setLogs] = useLogsDelDia(exercise, logsTodos, setLogsTodos, diaPropio, fechasPorDia);
   const [open, setOpen] = useState(false);
   const [showWarmup, setShowWarmup] = useState(false);
@@ -16265,6 +16289,7 @@ function ExerciseCard({ exercise, accent, logs: logsTodos, setLogs: setLogsTodos
                 largo se acomoda en su lugar y las fichas quedan a su lado. */}
             <div className="ejercicio-sub">
               {settings.showMuscle !== false && musculoPrincipal(exercise.muscle) && <span className="ejercicio-musculo" title={exercise.muscle}>{musculoPrincipal(exercise.muscle)}</span>}
+              {exercise.extra && <span className="ejercicio-hoy">sólo hoy</span>}
               {/* Si el músculo ya dice "Cardio", el chip de cardio repetía la palabra. */}
               {exercise.cardio && String(exercise.muscle || "").toLowerCase() !== "cardio" && <span className="text-[11px] bg-rose-400/15 text-rose-300 rounded-md px-1.5 py-0.5 font-bold flex items-center gap-1"><Footprints size={9} /> CARDIO</span>}
               {!open && restTimerId && <ChipDescansoEnCurso timerId={restTimerId} color={accent} />}
@@ -16417,11 +16442,12 @@ function ExerciseCard({ exercise, accent, logs: logsTodos, setLogs: setLogsTodos
         </div>
         )}
         {exercise.video && (
-          <div className="pt-1 -mb-2">
-            <a href={exercise.video} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 h-11 rounded-full text-slate-400 hover:text-white transition text-[14px] font-semibold active:scale-[0.98]" style={{ backgroundColor: "var(--surface-2)" }}>
-              <SquarePlay size={17} /> Técnica
-            </a>
-          </div>
+          <a href={exercise.video} target="_blank" rel="noreferrer" className="ejercicio-tecnica">
+            <SquarePlay size={16} /> <span>Técnica</span><ChevronRight size={15} className="ml-auto" />
+          </a>
+        )}
+        {onQuitarExtra && (
+          <button onClick={onQuitarExtra} className="ejercicio-tecnica"><X size={16} /> <span>Quitarlo de hoy</span></button>
         )}
       </div>
       </div>
@@ -17657,8 +17683,27 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   // La semana de adaptación (ver esSemanaDeAdaptacion): el día, con tres
   // cuartos de las series.
   const adaptacion = !semanaDescarga && !descargaPrevia && esSemanaDeAdaptacion(cycleStart, settings, logs);
+  // UN EJERCICIO SÓLO POR HOY (26/11, pedido: "una opción de agregar un
+  // ejercicio como temporal en la sección que cargás las reps y kg, al final,
+  // para esa sesión nada más"): van en settings.extrasDeHoy, con la fecha; al
+  // otro día ya no salen. Sus series se guardan como las de cualquier
+  // ejercicio (Progreso y los récords las ven), pero la rutina no cambia.
+  const hoyExtras = todayStr();
+  const extrasHoy = settings?.extrasDeHoy;
+  const extrasDelDia = useMemo(() => (extrasHoy?.fecha === hoyExtras ? extrasHoy.dias?.[activeDay] || [] : []), [extrasHoy, hoyExtras, activeDay]);
+  const guardarExtras = (lista) => {
+    if (!onUpdateSettings) return;
+    const previo = settings?.extrasDeHoy?.fecha === hoyExtras ? settings.extrasDeHoy.dias || {} : {};
+    onUpdateSettings({ extrasDeHoy: { fecha: hoyExtras, dias: { ...previo, [activeDay]: lista } } });
+  };
+  const [eligiendoExtra, setEligiendoExtra] = useState(false);
+  const day = useMemo(() => {
+    const base = adaptacion ? diaDeAdaptacion(ROUTINE[activeDay]) : ROUTINE[activeDay];
+    if (!base || !extrasDelDia.length) return base;
+    const ids = new Set(base.exercises.map((e) => e.id));
+    return { ...base, exercises: [...base.exercises, ...extrasDelDia.filter((e) => !ids.has(e.id)).map((e) => ({ ...e, extra: true, supersetNext: false }))] };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const day = useMemo(() => (adaptacion ? diaDeAdaptacion(ROUTINE[activeDay]) : ROUTINE[activeDay]), [adaptacion, activeDay, activeRoutineDef]);
+  }, [adaptacion, activeDay, activeRoutineDef, extrasDelDia]);
   // "Color de día": el día que estás mirando tiñe la app entera.
   useEffect(() => { TONO_RUTINA = day?.color || null; ponerTono(day?.color); }, [day?.color]);
   // ── EL MODO DESCARGA ──────────────────────────────────────────────────────
@@ -18096,7 +18141,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             const plegar = !!sessionForThisDay && (modoDescarga ? grupoDescargaCompleto(group) : estaCompleto(group));
             if (group.length === 1) {
               const ex = group[0];
-              return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} diaPropio={diaDe(ex)} fechasPorDia={fechasPorDia} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} cicloActual={cicloActual} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} nextExerciseName={nextExerciseName} nextObjetivo={nextObjetivo} orden={primeroDe[gi]} descarga={descargaParaTarjetas} />;
+              return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} diaPropio={diaDe(ex)} fechasPorDia={fechasPorDia} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} cicloActual={cicloActual} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} nextExerciseName={nextExerciseName} nextObjetivo={nextObjetivo} orden={primeroDe[gi]} descarga={descargaParaTarjetas} onQuitarExtra={ex.extra ? () => guardarExtras(extrasDelDia.filter((e) => e.id !== ex.id)) : null} />;
             }
             // Superserie: varios ejercicios encadenados comparten un solo
             // cronómetro al final del grupo, en vez de uno por ejercicio —
@@ -18116,6 +18161,28 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           });
         })()}
         </div>
+        {!modoDescarga && onUpdateSettings && (
+          <div className="extra-de-hoy">
+            {eligiendoExtra ? (
+              <ExercisePickerPanel existingIds={day.exercises.map((e) => e.id)} color={day.color}
+                onAdd={(libEx) => {
+                  const lib = EXERCISE_LIBRARY_BY_ID[libEx.id] || libEx;
+                  guardarExtras([...extrasDelDia, { id: lib.id, name: lib.name, muscle: lib.muscle, nota: lib.nota || null, video: lib.videoQuery ? yt(lib.videoQuery) : null, cardio: !!lib.cardio, custom: false, sets: lib.cardio ? mkSets(1, "") : mkSets(3, "8-10") }]);
+                  setEligiendoExtra(false);
+                }}
+                onAddCustom={(nombre, musculo) => {
+                  const id = findExistingCustomExerciseId(logs, nombre) || `custom_hoy_${Date.now().toString(36)}`;
+                  const cardio = musculo === "cardio";
+                  guardarExtras([...extrasDelDia, { id, name: nombre, muscle: MUSCLE_GROUP_BY_KEY[musculo]?.label || "Personalizado", nota: null, video: null, cardio, custom: true, sets: cardio ? mkSets(1, "") : mkSets(3, "8-10") }]);
+                  setEligiendoExtra(false);
+                  return id;
+                }}
+                onClose={() => setEligiendoExtra(false)} />
+            ) : (
+              <button onClick={() => setEligiendoExtra(true)} className="enlace-suave mx-auto"><Plus size={15} /> Sumar un ejercicio sólo hoy</button>
+            )}
+          </div>
+        )}
         {/* Marcaste series de descarga sin iniciar la sesión: así queda
             registrada igual (suma a la racha y al calendario). Con una sesión
             en curso, lo cierra la barra de abajo. */}
