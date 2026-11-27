@@ -172,3 +172,34 @@ describe("esDelDia", () => {
     expect(esDelDia({ date: "2026-10-01" }, "piernas2", fechas)).toBe(true);
   });
 });
+
+import { puntajeAsistencia, puntajeMejorVersion, fechaDelAnio } from "./entrenamiento";
+describe("los puntajes de la semana", () => {
+  it("asistencia: todos los días planeados y completos es 10", () => {
+    expect(puntajeAsistencia({ planeados: 4, sesiones: [1, 2, 3, 4].map((d) => ({ date: `2026-11-0${d}`, completionPct: 100 })) }).puntaje).toBe(10);
+  });
+  it("asistencia: 3 de 4 días al 80 %", () => {
+    const r = puntajeAsistencia({ planeados: 4, sesiones: [1, 2, 3].map((d) => ({ date: `2026-11-0${d}`, completionPct: 80 })) });
+    expect(r.puntaje).toBe(7.7); expect(r.dias).toBe(3);
+  });
+  it("asistencia: ir de más no pasa de 10, y sin ir es 0", () => {
+    expect(puntajeAsistencia({ planeados: 2, sesiones: [1, 2, 3].map((d) => ({ date: `2026-11-0${d}` })) }).puntaje).toBe(10);
+    expect(puntajeAsistencia({ planeados: 3, sesiones: [] }).puntaje).toBe(0);
+  });
+  it("mejor versión: igualar tu récord es 10; 10 % abajo es 5", () => {
+    const logs = {
+      press_0: [{ date: "2026-10-01", reps: 5, kg: 100 }, { date: "2026-11-03", reps: 5, kg: 100 }],
+      sentadilla_0: [{ date: "2026-10-01", reps: 5, kg: 100 }, { date: "2026-11-04", reps: 5, kg: 90 }],
+      remo_0: [{ date: "2026-10-01", reps: 8, kg: 60 }],
+    };
+    const r = puntajeMejorVersion(logs, "2026-11-02", "2026-11-08");
+    expect(r.ejercicios).toBe(2); expect(r.enSuMejor).toBe(1); expect(r.puntaje).toBe(7.5);
+  });
+  it("mejor versión: no cuenta la descarga ni lo de después", () => {
+    const logs = { press_0: [{ date: "2026-10-01", reps: 5, kg: 100 }, { date: "2026-11-03", reps: 5, kg: 80, deload: true }, { date: "2026-11-20", reps: 5, kg: 120 }] };
+    expect(puntajeMejorVersion(logs, "2026-11-02", "2026-11-08").puntaje).toBe(null);
+  });
+  it("la fecha de tu año, como Spotify", () => {
+    expect(fechaDelAnio(2024)).toBe("2024-12-04"); expect(fechaDelAnio(2025)).toBe("2025-12-03"); expect(fechaDelAnio(2023)).toBe("2023-11-29"); expect(fechaDelAnio(2026)).toBe("2026-12-02");
+  });
+});

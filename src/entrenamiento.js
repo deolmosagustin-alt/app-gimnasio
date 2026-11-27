@@ -217,3 +217,65 @@ export function esDelDia(h, dia, fechasPorDia) {
   return true;
 }
 export const porFecha = (a, b) => ((a?.date || "") < (b?.date || "") ? -1 : (a?.date || "") > (b?.date || "") ? 1 : 0);
+
+// LOS DOS PUNTAJES DE LA SEMANA (26/11, pedido: "que en el resumen semanal te
+// puntúe por un lado en asistencia y cumplimiento de la rutina y por otro en
+// si estás en tu mejor versión en kg, siendo un 10 si estás en tu mejor
+// versión"). Del 0 al 10, con un decimal.
+const unDecimal = (x) => Math.round(x * 10) / 10;
+// Asistencia y cumplimiento: los días que fuiste contra los que tu cronograma
+// pide (60 %) y cuánto completaste de cada día (40 %). Ir más días de los
+// planeados no suma más de 10.
+export function puntajeAsistencia({ planeados = 0, sesiones = [] } = {}) {
+  const porDia = new Map();
+  sesiones.forEach((x) => {
+    if (!x?.date) return;
+    const pct = x.completionPct == null ? 100 : Math.max(0, Math.min(100, x.completionPct));
+    porDia.set(x.date, Math.max(porDia.get(x.date) ?? 0, pct));
+  });
+  const dias = porDia.size;
+  const meta = planeados > 0 ? planeados : Math.max(dias, 1);
+  if (!dias) return { puntaje: 0, dias: 0, planeados: meta, cumplimiento: 0 };
+  const asistencia = Math.min(1, dias / meta);
+  const cumplimiento = [...porDia.values()].reduce((t, p) => t + p, 0) / dias / 100;
+  return { puntaje: unDecimal(10 * (0.6 * asistencia + 0.4 * cumplimiento)), dias, planeados: meta, cumplimiento: Math.round(cumplimiento * 100) };
+}
+// Tu mejor versión: en cada ejercicio que hiciste en la semana, tu mejor serie
+// de la semana (1RM estimado; a peso corporal, las reps) contra tu mejor serie
+// de siempre hasta esa semana. Estar en tu mejor marca es 10; cada 1 % por
+// debajo resta medio punto (al 10 % por debajo, un 5). El puntaje es el
+// promedio de los ejercicios. `ids` dice el ejercicio de cada clave de logs.
+export function puntajeMejorVersion(logs, desde, hasta) {
+  const valor = (h) => (h.kg > 0 ? estimate1RM(h.kg, h.reps) : h.reps || 0);
+  const ej = {};
+  Object.entries(logs || {}).forEach(([clave, historial]) => {
+    if (!Array.isArray(historial) || clave.endsWith("_pr_override")) return;
+    const id = clave.replace(/_\d+$/, "");
+    historial.forEach((h) => {
+      if (!h?.date || h.deload || !(h.reps > 0) || h.minutes != null || h.date > hasta) return;
+      const e = ej[id] || (ej[id] = { semana: 0, siempre: 0 });
+      const v = valor(h);
+      if (v > e.siempre) e.siempre = v;
+      if (h.date >= desde && v > e.semana) e.semana = v;
+    });
+  });
+  const filas = Object.entries(ej).filter(([, e]) => e.semana > 0 && e.siempre > 0).map(([id, e]) => {
+    const ratio = Math.min(1, e.semana / e.siempre);
+    return { id, ratio, puntaje: Math.max(0, Math.min(10, 10 - (1 - ratio) * 50)) };
+  });
+  if (!filas.length) return { puntaje: null, ejercicios: 0, enSuMejor: 0, filas: [] };
+  return {
+    puntaje: unDecimal(filas.reduce((t, f) => t + f.puntaje, 0) / filas.length),
+    ejercicios: filas.length,
+    enSuMejor: filas.filter((f) => f.ratio >= 0.999).length,
+    filas: filas.sort((a, b) => a.ratio - b.ratio),
+  };
+}
+// LA FECHA DE "TU AÑO" (el Wrapped): la misma época que el de Spotify, que sale
+// el primer miércoles desde el 29 de noviembre (2022: 30/11, 2023: 29/11,
+// 2024: 4/12, 2025: 3/12).
+export function fechaDelAnio(anio) {
+  const d = new Date(anio, 10, 29, 12);
+  while (d.getDay() !== 3) d.setDate(d.getDate() + 1);
+  return localDateStr(d);
+}

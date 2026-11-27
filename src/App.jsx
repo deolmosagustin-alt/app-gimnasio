@@ -70,7 +70,7 @@ import {
 // orden, con errores de tipeo, en inglés o con el apodo del gimnasio).
 import { buscarEjercicios, mejorEjercicio, nombreCoincide, partesResaltadas, REGIONES_BUSCADOR, alternativasDe } from "./buscar-ejercicios.js";
 import { FORMAS, NOMBRE_DE_FORMA, COLORES_SUPLEMENTO, SUGERIDOS, MAX_SUPLEMENTOS, MAX_DOSIS, listaDeSuplementos, nuevoSuplemento, sanearSuplemento, tomadas, tomar, unirTomas, rachaDe, ultimosDias, recortarTomas, suplementosParaWidget } from "./suplementos.js";
-import { rangoDeReps, siguientePaso, seriesDeDescarga, seriesDeAdaptacion, cargaDeDescarga, ejerciciosEnBaja, planDeEntrenador, equilibrarReps, redondearConReps, resumenDeCiclo, esDelDia, porFecha } from "./entrenamiento.js";
+import { rangoDeReps, siguientePaso, seriesDeDescarga, seriesDeAdaptacion, cargaDeDescarga, ejerciciosEnBaja, planDeEntrenador, equilibrarReps, redondearConReps, resumenDeCiclo, esDelDia, porFecha, puntajeAsistencia, puntajeMejorVersion, fechaDelAnio } from "./entrenamiento.js";
 // Modus Fit Premium: preparada y con el cobro apagado por bandera (ver
 // src/suscripcion.js y docs/suscripcion.md).
 import {
@@ -1459,6 +1459,10 @@ function getRoutineWeekSchedule(routineDef) {
 // entonces, y a quien no, que descansaba todos los días. Fuera de la pantalla
 // (donde App ya usa getRoutineWeekSchedule), pedilo siempre por acá. Devuelve
 // { mon: "push", tue: null, ... }: sólo días que existen en la rutina.
+// Cuántos días de entrenamiento pide tu cronograma por semana.
+function diasPlaneados(profile) {
+  return Object.values(cronogramaDe(profile) || {}).filter(Boolean).length;
+}
 function cronogramaDe(profile) {
   const id = profile?.activeRoutineId;
   const def = resolveRoutineDef(profile?.routines?.[id] || null, id);
@@ -2744,6 +2748,65 @@ const ANIMATION_CSS = letraEscalable(`
    de todo, y era la mayor parte del corte. */
 .pestana-guardada > * + * { content-visibility: auto; contain-intrinsic-size: auto 420px; }
 .barra-pestanas { view-transition-name: barra-pestanas; }
+/* TU AÑO (TuAnio): el único lugar de la app con colores fuertes de fondo, a
+   pedido ("que sea muy loco, es una vez al año"). Cada historia, un color
+   lleno; formas grandes que giran detrás; números enormes que entran con
+   rebote. Respeta "reducir movimiento". */
+.historias.tu-anio { background: var(--fondo-anio); transition: background-color .45s ease; overflow: hidden; }
+.historias.tu-anio.tinta-oscura { color: #121316; }
+.tu-anio.tinta-oscura .historias-barras span { background: rgba(0,0,0,.18); }
+.tu-anio.tinta-oscura .historias-barras span::after { background: #121316; }
+.tu-anio.tinta-oscura .historias-cerrar { color: #121316; background: rgba(0,0,0,.08); }
+.tu-anio-formas { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+.tu-anio-formas i { position: absolute; border-radius: 999px; background: rgba(255,255,255,.14); animation: tuAnioForma 9s linear infinite, tuAnioAparece .7s var(--sale, ease-out) both; }
+.tu-anio.tinta-oscura .tu-anio-formas i { background: rgba(0,0,0,.08); }
+.tu-anio-formas i:nth-child(1) { width: 120vmax; height: 26vmax; left: -30vmax; top: 8%; transform: rotate(-18deg); border-radius: 40px; }
+.tu-anio-formas i:nth-child(2) { width: 70vmax; height: 70vmax; right: -38vmax; bottom: -30vmax; animation-duration: 14s, .9s; }
+.tu-anio-formas i:nth-child(3) { width: 22vmax; height: 22vmax; left: 6%; bottom: 14%; background: rgba(0,0,0,.14); animation-duration: 6s, 1.1s; }
+@keyframes tuAnioForma { to { rotate: 360deg; } }
+@keyframes tuAnioAparece { from { opacity: 0; scale: .6; } }
+.tu-anio .historias-barras, .tu-anio .historias-cerrar, .tu-anio .historias-escena, .tu-anio .historias-pie { position: relative; z-index: 1; }
+.tu-anio-historia { gap: 14px; }
+.tu-anio-ceja { font-size: 19px; font-weight: 700; opacity: .85; animation: tuAnioSube .5s var(--sale, ease-out) both; }
+.tu-anio-gigante { font-size: clamp(7rem, 34vw, 11rem); line-height: .82; font-weight: 900; font-stretch: 70%; letter-spacing: -0.04em; animation: tuAnioRebota .9s cubic-bezier(.2, 1.6, .35, 1) .1s both; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.tu-anio-gigante small { font-size: .22em; font-weight: 750; letter-spacing: 0; font-stretch: 90%; }
+.tu-anio-grande { font-size: clamp(2.8rem, 13vw, 4.4rem); line-height: .95; font-weight: 900; font-stretch: 78%; letter-spacing: -0.02em; text-wrap: balance; animation: tuAnioRebota .8s cubic-bezier(.2, 1.6, .35, 1) .1s both; }
+.tu-anio-texto { font-size: 20px; line-height: 1.35; font-weight: 600; max-width: 30ch; text-wrap: pretty; animation: tuAnioSube .6s var(--sale, ease-out) .45s both; }
+.tu-anio-tiza { animation: tuAnioSube .6s var(--sale, ease-out) .7s both; }
+.tu-anio-medalla { display: flex; justify-content: center; animation: tuAnioCae 1s cubic-bezier(.2, 1.5, .4, 1) .3s both; }
+@keyframes tuAnioSube { from { opacity: 0; transform: translateY(18px); } }
+@keyframes tuAnioRebota { 0% { opacity: 0; transform: scale(.3) rotate(-8deg); } 60% { opacity: 1; } }
+@keyframes tuAnioCae { from { opacity: 0; transform: translateY(-120px) rotate(20deg); } }
+.tu-anio-podio { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.tu-anio-podio li { display: grid; gap: 2px; padding: 14px 16px; border-radius: 22px; background: rgba(255,255,255,.16); animation: tuAnioEntraCostado .6s cubic-bezier(.2, 1.4, .4, 1) both; }
+.tu-anio.tinta-oscura .tu-anio-podio li { background: rgba(0,0,0,.08); }
+.tu-anio-podio li b { font-size: 2.6rem; line-height: 1; font-weight: 900; font-stretch: 72%; }
+.tu-anio-podio li span { font-size: 17px; font-weight: 650; }
+.tu-anio-podio li:first-child b { font-size: 3.4rem; }
+@keyframes tuAnioEntraCostado { from { opacity: 0; transform: translateX(-60px) rotate(-4deg); } }
+.tu-anio-tarjeta { border-radius: 28px; padding: 24px 22px; background: #f6f4ec; color: #121316; box-shadow: 0 30px 60px rgba(0,0,0,.35); transform: rotate(-2deg); animation: tuAnioCae 1s cubic-bezier(.2, 1.4, .4, 1) .1s both; display: grid; gap: 12px; }
+.tu-anio-tarjeta-anio { font-size: 5rem; line-height: .8; font-weight: 900; font-stretch: 70%; color: var(--fondo-anio); filter: saturate(1.2); }
+.tu-anio-tarjeta-titulo { font-size: 17px; font-weight: 750; }
+.tu-anio-tarjeta dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; margin: 0; }
+.tu-anio-tarjeta dt { font-size: 12px; font-weight: 650; color: #5d6068; }
+.tu-anio-tarjeta dd { margin: 0; font-size: 2.2rem; line-height: 1; font-weight: 850; font-stretch: 75%; }
+.tu-anio-tarjeta-pie { font-size: 14px; color: #3c3f45; }
+.tu-anio-boton { background: #f6f4ec !important; color: #121316 !important; }
+@media (prefers-reduced-motion: reduce) {
+  .tu-anio-formas i, .tu-anio-ceja, .tu-anio-gigante, .tu-anio-grande, .tu-anio-texto, .tu-anio-tiza, .tu-anio-medalla, .tu-anio-podio li, .tu-anio-tarjeta { animation: none; }
+}
+/* Los dos puntajes de la semana (PuntajesSemana). */
+.puntajes-semana { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 14px 0 4px; }
+.puntaje { display: grid; gap: 6px; align-content: start; padding: 14px 14px 12px; border-radius: 20px; background: var(--surface-2); box-shadow: var(--placa-canto); }
+.puntaje-titulo { font-size: 13px; font-weight: 650; color: var(--text-muted); }
+.puntaje-nota { font-size: 2.75rem; font-weight: 800; line-height: .95; color: var(--text-strong); letter-spacing: -0.02em; }
+.puntaje-nota small { font-size: 15px; font-weight: 600; color: var(--text-faint); margin-left: 3px; letter-spacing: 0; }
+.puntaje.pleno .puntaje-nota { color: var(--record); }
+.puntaje-rayas { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 3px; }
+.puntaje-rayas i { height: 6px; border-radius: 2px; background: var(--surface-3); transition: background-color .3s ease; }
+.puntaje-rayas i.llena { background: color-mix(in oklab, var(--tono) 72%, white); }
+.puntaje.pleno .puntaje-rayas i.llena { background: var(--record); }
+.puntaje-detalle { font-size: 12px; line-height: 1.35; color: var(--text-muted); text-wrap: pretty; }
 /* Los formatos de la serie (ElegirFormato). */
 .formatos { display: grid; gap: 14px; }
 .formatos-opciones { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -13074,6 +13137,9 @@ function VitrinaMedallas({ logs, trainingSessions }) {
   const [abierto, setAbierto] = useState(null);
   const [resumenEntero, setResumenEntero] = useState(false);
   const [elAnio, setElAnio] = useState(false);
+  const [verTuAnio, setVerTuAnio] = useState(false);
+  const hoyVitrina = new Date();
+  const anioWrapped = todayStr() >= fechaDelAnio(hoyVitrina.getFullYear()) ? hoyVitrina.getFullYear() : hoyVitrina.getMonth() === 0 ? hoyVitrina.getFullYear() - 1 : null;
   const meses = useMemo(() => {
     const idx = buildSessionsIndex(logs || {}, trainingSessions || []);
     const hoy = new Date();
@@ -13123,6 +13189,10 @@ function VitrinaMedallas({ logs, trainingSessions }) {
           </div>
         )))}
       </div>
+      {anioWrapped && (
+        <button onClick={() => setVerTuAnio(true)} className="boton-pildora w-full mt-3 tu-anio-abrir"><Sparkles size={16} /> Tu {anioWrapped} en el gimnasio</button>
+      )}
+      {verTuAnio && <TuAnio anio={anioWrapped} logs={logs} trainingSessions={trainingSessions} onClose={() => setVerTuAnio(false)} />}
       {hayAntes && (
         <button onClick={() => setElAnio((v) => !v)} className="enlace-suave vitrina-mas" aria-expanded={elAnio}>
           {elAnio ? "Ver los últimos seis meses" : "Ver el año entero"}
@@ -13214,6 +13284,166 @@ function HistoriasDelMes({ data, prefijo, onClose, onResumen }) {
     </div>,
     document.body
   );
+}
+
+// TU AÑO EN EL GIMNASIO (26/11, pedido: "que el anual se parezca más al
+// Wrapped de Spotify pero adaptado; que sea muy loco porque es sólo una vez
+// al año, cuando termina el año, en la misma fecha que Spotify"). Historias a
+// pantalla completa, cada una de un color fuerte y con los números enormes:
+// el año, los días y las horas, las toneladas (en elefantes), tu hora de
+// entrenar, tu mes más fuerte, tu ejercicio, lo que más subiste, tus récords
+// y la tarjeta final. Sale sola una vez, desde la fecha de Spotify (ver
+// fechaDelAnio), y desde la vitrina de Perfil hasta fin de año.
+const DURA_TU_ANIO = 5200;
+const COLORES_TU_ANIO = ["#ff4f2b", "#2747ff", "#00a86b", "#ffc31f", "#8f3dff", "#ff3d8e", "#00b2c9", "#111216", "#ff7a00", "#e8e6dc"];
+function horaDeEntrenar(sesiones) {
+  const horas = (sesiones || []).map((x) => (x?.startedAt ? new Date(x.startedAt).getHours() : null)).filter((h) => h != null);
+  if (horas.length < 3) return null;
+  const tramos = [
+    { nombre: "Madrugador", texto: "antes de las 9", de: 0, a: 9 },
+    { nombre: "De la mañana", texto: "entre las 9 y las 13", de: 9, a: 13 },
+    { nombre: "De la siesta", texto: "entre las 13 y las 18", de: 13, a: 18 },
+    { nombre: "Después del trabajo", texto: "entre las 18 y las 21", de: 18, a: 21 },
+    { nombre: "Nocturno", texto: "después de las 21", de: 21, a: 24 },
+  ].map((t) => ({ ...t, n: horas.filter((h) => h >= t.de && h < t.a).length }));
+  const top = tramos.reduce((m, t) => (t.n > m.n ? t : m), tramos[0]);
+  return { ...top, pct: Math.round((top.n / horas.length) * 100) };
+}
+function rachaDeSemanasDelAnio(sesiones, anio) {
+  const semanas = new Set((sesiones || []).filter((x) => String(x?.date || "").startsWith(String(anio))).map((x) => localDateStr(lunesDe(new Date(`${x.date}T12:00:00`)))));
+  let mejor = 0, actual = 0;
+  const d = lunesDe(new Date(anio, 0, 1, 12));
+  for (let k = 0; k < 54; k++) {
+    if (semanas.has(localDateStr(d))) { actual++; mejor = Math.max(mejor, actual); } else actual = 0;
+    d.setDate(d.getDate() + 7);
+  }
+  return mejor;
+}
+function TuAnio({ anio, logs, trainingSessions, nombre = "", onClose }) {
+  useAndroidBack(onClose);
+  const data = useMemo(() => computePrefixRecap(logs || {}, trainingSessions || [], String(anio)), [anio, logs, trainingSessions]);
+  const sesionesDelAnio = useMemo(() => (trainingSessions || []).filter((x) => String(x?.date || "").startsWith(String(anio))), [trainingSessions, anio]);
+  const hora = useMemo(() => horaDeEntrenar(sesionesDelAnio), [sesionesDelAnio]);
+  const racha = useMemo(() => rachaDeSemanasDelAnio(trainingSessions, anio), [trainingSessions, anio]);
+  const [i, setI] = useState(0);
+  const [pausa, setPausa] = useState(false);
+  const mesTop = data?.meses ? data.meses.reduce((m, x) => (x.dias > m.dias ? x : m), data.meses[0]) : null;
+  const toneladas = (data?.volumen || 0) / 1000;
+  const elefantes = toneladas / 6;
+  const pantallas = data ? [
+    { k: "tapa" },
+    { k: "dias" },
+    { k: "kilos" },
+    ...(hora ? [{ k: "hora" }] : []),
+    ...(mesTop?.dias ? [{ k: "mes" }] : []),
+    ...(data.estrella ? [{ k: "estrella" }] : []),
+    ...(data.progresos?.length ? [{ k: "subiste" }] : []),
+    ...(racha >= 2 ? [{ k: "racha" }] : []),
+    { k: "final" },
+  ].map((p, n) => ({ ...p, fondo: COLORES_TU_ANIO[n % COLORES_TU_ANIO.length] })) : [];
+  const ultima = i === pantallas.length - 1;
+  useEffect(() => {
+    if (pausa || ultima || !pantallas.length) return undefined;
+    const t = setTimeout(() => setI((n) => Math.min(n + 1, pantallas.length - 1)), DURA_TU_ANIO);
+    return () => clearTimeout(t);
+  }, [i, pausa, ultima, pantallas.length]);
+  if (!data || typeof document === "undefined") return null;
+  const tocar = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    if (e.clientX - r.left < r.width * 0.3) setI((n) => Math.max(0, n - 1));
+    else if (!ultima) setI((n) => n + 1);
+  };
+  const p = pantallas[i];
+  const claro = ["#ffc31f", "#e8e6dc"].includes(p.fondo);
+  const top3 = (data.progresos || []).slice(0, 3);
+  const nombreMes = (m) => capitalizar(NOMBRES_MES[m]);
+  return createPortal(
+    <div className={`historias tu-anio ${claro ? "tinta-oscura" : ""}`} role="dialog" aria-modal="true" aria-label={`Tu ${anio} en el gimnasio`} style={{ "--fondo-anio": p.fondo }}>
+      <div className="tu-anio-formas" aria-hidden="true" key={`f-${p.k}`}><i /><i /><i /></div>
+      <div className="historias-barras" aria-hidden="true">
+        {pantallas.map((x, k) => <span key={x.k} className={k < i ? "llena" : k === i ? (pausa ? "corre pausa" : "corre") : ""} style={k === i ? { animationDuration: `${DURA_TU_ANIO}ms` } : undefined} />)}
+      </div>
+      <button onClick={onClose} aria-label="Cerrar" className="historias-cerrar"><X size={20} /></button>
+      <div className="historias-escena" onClick={tocar} onPointerDown={() => setPausa(true)} onPointerUp={() => setPausa(false)} onPointerLeave={() => setPausa(false)}>
+        <div key={p.k} className="historia tu-anio-historia" aria-live="polite">
+          {p.k === "tapa" && (<>
+            <p className="tu-anio-ceja">{nombre ? `${nombre}, este fue` : "Este fue"}</p>
+            <p className="tu-anio-gigante num-display">{anio}</p>
+            <p className="tu-anio-texto">Tu año en el gimnasio. Tocá para seguir.</p>
+          </>)}
+          {p.k === "dias" && (<>
+            <p className="tu-anio-ceja">Fuiste al gimnasio</p>
+            <p className="tu-anio-gigante num-display"><ContadorAnio valor={data.dias} /></p>
+            <p className="tu-anio-texto">{data.dias === 1 ? "día" : "días"}{data.minutos ? `, y te quedaste ${numeroAR(Math.round(data.minutos / 60))} horas en total` : ""}. {data.series ? `${numeroAR(data.series)} series, una por una.` : ""}</p>
+            <div className="tu-anio-tiza"><MarcasTiza dias={Math.min(data.dias, 60)} max={60} alto={24} decorativa /></div>
+          </>)}
+          {p.k === "kilos" && (<>
+            <p className="tu-anio-ceja">Entre todas tus series levantaste</p>
+            <p className="tu-anio-gigante num-display"><ContadorAnio valor={Math.round(toneladas)} /><small>toneladas</small></p>
+            <p className="tu-anio-texto">{elefantes >= 1 ? `Es como levantar ${numeroAR(Math.round(elefantes))} ${Math.round(elefantes) === 1 ? "elefante" : "elefantes"} africanos.` : `Es como levantar ${numeroAR(Math.max(1, Math.round(toneladas / 1.2)))} autos.`}</p>
+          </>)}
+          {p.k === "hora" && (<>
+            <p className="tu-anio-ceja">Tu horario</p>
+            <p className="tu-anio-grande">{hora.nombre}</p>
+            <p className="tu-anio-texto">El {hora.pct} % de tus sesiones empezó {hora.texto}.</p>
+          </>)}
+          {p.k === "mes" && (<>
+            <p className="tu-anio-ceja">Tu mes más fuerte</p>
+            <p className="tu-anio-grande">{nombreMes(mesTop.mes)}</p>
+            <div className="tu-anio-medalla"><MedallaMes prefijo={mesTop.prefijo} numero={mesTop.dias} /></div>
+            <p className="tu-anio-texto">{mesTop.dias} días entrenados. {data.meses.filter((x) => x.dias > 0).length} de 12 meses con medalla.</p>
+          </>)}
+          {p.k === "estrella" && (<>
+            <p className="tu-anio-ceja">Tu ejercicio del año</p>
+            <p className="tu-anio-grande">{data.estrella.nombre}</p>
+            <p className="tu-anio-texto">Lo hiciste {data.estrella.dias} {data.estrella.dias === 1 ? "día" : "días"}.{data.topMusculo ? ` Y lo que más trabajaste fue ${data.topMusculo.nombre.toLowerCase()}: el ${data.topMusculo.pct} % de tus series.` : ""}</p>
+          </>)}
+          {p.k === "subiste" && (<>
+            <p className="tu-anio-ceja">Lo que más subiste</p>
+            <ol className="tu-anio-podio">
+              {top3.map((f, k) => (
+                <li key={f.id} style={{ animationDelay: `${250 + k * 220}ms` }}>
+                  <b className="num-display">+{conComa(Math.round(f.cambio))} %</b>
+                  <span>{f.nombre}</span>
+                </li>
+              ))}
+            </ol>
+            {data.records > 0 && <p className="tu-anio-texto">{numeroAR(data.records)} {data.records === 1 ? "récord nuevo" : "récords nuevos"} en el año.</p>}
+          </>)}
+          {p.k === "racha" && (<>
+            <p className="tu-anio-ceja">Tu mejor racha</p>
+            <p className="tu-anio-gigante num-display"><ContadorAnio valor={racha} /></p>
+            <p className="tu-anio-texto">semanas seguidas sin faltar una.</p>
+          </>)}
+          {p.k === "final" && (
+            <div className="tu-anio-tarjeta">
+              <p className="tu-anio-tarjeta-anio num-display">{anio}</p>
+              <p className="tu-anio-tarjeta-titulo">Mi año en Modus Fit</p>
+              <dl>
+                <div><dt>Días</dt><dd className="num-display">{data.dias}</dd></div>
+                <div><dt>Toneladas</dt><dd className="num-display">{numeroAR(Math.round(toneladas))}</dd></div>
+                <div><dt>Series</dt><dd className="num-display">{numeroAR(data.series)}</dd></div>
+                <div><dt>Récords</dt><dd className="num-display">{numeroAR(data.records || 0)}</dd></div>
+              </dl>
+              {data.estrella && <p className="tu-anio-tarjeta-pie">Mi ejercicio: <b>{data.estrella.nombre}</b></p>}
+              {hora && <p className="tu-anio-tarjeta-pie">Mi horario: <b>{hora.nombre.toLowerCase()}</b></p>}
+            </div>
+          )}
+        </div>
+      </div>
+      {ultima && (
+        <div className="historias-pie">
+          <button onClick={onClose} className="boton-pildora w-full tu-anio-boton">Vamos por {anio + 1}</button>
+        </div>
+      )}
+    </div>,
+    document.body
+  );
+}
+function ContadorAnio({ valor }) {
+  const [v, setV] = useState(0);
+  useEffect(() => { const t = setTimeout(() => setV(valor), 250); return () => clearTimeout(t); }, [valor]);
+  return <NumberFlow value={v} locales="es-AR" />;
 }
 
 // Resumen semanal: aparece al finalizar una sesión que cae en domingo (o el
@@ -13522,6 +13752,33 @@ function TarjetaSemana({ data }) {
   );
 }
 
+// LOS DOS PUNTAJES DE LA SEMANA (ver puntajeAsistencia y puntajeMejorVersion):
+// cada uno en su placa, la nota grande y diez rayitas que se llenan.
+function PuntajesSemana({ p, encendido }) {
+  if (!p) return null;
+  const a = p.asistencia, m = p.mejor;
+  const filas = [
+    { k: "asis", titulo: "Asistencia", v: a?.puntaje ?? 0,
+      detalle: `${a?.dias || 0} de ${a?.planeados || 0} ${a?.planeados === 1 ? "día" : "días"}${a?.dias ? ` · ${a.cumplimiento} % completado` : ""}` },
+    { k: "mejor", titulo: "Tu mejor versión", v: m?.puntaje,
+      detalle: m?.puntaje == null ? "Sin marcas para comparar esta semana" : `${m.enSuMejor} de ${m.ejercicios} ${m.ejercicios === 1 ? "ejercicio" : "ejercicios"} en tu mejor marca` },
+  ];
+  return (
+    <section className="puntajes-semana" aria-label="Tus puntajes de la semana">
+      {filas.map((f) => (
+        <div key={f.k} className={`puntaje ${f.v != null && f.v >= 9.5 ? "pleno" : ""}`} role="img" aria-label={`${f.titulo}: ${f.v == null ? "sin datos" : `${conComa(f.v)} de 10`}. ${f.detalle}.`}>
+          <p className="puntaje-titulo">{f.titulo}</p>
+          <p className="puntaje-nota num-display" aria-hidden="true">{f.v == null ? "–" : <NumberFlow value={encendido ? f.v : 0} locales="es-AR" format={{ minimumFractionDigits: 1, maximumFractionDigits: 1 }} />}<small>/10</small></p>
+          <span className="puntaje-rayas" aria-hidden="true">
+            {Array.from({ length: 10 }, (_, i) => <i key={i} className={f.v != null && encendido && f.v >= i + 0.5 ? "llena" : ""} style={{ transitionDelay: `${i * 45}ms` }} />)}
+          </span>
+          <p className="puntaje-detalle" aria-hidden="true">{f.detalle}</p>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 // LA COSTUMBRE DEL MES: cuántas veces fuiste cada día de la semana.
 function CostumbreDelMes({ porDia = [] }) {
   const max = Math.max(1, ...porDia);
@@ -13626,6 +13883,7 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
           )}
         </header>
 
+        {periodo === "semana" && <PuntajesSemana p={data.puntajes} encendido={encendido} />}
         {periodo === "semana" && data.diasDetalle?.length > 0 && <TarjetaSemana data={data} />}
         {periodo === "semana" && data.rachaSemanas >= 2 && (
           <p className="resumen-racha"><MarcasTiza dias={data.rachaSemanas} max={8} alto={15} decorativa /><span><b>{data.rachaSemanas}</b> semanas seguidas</span></p>
@@ -22229,7 +22487,9 @@ function estadoDeWidgets({ profile, logs, cycleStart }) {
   };
 }
 
-function computeWeekRecap(logs, trainingSessions) {
+// `planeados`: cuántos días pide tu cronograma por semana (para el puntaje de
+// asistencia; ver puntajeAsistencia).
+function computeWeekRecap(logs, trainingSessions, planeados = 0) {
   const idx = buildSessionsIndex(logs, trainingSessions);
   const data = resumirSesiones(getSessionsForPeriod(idx, "week"), tramosDeSemana);
   if (!data) return null;
@@ -22249,6 +22509,11 @@ function computeWeekRecap(logs, trainingSessions) {
   });
   // Cuántas semanas seguidas venís entrenando (contando ésta).
   data.lunes = localDateStr(esta);
+  const domingo = new Date(esta); domingo.setDate(domingo.getDate() + 6);
+  data.puntajes = {
+    asistencia: puntajeAsistencia({ planeados, sesiones: deLaSemana(esta) }),
+    mejor: puntajeMejorVersion(logs, data.lunes, localDateStr(domingo)),
+  };
   data.rachaSemanas = 0;
   for (let k = data.historia.length - 1; k >= 0 && data.historia[k].volumen > 0; k--) data.rachaSemanas++;
   return data;
@@ -34657,6 +34922,21 @@ export default function App() {
   }, []);
 
   const profile = profiles[activeProfile], logs = profile?.logs || {}, drafts = profile?.drafts || {};
+  // TU AÑO (ver TuAnio): sale solo una vez, desde la fecha del Wrapped de
+  // Spotify (fechaDelAnio) hasta fin de enero, si entrenaste al menos 5 días.
+  const [tuAnio, setTuAnio] = useState(null);
+  const sesionesParaTuAnio = profile?.trainingSessions;
+  useEffect(() => {
+    if (!activeProfile || !Array.isArray(sesionesParaTuAnio)) return undefined;
+    const hoy = new Date(), hoyStr = todayStr();
+    const anio = hoyStr >= fechaDelAnio(hoy.getFullYear()) ? hoy.getFullYear() : hoy.getMonth() === 0 ? hoy.getFullYear() - 1 : null;
+    if (!anio) return undefined;
+    const clave = `modusfit_tu_anio_${anio}_${activeProfile}`;
+    try { if (localStorage.getItem(clave)) return undefined; } catch { return undefined; }
+    if (new Set(sesionesParaTuAnio.filter((x) => String(x?.date || "").startsWith(String(anio))).map((x) => x.date)).size < 5) return undefined;
+    const t = setTimeout(() => { try { localStorage.setItem(clave, "1"); } catch { /* sin almacenamiento */ } setTuAnio(anio); }, 2500);
+    return () => clearTimeout(t);
+  }, [activeProfile, sesionesParaTuAnio]);
   // Si esta cuenta es Premium (con el cobro apagado, nadie lo es ni lo
   // necesita). La cuenta de RevenueCat es la de Google (googleUid).
   useEffect(() => { iniciarSuscripcion(profile?.googleUid || null); }, [profile?.googleUid]);
@@ -34919,7 +35199,8 @@ export default function App() {
     const ver = (e) => {
       const ctx = notifCtxRef.current || {};
       const { periodo, prefijo } = e.detail || {};
-      if (periodo === "semana") { setWeeklyRecap(computeWeekRecap(ctx.logs || {}, ctx.profile?.trainingSessions || [])); return; }
+      if (periodo === "tu-anio") { setTuAnio(Number(prefijo) || new Date().getFullYear()); return; }
+      if (periodo === "semana") { setWeeklyRecap(computeWeekRecap(ctx.logs || {}, ctx.profile?.trainingSessions || [], diasPlaneados(ctx.profile))); return; }
       const data = computePrefixRecap(ctx.logs || {}, ctx.profile?.trainingSessions || [], prefijo);
       if (data) setPeriodRecap({ periodo, etiqueta: etiquetaPeriodo(prefijo), data });
     };
@@ -34934,7 +35215,7 @@ export default function App() {
       const id = evento?.notification?.id;
       if (id === 9300) {
         const ctx = notifCtxRef.current || {};
-        const recap = computeWeekRecap(ctx.logs || {}, ctx.profile?.trainingSessions || []);
+        const recap = computeWeekRecap(ctx.logs || {}, ctx.profile?.trainingSessions || [], diasPlaneados(ctx.profile));
         if (recap) setWeeklyRecap(recap);
         else setTab("progreso");
         return;
@@ -35746,7 +36027,7 @@ export default function App() {
   const checkWeeklyRecap = (updatedTrainingSessions) => {
     const st = getProfileSettings(profile);
     if (!st.weeklyRecapEnabled || todayWeekdayKey() !== "sun") return;
-    const recap = computeWeekRecap(logs, updatedTrainingSessions);
+    const recap = computeWeekRecap(logs, updatedTrainingSessions, diasPlaneados(profile));
     if (recap) setWeeklyRecap(recap);
     if (Capacitor.isNativePlatform()) LocalNotifications.cancel({ notifications: [{ id: 9300 }] }).catch(() => {});
   };
@@ -36007,6 +36288,7 @@ export default function App() {
       {paywall && <Paywall motivo={paywall.motivo} claro={themeClass === "light-mode"} onClose={() => setPaywall(null)} />}
       {weeklyRecap && !sessionSummary && <WeeklyRecapModal data={weeklyRecap} onClose={() => setWeeklyRecap(null)} />}
       {periodRecap && <WeeklyRecapModal data={periodRecap.data} periodo={periodRecap.periodo} etiqueta={periodRecap.etiqueta} onClose={() => setPeriodRecap(null)} />}
+      {tuAnio && profile && <TuAnio anio={tuAnio} logs={logs} trainingSessions={profile.trainingSessions || []} nombre={String(profile.name || activeProfile || "").split(" ")[0]} onClose={() => setTuAnio(null)} />}
       {cicloResumen && cycleStart && !periodRecap && !weeklyRecap && !sessionSummary && (
         <ResumenDeCicloModal numero={cicloResumen.numero} logs={logs} cycleStart={cycleStart} settings={getProfileSettings(profile)} nombres={nombresDeEjercicios} onClose={() => setCicloResumen(null)} />
       )}
