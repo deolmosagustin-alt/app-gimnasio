@@ -2938,6 +2938,30 @@ const ANIMATION_CSS = letraEscalable(`
   .disco-fondo, .ilus-barra-disco, .ilus-barra-cuerpo, .ilus-anio i.si, .ilus-mes span.si, .ilus-pila-disco, .ilus-elefantes span, .ilus-reloj, .ilus-reloj-hora, .ilus-reloj-minuto, .ilus-reloj-tramo, .ilus-rayos, .tu-anio-marquesina p, .ilus-cajon, .tu-anio-podio-nombres li, .ilus-pizarra, .ilus-pizarra .marcas line, .tu-anio-sello, .ilus-musculos li, .ilus-musculos li i::after { animation: none; }
   .ilus-reloj-hora, .ilus-reloj-minuto { transform: rotate(var(--a)); }
 }
+/* La portada del mes (PortadaDelMes): pega a los bordes del resumen. */
+.mes-portada { position: relative; overflow: hidden; isolation: isolate; min-height: max-content; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 8px; margin: -24px -18px 0; padding: 22px 18px 18px; border-radius: 30px 30px 24px 24px; color: #f6f4ec; background: var(--mes-c); --disco-raya: rgba(0,0,0,.16); --disco-hueco: var(--mes-c); }
+.mes-portada.tinta-oscura { color: #121316; }
+.mes-portada .disco-fondo { z-index: -1; color: rgba(255,255,255,.13); }
+.mes-portada.tinta-oscura .disco-fondo { color: rgba(0,0,0,.07); }
+.mes-portada .disco-fondo.uno { width: 320px; right: -120px; bottom: -150px; left: auto; top: auto; }
+.mes-portada .disco-fondo.dos { width: 150px; left: -60px; top: -60px; }
+.mes-portada-texto { display: grid; gap: 2px; min-width: 0; }
+.mes-portada-ceja { font-size: 14px; font-weight: 700; opacity: .8; }
+.mes-portada-mes { font-size: clamp(2.6rem, 13vw, 3.4rem); line-height: .9; font-weight: 900; font-stretch: 70%; letter-spacing: -0.02em; overflow-wrap: anywhere; animation: tuAnioRebota .8s cubic-bezier(.2, 1.6, .35, 1) .05s both; }
+.mes-portada-dias { margin-top: 6px; font-size: 18px; font-weight: 750; }
+.mes-portada-dias b { font-size: 2.4rem; font-weight: 900; font-stretch: 72%; }
+.mes-portada-dias span { font-weight: 600; opacity: .75; }
+.mes-portada-vs { display: inline-flex; align-items: center; gap: 5px; width: fit-content; margin-top: 6px; padding: 4px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; background: rgba(0,0,0,.16); }
+.mes-portada.tinta-oscura .mes-portada-vs { background: rgba(0,0,0,.08); }
+.mes-portada-medalla { position: relative; isolation: isolate; width: 104px; align-self: start; transform-origin: 50% 0; animation: medallaCuelga 1.1s cubic-bezier(.3,1.4,.5,1) .15s both; }
+.mes-portada-medalla .ilus-rayos { width: 260px; height: 260px; margin: -100px 0 0 -130px; color: #fff; opacity: .28; }
+.mes-portada-boton { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-height: 48px; margin-top: 10px; padding: 6px 6px 6px 16px; border-radius: 999px; font-size: 15px; font-weight: 750; text-align: left; color: #121316; background: #f6f4ec; box-shadow: 0 10px 24px rgba(0,0,0,.18); }
+.mes-portada-boton > span:nth-child(2) { flex: 1; }
+.mes-portada-boton .resumen-portada-barras i { background: rgba(0,0,0,.2); }
+.mes-portada-boton .resumen-portada-barras i:first-child { background: #121316; }
+.mes-portada-play { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 999px; color: #f6f4ec; background: var(--mes-c); }
+.mes-portada.tinta-oscura .mes-portada-play { color: #121316; }
+@media (prefers-reduced-motion: reduce) { .mes-portada-mes, .mes-portada-medalla { animation: none; } }
 /* Los dos puntajes de la semana (PuntajesSemana). */
 .puntajes-semana { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 14px 0 4px; }
 .puntaje { display: grid; gap: 6px; align-content: start; padding: 14px 14px 12px; border-radius: 20px; background: var(--surface-2); box-shadow: var(--placa-canto); }
@@ -6489,7 +6513,7 @@ label.ajuste-rotulo { display: block; }
 /* EL RESUMEN DE LA SEMANA (y del mes y del año): una placa con el filete
    del color del período, los tres números, cuándo entrenaste, dónde fue el
    trabajo (en barras, como el Balance), las marcas y renglones finos. */
-.resumen-periodo { width: 100%; max-width: 24rem; max-height: 92vh; overflow-y: auto; overscroll-behavior: contain; display: grid; gap: 18px; padding: 24px 18px 18px; border-radius: 30px; background: var(--surface-1); box-shadow: var(--placa-canto), 0 30px 60px -30px rgba(0,0,0,.8); scrollbar-width: none; }
+.resumen-periodo { width: 100%; max-width: 24rem; max-height: 92vh; overflow-y: auto; overscroll-behavior: contain; display: grid; grid-auto-rows: max-content; gap: 18px; padding: 24px 18px 18px; border-radius: 30px; background: var(--surface-1); box-shadow: var(--placa-canto), 0 30px 60px -30px rgba(0,0,0,.8); scrollbar-width: none; }
 .resumen-periodo::-webkit-scrollbar { display: none; }
 .resumen-cabeza { display: grid; gap: 4px; }
 .resumen-titulo { font-size: 1.7rem; font-weight: 800; font-stretch: 84%; line-height: 1.05; letter-spacing: -0.02em; color: var(--text-strong); }
@@ -8948,7 +8972,7 @@ async function dibujarHojaRutina(ctx, W, H, routineDef) {
   try { await document.fonts?.load?.(`700 20px ${F}`); } catch { /* se dibuja con la que haya */ }
   const model = buildRoutineModel(routineDef);
   const PAPEL = "#f4f3ee", TINTA = "#1d1d1f", GRIS = "#6b6b70", PUNTOS = "#bdbdb8";
-  ctx.fillStyle = "#0b0b0d"; ctx.fillRect(0, 0, W, H);
+  const fondoHoja = COLORES_COMPARTIR.ciclo; drawShareCardBase(ctx, W, H, fondoHoja);
   // La tabla y la hoja.
   const tx = 30, ty = 46, tw = W - 60, th = H - 126;
   ctx.fillStyle = "#2a2b30"; ctx.beginPath(); ctx.roundRect(tx, ty, tw, th, 26); ctx.fill();
@@ -9017,8 +9041,8 @@ async function dibujarHojaRutina(ctx, W, H, routineDef) {
       cy += renglon * 0.5;
     });
   });
-  ctx.textAlign = "center"; ctx.fillStyle = "#9d9ea4"; ctx.font = `600 20px ${F}`;
-  ctx.fillText("modus fit", W / 2, H - 40);
+  
+  drawWordmark(ctx, W, H, fondoHoja);
 }
 
 function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) {
@@ -9382,221 +9406,244 @@ function canvasRoundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-function drawShareCardBase(ctx, W, H, accent, accent2) {
-  // Fondo
-  const bg = ctx.createLinearGradient(0, 0, 0, H);
-  bg.addColorStop(0, "#0e1113"); bg.addColorStop(1, "#07070f");
-  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-  // Glow top-left
-  const g1 = ctx.createRadialGradient(W * 0.15, H * 0.12, 0, W * 0.15, H * 0.12, W * 0.55);
-  g1.addColorStop(0, tint(accent, "22")); g1.addColorStop(1, "transparent");
-  ctx.fillStyle = g1; ctx.fillRect(0, 0, W, H);
-  // Glow bottom-right
-  const g2 = ctx.createRadialGradient(W * 0.85, H * 0.88, 0, W * 0.85, H * 0.88, W * 0.45);
-  g2.addColorStop(0, (accent2 || accent) + "18"); g2.addColorStop(1, "transparent");
-  ctx.fillStyle = g2; ctx.fillRect(0, 0, W, H);
-  // Borde sutil
-  ctx.strokeStyle = tint(accent, "30"); ctx.lineWidth = 2;
-  const r = 28; ctx.beginPath(); ctx.moveTo(r, 1); ctx.arcTo(W - 1, 1, W - 1, r, r); ctx.arcTo(W - 1, H - 1, W - r, H - 1, r); ctx.arcTo(1, H - 1, 1, H - r, r); ctx.arcTo(1, 1, r, 1, r); ctx.closePath(); ctx.stroke();
-  // Logo / branding
-  ctx.fillStyle = tint(accent, "cc"); ctx.font = "bold 18px system-ui";
-  ctx.textAlign = "right"; ctx.fillText("Modus Fit", W - 28, H - 22);
-  ctx.textAlign = "left";
+// LAS IMÁGENES PARA COMPARTIR, CON LA ESTÉTICA DE TU AÑO (27/11, pedido: "me
+// gustó la estética del wrap; mejorá la de los widgets, el resumen mensual,
+// las cosas que se comparten"). Un color lleno de fondo, dos discos grandes
+// que asoman, el grano de papel impreso, la letra de la app angosta y enorme
+// para el número, y la marca abajo con su barrita. Cada imagen tiene su
+// color: el récord en amarillo, el ciclo en azul, el período en verde, los
+// rangos en violeta, tu perfil en rosa. Lo que es un objeto (el ticket, la
+// hoja de la rutina, la pizarra, el mano a mano) va arriba de ese fondo.
+const F_COMPARTIR = "'Mona Sans Variable', system-ui, sans-serif";
+const COLORES_COMPARTIR = { record: "#ffc31f", ciclo: "#2747ff", periodo: "#00a86b", rango: "#8f3dff", perfil: "#ff3d8e", qr: "#2747ff", social: "#8f3dff", naranja: "#ff4f2b" };
+const esFondoClaro = (hex) => {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+  if (!m) return false;
+  const n = parseInt(m[1], 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  return (r * 299 + g * 587 + b * 114) / 1000 > 165;
+};
+// La tinta que va sobre un color: casi negra sobre los claros, papel sobre el resto.
+const tintaSobre = (hex) => (esFondoClaro(hex) ? "#121316" : "#f6f4ec");
+const tintaSuave = (hex) => (esFondoClaro(hex) ? "rgba(18,19,22,.68)" : "rgba(246,244,236,.78)");
+function letraCompartir(ctx, peso, px, angosta = false) {
+  ctx.font = `${peso} ${px}px ${F_COMPARTIR}`;
+  if ("fontStretch" in ctx) ctx.fontStretch = angosta ? "condensed" : "normal";
 }
-// El "logo" de la app abajo de la tarjeta: una llamita simple dibujada a
-// mano (no hay archivo de imagen en este proyecto de un solo archivo) más
-// el nombre, en la parte inferior — tal como se pidió.
-function drawWordmark(ctx, W, H, accent) {
+// Un disco visto de frente: el aro, la raya punteada, la maza y el agujero.
+function discoCompartir(ctx, cx, cy, r, fondo, claro) {
   ctx.save();
-  ctx.textAlign = "center";
-  ctx.fillStyle = tint(accent, "cc");
-  ctx.font = "bold 30px system-ui, sans-serif";
-  ctx.fillText("Modus Fit", W / 2, H - 80);
+  ctx.fillStyle = claro ? "rgba(0,0,0,.07)" : "rgba(255,255,255,.12)";
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,.14)"; ctx.lineWidth = r * 0.03;
+  ctx.beginPath(); ctx.arc(cx, cy, r * 0.88, 0, Math.PI * 2); ctx.stroke();
+  ctx.setLineDash([r * 0.02, r * 0.06]); ctx.lineWidth = r * 0.015;
+  ctx.beginPath(); ctx.arc(cx, cy, r * 0.63, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = "rgba(0,0,0,.14)";
+  ctx.beginPath(); ctx.arc(cx, cy, r * 0.3, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = fondo;
+  ctx.beginPath(); ctx.arc(cx, cy, r * 0.14, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 }
-
-function drawPRShareCard(ctx, W, H, { exerciseName, muscle, kg, reps, accent = "#14B8A6", unit = "kg" }) {
-  // kg/reps entran SIEMPRE en kg reales (así se guardan) y se convierten
-  // recién al rotularlos: el 1RM y el volumen se calculan en kg y lo que
-  // se dibuja sale en la unidad de quien comparte.
-  const uLabel = weightLabel(unit);
-  // Layout FIJO para el canvas real de 540×960 — la versión anterior usaba
-  // posiciones acumulativas pensadas para un lienzo más grande: con nombres
-  // largos todo se corría hacia abajo y los tiles quedaban cortados o fuera.
-  drawShareCardBase(ctx, W, H, accent, "#A855F7");
-  ctx.textAlign = "center";
-
-  // Chip "NUEVA MARCA PERSONAL"
-  const chipText = "✦  NUEVA MARCA PERSONAL  ✦";
-  ctx.font = "700 16px system-ui";
-  const chipW = ctx.measureText(chipText).width + 44;
-  const gChip = ctx.createLinearGradient(W / 2 - chipW / 2, 0, W / 2 + chipW / 2, 0);
-  gChip.addColorStop(0, tint(accent, "40")); gChip.addColorStop(1, tint(accent, "20"));
-  ctx.fillStyle = gChip;
-  canvasRoundRect(ctx, W / 2 - chipW / 2, 96, chipW, 36, 18); ctx.fill();
-  ctx.strokeStyle = tint(accent, "60"); ctx.lineWidth = 1.5;
-  canvasRoundRect(ctx, W / 2 - chipW / 2, 96, chipW, 36, 18); ctx.stroke();
-  ctx.fillStyle = accent; ctx.fillText(chipText, W / 2, 120);
-
-  // Nombre del ejercicio — truncado a un largo seguro, máximo 2 líneas.
-  let name = (exerciseName || "").toUpperCase();
-  if (name.length > 44) name = name.slice(0, 43).trimEnd() + "…";
-  ctx.fillStyle = "#f9fafa"; ctx.font = "800 34px system-ui";
-  wrapCanvasText(ctx, name, W / 2, 188, W - 72, 42, 2);
-
-  // Chip de músculo — posición fija, debajo del área reservada del nombre.
-  if (muscle) {
-    ctx.font = "600 17px system-ui";
-    const mW = ctx.measureText(muscle.toUpperCase()).width + 36;
-    ctx.fillStyle = tint(accent, "20");
-    canvasRoundRect(ctx, W / 2 - mW / 2, 268, mW, 32, 16); ctx.fill();
-    ctx.fillStyle = tint(accent, "dd"); ctx.fillText(muscle.toUpperCase(), W / 2, 290);
+// El grano de papel impreso: puntos claros y oscuros al azar, fijos.
+function granoCompartir(ctx, W, H) {
+  ctx.save();
+  let s = 7;
+  const azar = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  for (let k = 0; k < 2600; k++) {
+    ctx.fillStyle = azar() > 0.5 ? "rgba(255,255,255,.07)" : "rgba(0,0,0,.07)";
+    ctx.fillRect(azar() * W, azar() * H, 1.4, 1.4);
   }
+  ctx.restore();
+}
+function drawShareCardBase(ctx, W, H, color = COLORES_COMPARTIR.naranja) {
+  const claro = esFondoClaro(color);
+  ctx.fillStyle = color; ctx.fillRect(0, 0, W, H);
+  discoCompartir(ctx, W * 0.98, H * 0.86, W * 0.62, color, claro);
+  discoCompartir(ctx, W * 0.02, H * 0.1, W * 0.34, color, claro);
+  granoCompartir(ctx, W, H);
+  ctx.textAlign = "left";
+  return { claro, tinta: tintaSobre(color), suave: tintaSuave(color) };
+}
+// La marca de abajo: una barrita con dos discos y "Modus Fit".
+function drawWordmark(ctx, W, H, color = COLORES_COMPARTIR.naranja) {
+  const tinta = tintaSobre(color);
+  ctx.save();
+  letraCompartir(ctx, 800, 24, true);
+  const texto = "Modus Fit";
+  const tw = ctx.measureText(texto).width;
+  const total = 44 + 10 + tw;
+  const x = W / 2 - total / 2, y = H - 52;
+  ctx.fillStyle = tinta;
+  ctx.fillRect(x, y - 9, 44, 4);
+  [[x + 6, 22], [x + 12, 16], [x + 32, 16], [x + 38, 22]].forEach(([bx, h]) => { ctx.beginPath(); ctx.roundRect(bx - 2.5, y - 7 - h / 2, 5, h, 2); ctx.fill(); });
+  ctx.textAlign = "left";
+  ctx.fillText(texto, x + 54, y);
+  ctx.restore();
+}
+// Una placa de papel con sombra, como la tarjeta final de Tu año.
+function placaCompartir(ctx, x, y, w, h, giro = 0) {
+  ctx.save();
+  ctx.translate(x + w / 2, y + h / 2); ctx.rotate(giro);
+  ctx.shadowColor = "rgba(0,0,0,.28)"; ctx.shadowBlur = 40; ctx.shadowOffsetY = 18;
+  ctx.fillStyle = "#f6f4ec";
+  ctx.beginPath(); ctx.roundRect(-w / 2, -h / 2, w, h, 28); ctx.fill();
+  ctx.restore();
+}
+// Un número grande que se achica hasta entrar en el ancho.
+function numeroGrande(ctx, texto, x, y, maxW, px, peso = 900) {
+  let t = px;
+  letraCompartir(ctx, peso, t, true);
+  while (ctx.measureText(texto).width > maxW && t > 30) { t -= 4; letraCompartir(ctx, peso, t, true); }
+  ctx.fillText(texto, x, y);
+  return t;
+}
 
-  // Número de kg — protagonista, centrado en el tercio medio.
-  const kgStr = `${kgToDisplay(kg ?? 0, unit)}`;
-  ctx.font = `900 ${kgStr.length >= 3 ? 128 : 148}px system-ui`;
-  const gKg = ctx.createLinearGradient(0, 340, 0, 500);
-  gKg.addColorStop(0, "#ffffff"); gKg.addColorStop(1, accent);
-  ctx.fillStyle = gKg;
-  ctx.fillText(kgStr, W / 2, 492);
-  ctx.fillStyle = "#6e7379"; ctx.font = "600 24px system-ui";
-  ctx.fillText(uLabel, W / 2, 528);
-
-  // Reps
-  ctx.fillStyle = "#e6e8ea"; ctx.font = "700 30px system-ui";
-  ctx.fillText(`${reps ?? 0} repeticiones`, W / 2, 596);
-
-  // Tiles 1RM + Volumen
+function drawPRShareCard(ctx, W, H, { exerciseName, muscle, kg, reps, unit = "kg" }) {
+  // kg/reps entran SIEMPRE en kg reales (así se guardan) y se convierten
+  // recién al rotularlos.
+  const color = COLORES_COMPARTIR.record;
+  const { tinta, suave } = drawShareCardBase(ctx, W, H, color);
+  const uLabel = weightLabel(unit);
+  const x = 44;
+  ctx.fillStyle = suave; letraCompartir(ctx, 700, 26);
+  ctx.fillText("Nueva marca personal", x, 150);
+  // La campana del récord.
+  ctx.save(); ctx.translate(W - 110, 118);
+  ctx.fillStyle = tinta;
+  ctx.fillRect(-34, -40, 68, 6);
+  ctx.beginPath(); ctx.arc(0, -26, 8, 0, Math.PI * 2); ctx.lineWidth = 4; ctx.strokeStyle = tinta; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-26, 26); ctx.quadraticCurveTo(-26, -18, 0, -18); ctx.quadraticCurveTo(26, -18, 26, 26); ctx.lineTo(34, 34); ctx.lineTo(-34, 34); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.arc(0, 42, 7, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  // El nombre del ejercicio, enorme.
+  ctx.fillStyle = tinta; letraCompartir(ctx, 900, 64, true);
+  const lineas = wrapCanvasText(ctx, exerciseName || "", x, 250, W - 88, 62, 3);
+  let y = 250 + (lineas - 1) * 62;
+  if (muscle) { ctx.fillStyle = suave; letraCompartir(ctx, 650, 24); ctx.fillText(musculoPrincipal(muscle), x, y + 44); }
+  // El número protagonista: reps × kilos.
+  ctx.fillStyle = tinta;
+  const kgStr = conComa(kgToDisplay(kg ?? 0, unit));
+  const t = numeroGrande(ctx, kgStr, x, 600, W - 88 - 90, 230);
+  const anchoKg = ctx.measureText(kgStr).width;
+  letraCompartir(ctx, 800, Math.round(t * 0.22), true);
+  ctx.fillText(uLabel, x + anchoKg + 10, 600);
+  letraCompartir(ctx, 900, 70, true);
+  ctx.fillText(`× ${reps ?? 0} reps`, x, 700);
+  // La placa con el 1RM estimado y el volumen.
   const est = Math.round(kgToDisplay(estimate1RM(kg, reps), unit));
-  const tileY = 660, tileGap = 20, tileW = (W - 80 - tileGap) / 2, tileH = 108;
-  [{ val: `${est} ${uLabel}`, label: "1RM estimado" }, { val: `${Math.round(kgToDisplay((kg || 0) * (reps || 0), unit))} ${uLabel}`, label: "Volumen" }].forEach((t, i) => {
-    const x = 40 + i * (tileW + tileGap);
-    ctx.fillStyle = "rgba(255,255,255,0.05)";
-    canvasRoundRect(ctx, x, tileY, tileW, tileH, 16); ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.08)"; ctx.lineWidth = 1;
-    canvasRoundRect(ctx, x, tileY, tileW, tileH, 16); ctx.stroke();
-    ctx.fillStyle = "#ffffff"; ctx.font = "800 32px system-ui";
-    ctx.fillText(t.val, x + tileW / 2, tileY + 56);
-    ctx.fillStyle = "#6e7379"; ctx.font = "500 16px system-ui";
-    ctx.fillText(t.label, x + tileW / 2, tileY + 86);
+  const vol = Math.round(kgToDisplay((kg || 0) * (reps || 0), unit));
+  placaCompartir(ctx, x, 778, W - 88, 92, -0.015);
+  ctx.fillStyle = "#121316";
+  [[`${numeroAR(est)} ${uLabel}`, "1RM estimado"], [`${numeroAR(vol)} ${uLabel}`, "Volumen"]].forEach(([v, l], i) => {
+    const cx = x + 26 + i * ((W - 88) / 2);
+    letraCompartir(ctx, 900, 36, true); ctx.fillText(v, cx, 826);
+    ctx.fillStyle = "#5d6068"; letraCompartir(ctx, 650, 17); ctx.fillText(l, cx, 852);
+    ctx.fillStyle = "#121316";
   });
-
-  drawWordmark(ctx, W, H, accent);
+  drawWordmark(ctx, W, H, color);
 }
 
-function drawCycleShareCard(ctx, W, H, { cycleNumber, daysTrained, totalVol, accent = "#A855F7", unit = "kg" }) {
+// Unos cajones de salto chicos, uno por semana, para el ciclo.
+function cajonesCompartir(ctx, x, yPiso, w, semanas, tinta) {
+  const n = Math.max(1, semanas);
+  const gap = 10, cw = (w - gap * (n - 1)) / n;
+  for (let k = 0; k < n; k++) {
+    const descarga = k === n - 1;
+    const h = descarga ? 46 : 70 + (k / Math.max(1, n - 2)) * 110;
+    const cx = x + k * (cw + gap);
+    ctx.fillStyle = descarga ? "rgba(0,0,0,.35)" : "#f6f4ec";
+    ctx.beginPath(); ctx.roundRect(cx, yPiso - h, cw, h, [10, 10, 3, 3]); ctx.fill();
+    ctx.fillStyle = "rgba(0,0,0,.2)";
+    ctx.beginPath(); ctx.roundRect(cx + cw * 0.28, yPiso - h + 14, cw * 0.44, 8, 4); ctx.fill();
+    ctx.fillStyle = descarga ? tinta : "#121316"; letraCompartir(ctx, 900, 22, true); ctx.textAlign = "center";
+    ctx.fillText(descarga ? "D" : String(k + 1), cx + cw / 2, yPiso - 14);
+    ctx.textAlign = "left";
+  }
+  ctx.fillStyle = tinta; ctx.fillRect(x - 8, yPiso, w + 16, 5);
+}
+function drawCycleShareCard(ctx, W, H, { cycleNumber, daysTrained, totalVol, unit = "kg", semanas = 7 }) {
+  const color = COLORES_COMPARTIR.ciclo;
+  const { tinta, suave } = drawShareCardBase(ctx, W, H, color);
+  const x = 44;
+  ctx.fillStyle = suave; letraCompartir(ctx, 700, 26); ctx.fillText("Ciclo completo", x, 150);
+  ctx.fillStyle = tinta;
+  letraCompartir(ctx, 900, 64, true); ctx.fillText("Ciclo", x, 236);
+  numeroGrande(ctx, String(cycleNumber ?? 1), x, 446, W - 88, 240);
+  cajonesCompartir(ctx, x, 690, W - 88, semanas, tinta);
   const volMostrado = Math.round(kgToDisplay(totalVol || 0, unit));
-  // Layout para el canvas real de 540×960 (las coordenadas anteriores eran
-  // de un lienzo del doble: la mitad de la tarjeta quedaba fuera de cuadro).
-  drawShareCardBase(ctx, W, H, accent, "#06B6D4");
-  ctx.textAlign = "center";
-  ctx.fillStyle = accent;
-  ctx.font = "800 26px sans-serif";
-  ctx.fillText("🎉 CICLO COMPLETO", W / 2, 250);
-  ctx.fillStyle = "#f9fafa";
-  ctx.font = "900 76px sans-serif";
-  ctx.fillText(`Ciclo #${cycleNumber}`, W / 2, 360);
-  const tiles = [
-    { val: daysTrained, label: "DÍAS\nENTRENADOS" },
-    { val: volMostrado > 999 ? `${(volMostrado / 1000).toFixed(1)}k` : volMostrado, label: `${weightLabel(unit).toUpperCase()} × REPS\nTOTALES` },
-  ];
-  const tileY = 460, tileGap = 28, tileW = (W - 80 - tileGap) / 2, tileH = 170;
-  tiles.forEach((t, i) => {
-    const x = 40 + i * (tileW + tileGap);
-    ctx.fillStyle = "rgba(255,255,255,0.06)";
-    canvasRoundRect(ctx, x, tileY, tileW, tileH, 20); ctx.fill();
-    ctx.fillStyle = "#f9fafa";
-    ctx.font = "900 54px sans-serif";
-    ctx.fillText(`${t.val}`, x + tileW / 2, tileY + 82);
-    ctx.fillStyle = "#9da2a8";
-    ctx.font = "700 17px sans-serif";
-    t.label.split("\n").forEach((l, li) => ctx.fillText(l, x + tileW / 2, tileY + 118 + li * 22));
+  placaCompartir(ctx, x, 736, W - 88, 92, 0.012);
+  ctx.fillStyle = "#121316";
+  [[String(daysTrained ?? 0), "días entrenados"], [volMostrado >= 1000 ? `${conComa(Math.round(volMostrado / 100) / 10)} t` : `${volMostrado} ${weightLabel(unit)}`, "levantados"]].forEach(([v, l], i) => {
+    const cx = x + 26 + i * ((W - 88) / 2);
+    letraCompartir(ctx, 900, 38, true); ctx.fillText(v, cx, 786);
+    ctx.fillStyle = "#5d6068"; letraCompartir(ctx, 650, 17); ctx.fillText(l, cx, 812);
+    ctx.fillStyle = "#121316";
   });
-  ctx.fillStyle = "#d1d4d7";
-  ctx.font = "700 26px sans-serif";
-  ctx.fillText("7 semanas de entrenamiento y descarga 💪", W / 2, 740);
-  drawWordmark(ctx, W, H, accent);
+  drawWordmark(ctx, W, H, color);
 }
 
-// Versión genérica de la tarjeta de resumen, para cuando la persona la
-// genera a pedido desde Historial (no por completar un ciclo entero, sino
-// el resumen de hoy, de la semana o del mes) — mismo estilo visual que
-// drawCycleShareCard, pero con un título y una etiqueta de período
-// configurables, una grilla de casilleros llenos/vacíos (igual a la del
-// calendario de Historial) cuando el período es semana o mes, y una
-// estadística más (series totales) para que no se sienta tan vacía.
-function drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained, totalSets, totalVol, calendarCells, accent = "#3B82F6", unit = "kg" }) {
-  const volMostrado = Math.round(kgToDisplay(totalVol || 0, unit));
-  // Layout para el canvas real de 540×960. La versión anterior usaba
-  // coordenadas de un lienzo del doble (título en y=480, cierre en y≈1200):
-  // la tarjeta salía cortada, con textos gigantes y la mitad fuera de
-  // cuadro — la "imagen bugueada" del historial.
-  drawShareCardBase(ctx, W, H, accent, "#06B6D4");
-  ctx.textAlign = "center";
-
-  ctx.fillStyle = accent;
-  ctx.font = "800 22px sans-serif";
-  ctx.fillText("💪 RESUMEN DE ENTRENAMIENTO", W / 2, 150);
-
-  ctx.fillStyle = "#f9fafa";
-  ctx.font = "900 42px sans-serif";
-  let label = (periodLabel || "").toUpperCase();
-  if (label.length > 40) label = label.slice(0, 39).trimEnd() + "…";
-  const lines = wrapCanvasText(ctx, label, W / 2, 208, W - 80, 50);
-  let y = 208 + (lines - 1) * 50;
-
-  // Grilla de días entrenados — mismos casilleros llenos/vacíos que el
-  // calendario de Historial, dimensionados para que SIEMPRE entren:
-  // semana = 1 fila (celdas grandes), mes = hasta 6 filas (celdas chicas).
-  const gridCols = 7;
+function drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained, totalSets, totalVol, calendarCells, unit = "kg" }) {
+  const color = COLORES_COMPARTIR.periodo;
+  const { tinta, suave } = drawShareCardBase(ctx, W, H, color);
+  const x = 44;
+  ctx.fillStyle = suave; letraCompartir(ctx, 700, 26);
+  wrapCanvasText(ctx, periodLabel ? capitalizar(periodLabel) : "Tu entrenamiento", x, 150, W - 88, 30, 2);
+  ctx.fillStyle = tinta;
+  numeroGrande(ctx, String(daysTrained ?? 0), x, 380, W - 88 - 160, 230);
+  const anchoNum = ctx.measureText(String(daysTrained ?? 0)).width;
+  letraCompartir(ctx, 800, 48, true);
+  ctx.fillText(daysTrained === 1 ? "día" : "días", x + anchoNum + 12, 380);
+  // Los casilleros del período, como el año de Tu año.
+  let y = 430;
   if (calendarCells && calendarCells.length) {
-    const rows = Math.ceil(calendarCells.length / gridCols);
-    const cell = rows > 1 ? 44 : 56, gap = rows > 1 ? 8 : 12;
-    const gridW = gridCols * cell + (gridCols - 1) * gap;
-    const startX = (W - gridW) / 2, startY = y + 50;
+    const cols = 7, rows = Math.ceil(calendarCells.length / cols);
+    const gap = 8, cell = Math.min(rows > 1 ? 56 : 62, (W - 88 - gap * 6) / 7);
     calendarCells.forEach((c, i) => {
       if (c.isPad) return;
-      const col = i % gridCols, row = Math.floor(i / gridCols);
-      const x = startX + col * (cell + gap), cy = startY + row * (cell + gap);
-      ctx.fillStyle = c.trained ? accent : "rgba(255,255,255,0.07)";
-      canvasRoundRect(ctx, x, cy, cell, cell, 10); ctx.fill();
-      if (c.trained) {
-        ctx.fillStyle = "rgba(255,255,255,0.92)";
-        ctx.font = `700 ${Math.round(cell * 0.46)}px sans-serif`;
-        ctx.fillText("✓", x + cell / 2, cy + cell / 2 + cell * 0.17);
-      }
+      const cx = x + (i % cols) * (cell + gap), cy = y + Math.floor(i / cols) * (cell + gap);
+      ctx.fillStyle = c.trained ? "#f6f4ec" : "rgba(255,255,255,.16)";
+      ctx.beginPath(); ctx.roundRect(cx, cy, cell, cell, 10); ctx.fill();
     });
-    y = startY + rows * cell + (rows - 1) * gap;
-  } else {
-    y += 60;
+    y += rows * (cell + gap) + 18;
   }
-
-  // 3 tiles de estadísticas
-  const tileY = Math.min(y + 44, 640);
-  const tiles = [
-    { val: daysTrained, label: "DÍAS\nENTRENADOS" },
-    { val: totalSets ?? 0, label: "SERIES\nTOTALES" },
-    { val: volMostrado > 999 ? `${(volMostrado / 1000).toFixed(1)}k` : volMostrado, label: `${weightLabel(unit).toUpperCase()} × REPS\nTOTALES` },
-  ];
-  const tileGap = 16, tileW = (W - 64 - tileGap * 2) / 3, tileH = 128;
-  tiles.forEach((t, i) => {
-    const x = 32 + i * (tileW + tileGap);
-    ctx.fillStyle = "rgba(255,255,255,0.06)";
-    canvasRoundRect(ctx, x, tileY, tileW, tileH, 16); ctx.fill();
-    ctx.fillStyle = "#f9fafa";
-    ctx.font = "900 34px sans-serif";
-    ctx.fillText(`${t.val}`, x + tileW / 2, tileY + 58);
-    ctx.fillStyle = "#9da2a8";
-    ctx.font = "700 13px sans-serif";
-    t.label.split("\n").forEach((l, li) => ctx.fillText(l, x + tileW / 2, tileY + 86 + li * 17));
+  const volMostrado = Math.round(kgToDisplay(totalVol || 0, unit));
+  const py = Math.min(Math.max(y, 640), 770);
+  placaCompartir(ctx, x, py, W - 88, 92, -0.012);
+  ctx.fillStyle = "#121316";
+  [[numeroAR(totalSets ?? 0), "series"], [volMostrado >= 1000 ? `${conComa(Math.round(volMostrado / 100) / 10)} t` : `${volMostrado} ${weightLabel(unit)}`, "levantados"]].forEach(([v, l], i) => {
+    const cx = x + 26 + i * ((W - 88) / 2);
+    letraCompartir(ctx, 900, 38, true); ctx.fillText(v, cx, py + 50);
+    ctx.fillStyle = "#5d6068"; letraCompartir(ctx, 650, 17); ctx.fillText(l, cx, py + 76);
+    ctx.fillStyle = "#121316";
   });
-
-  ctx.fillStyle = "#d1d4d7";
-  ctx.font = "700 24px sans-serif";
-  ctx.fillText(daysTrained > 0 ? "¡Seguí así! 💪" : "A entrenar 💪", W / 2, tileY + tileH + 60);
-  drawWordmark(ctx, W, H, accent);
+  drawWordmark(ctx, W, H, color);
 }
+
+function drawSocialProfileShareCard(ctx, W, H, { name, topRank, avatarInitial }) {
+  const color = COLORES_COMPARTIR.perfil;
+  const { tinta, suave } = drawShareCardBase(ctx, W, H, color);
+  const x = 44;
+  ctx.fillStyle = suave; letraCompartir(ctx, 700, 26); ctx.fillText("Entrenemos juntos", x, 150);
+  ctx.fillStyle = tinta; letraCompartir(ctx, 900, 96, true);
+  wrapCanvasText(ctx, "Sumame en Modus Fit", x, 250, W - 88, 88, 3);
+  // El carnet: la foto (la inicial), el nombre y el rango.
+  const cy = 470, ch = 230;
+  placaCompartir(ctx, x, cy, W - 88, ch, -0.02);
+  ctx.save(); ctx.translate(x + (W - 88) / 2, cy + ch / 2); ctx.rotate(-0.02); ctx.translate(-(x + (W - 88) / 2), -(cy + ch / 2));
+  const acento = topRank?.color || color;
+  ctx.fillStyle = acento; ctx.beginPath(); ctx.roundRect(x, cy, W - 88, 22, [28, 28, 0, 0]); ctx.fill();
+  ctx.fillStyle = "#121316"; ctx.beginPath(); ctx.arc(x + 82, cy + 120, 52, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#f6f4ec"; letraCompartir(ctx, 900, 58, true); ctx.textAlign = "center";
+  ctx.fillText((avatarInitial || "?").toUpperCase(), x + 82, cy + 140); ctx.textAlign = "left";
+  ctx.fillStyle = "#121316"; letraCompartir(ctx, 900, 40, true);
+  wrapCanvasText(ctx, name || "Alguien", x + 156, cy + 106, W - 88 - 180, 40, 2);
+  if (topRank) { ctx.fillStyle = "#5d6068"; letraCompartir(ctx, 700, 20); ctx.fillText(`Mejor rango: ${topRank.tier} ${topRank.sub}`, x + 156, cy + 186); }
+  ctx.restore();
+  ctx.fillStyle = suave; letraCompartir(ctx, 650, 22); ctx.fillText("Buscame por mi nombre en Social", x, 856);
+  drawWordmark(ctx, W, H, color);
+}
+
 
 /* ============================================================================
    COMPARTIR LOS RANGOS — se había probado capturando el SVG real que
@@ -9776,15 +9823,14 @@ function ModeloFacetas({ data = [], type = "anterior", bodyColor = "#3c4146", hi
   );
 }
 
-function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent = "#F59E0B", sex = null }) {
-  drawShareCardBase(ctx, W, H, accent, "#A855F7");
+function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, sex = null }) {
+  const fondoRango = COLORES_COMPARTIR.rango;
+  const { tinta: tintaRango, suave: suaveRango } = drawShareCardBase(ctx, W, H, fondoRango);
+  ctx.fillStyle = suaveRango; letraCompartir(ctx, 700, 26);
+  ctx.fillText(modeLabel === "General" ? "Mi rango por músculo" : `Mi rango por músculo · ${modeLabel}`, 44, 110);
+  ctx.fillStyle = tintaRango; letraCompartir(ctx, 900, 84, true);
+  ctx.fillText("Mis rangos", 44, 180);
   ctx.textAlign = "center";
-  ctx.fillStyle = accent;
-  ctx.font = `800 ${Math.round(W * 0.052)}px sans-serif`;
-  ctx.fillText("MIS RANGOS", W / 2, Math.round(H * 0.13));
-  ctx.fillStyle = "#9da2a8";
-  ctx.font = `700 ${Math.round(W * 0.036)}px sans-serif`;
-  ctx.fillText(modeLabel, W / 2, Math.round(H * 0.158));
 
   // Dibujo DIRECTO de los polígonos en el canvas — sin SVG, sin Image,
   // sin drawImage. La conversión SVG→Image fallaba en los WebViews de
@@ -9795,7 +9841,7 @@ function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent = "#F59E0
   const bodyH = bodyW * 2;
   const gap = Math.round(W * 0.08);
   const startX = (W - (bodyW * 2 + gap)) / 2;
-  const bodyY = Math.round(H * 0.20);
+  const bodyY = Math.round(H * 0.235);
 
   const fillFor = (slug, view) => {
     if (NON_INTERACTIVE_SLUGS.has(slug)) return NEUTRAL;
@@ -9856,67 +9902,12 @@ function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent = "#F59E0
   drawView(POSTERIOR_POLY_ORDER, mujer ? MUJER_POSTERIOR_POLY_POINTS : POSTERIOR_POLY_POINTS, "back", startX + bodyW + gap);
 
   const labelY = bodyY + bodyH + Math.round(H * 0.035);
-  ctx.fillStyle = "#d1d4d7";
-  ctx.font = `700 ${Math.round(W * 0.030)}px sans-serif`;
+  ctx.fillStyle = suaveRango;
+  letraCompartir(ctx, 700, Math.round(W * 0.034));
   ctx.fillText("De frente", startX + bodyW / 2, labelY);
   ctx.fillText("De espalda", startX + bodyW + gap + bodyW / 2, labelY);
 
-  drawWordmark(ctx, W, H, accent);
-}
-
-// Tarjeta "invitación" para que te agreguen — sin esto, la ÚNICA forma de
-// que alguien llegue a tu perfil era que ya conociera tu @usuario exacto
-// de antemano. Pensada para mandarla por WhatsApp/Instagram: nombre,
-// @usuario grande (lo que la otra persona necesita escribir en "Buscar")
-// y tu mejor rango como gancho, si tenés uno.
-function drawSocialProfileShareCard(ctx, W, H, { name, topRank, avatarInitial }) {
-  const accent = topRank?.color || "#A855F7";
-  drawShareCardBase(ctx, W, H, accent, "#38BDF8");
-  ctx.textAlign = "center";
-
-  ctx.fillStyle = tint(accent, "cc"); ctx.font = `800 ${Math.round(W * 0.052)}px sans-serif`;
-  ctx.fillText("AGREGAME EN", W / 2, Math.round(H * 0.13));
-  ctx.font = `800 ${Math.round(W * 0.09)}px sans-serif`;
-  ctx.fillStyle = "#f9fafa";
-  ctx.fillText("MODUS FIT", W / 2, Math.round(H * 0.205));
-
-  // Avatar circular con la inicial — mismo criterio que el resto de la
-  // app cuando no hay foto: un círculo con degradé y la inicial en blanco.
-  const avatarR = Math.round(W * 0.17), avatarCy = Math.round(H * 0.36);
-  const gAv = ctx.createLinearGradient(W / 2 - avatarR, avatarCy - avatarR, W / 2 + avatarR, avatarCy + avatarR);
-  gAv.addColorStop(0, tint(accent, "cc")); gAv.addColorStop(1, tint(accent, "70"));
-  ctx.fillStyle = gAv;
-  ctx.beginPath(); ctx.arc(W / 2, avatarCy, avatarR, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = "#ffffff"; ctx.font = `800 ${Math.round(avatarR * 1.1)}px sans-serif`;
-  ctx.fillText((avatarInitial || "?").toUpperCase(), W / 2, avatarCy + avatarR * 0.38);
-
-  ctx.fillStyle = "#f9fafa"; ctx.font = `800 ${Math.round(W * 0.06)}px sans-serif`;
-  ctx.fillText(name || "Alguien", W / 2, Math.round(H * 0.505));
-
-  // @usuario — lo más grande de la tarjeta después del nombre de la app:
-  // es literalmente el dato que la otra persona tiene que escribir.
-  const chipY = Math.round(H * 0.545), chipH = Math.round(H * 0.075);
-  ctx.font = `700 ${Math.round(W * 0.058)}px sans-serif`;
-  const chipText = "Sumame en Social";
-  const chipW = ctx.measureText(chipText).width + W * 0.09;
-  ctx.fillStyle = tint(accent, "1c");
-  canvasRoundRect(ctx, W / 2 - chipW / 2, chipY, chipW, chipH, chipH / 2); ctx.fill();
-  ctx.strokeStyle = tint(accent, "50"); ctx.lineWidth = 2;
-  canvasRoundRect(ctx, W / 2 - chipW / 2, chipY, chipW, chipH, chipH / 2); ctx.stroke();
-  ctx.fillStyle = accent;
-  ctx.fillText(chipText, W / 2, chipY + chipH * 0.68);
-
-  if (topRank) {
-    ctx.fillStyle = "#6e7379"; ctx.font = `600 ${Math.round(W * 0.032)}px sans-serif`;
-    ctx.fillText(`Mejor rango · ${topRank.label}`, W / 2, Math.round(H * 0.70));
-    ctx.fillStyle = topRank.color; ctx.font = `800 ${Math.round(W * 0.075)}px sans-serif`;
-    ctx.fillText(`${topRank.tier} ${topRank.sub}`, W / 2, Math.round(H * 0.755));
-  }
-
-  ctx.fillStyle = "#6e7379"; ctx.font = `600 ${Math.round(W * 0.034)}px sans-serif`;
-  ctx.fillText("Buscame por mi nombre en la pestaña Social", W / 2, Math.round(H * 0.885));
-
-  drawWordmark(ctx, W, H, accent);
+  drawWordmark(ctx, W, H, fondoRango);
 }
 
 // ============================== QR DE PERFIL ==============================
@@ -9954,15 +9945,12 @@ function parseProfileQrPayload(text) {
 // drawMuscleRankShareCard — un <img>/drawImage asincrónico se rompe en
 // algunos WebViews de Android (onload que nunca dispara), dibujar
 // rectángulos a mano nunca falla.
-async function drawSocialProfileQrCard(ctx, W, H, { name, username, accent }) {
-  drawShareCardBase(ctx, W, H, accent, "#38BDF8");
+async function drawSocialProfileQrCard(ctx, W, H, { name, username }) {
+  const fondoQr = COLORES_COMPARTIR.qr;
+  const { tinta: tintaQr, suave: suaveQr } = drawShareCardBase(ctx, W, H, fondoQr);
+  ctx.fillStyle = suaveQr; letraCompartir(ctx, 700, 26); ctx.fillText("Escaneame en", 44, 110);
+  ctx.fillStyle = tintaQr; letraCompartir(ctx, 900, 84, true); ctx.fillText("Modus Fit", 44, 184);
   ctx.textAlign = "center";
-
-  ctx.fillStyle = tint(accent, "cc"); ctx.font = `800 ${Math.round(W * 0.05)}px sans-serif`;
-  ctx.fillText("ESCANEAME EN", W / 2, Math.round(H * 0.115));
-  ctx.font = `800 ${Math.round(W * 0.082)}px sans-serif`;
-  ctx.fillStyle = "#f9fafa";
-  ctx.fillText("MODUS FIT", W / 2, Math.round(H * 0.18));
 
   const QRCode = (await import("qrcode")).default;
   const qr = QRCode.create(buildProfileQrPayload(username), { errorCorrectionLevel: "M" });
@@ -9991,25 +9979,12 @@ async function drawSocialProfileQrCard(ctx, W, H, { name, username, accent }) {
     }
   }
 
-  const belowY = qrY + qrSide + Math.round(H * 0.078);
-  ctx.fillStyle = "#f9fafa"; ctx.font = `800 ${Math.round(W * 0.055)}px sans-serif`;
+  const belowY = qrY + qrSide + Math.round(H * 0.085);
+  ctx.fillStyle = tintaQr; letraCompartir(ctx, 900, 48, true);
   ctx.fillText(name || "Alguien", W / 2, belowY);
-
-  const chipY = belowY + Math.round(H * 0.03), chipH = Math.round(H * 0.062);
-  ctx.font = `700 ${Math.round(W * 0.046)}px sans-serif`;
-  const chipText = "Escaneá para sumarme";
-  const chipW = ctx.measureText(chipText).width + W * 0.08;
-  ctx.fillStyle = tint(accent, "1c");
-  canvasRoundRect(ctx, W / 2 - chipW / 2, chipY, chipW, chipH, chipH / 2); ctx.fill();
-  ctx.strokeStyle = tint(accent, "50"); ctx.lineWidth = 2;
-  canvasRoundRect(ctx, W / 2 - chipW / 2, chipY, chipW, chipH, chipH / 2); ctx.stroke();
-  ctx.fillStyle = accent;
-  ctx.fillText(chipText, W / 2, chipY + chipH * 0.68);
-
-  ctx.fillStyle = "#6e7379"; ctx.font = `600 ${Math.round(W * 0.032)}px sans-serif`;
-  ctx.fillText("Escanealo con la cámara del teléfono", W / 2, Math.round(H * 0.9));
-
-  drawWordmark(ctx, W, H, accent);
+  ctx.fillStyle = suaveQr; letraCompartir(ctx, 650, 22);
+  ctx.fillText("Escanealo con la cámara del teléfono", W / 2, belowY + 44);
+  drawWordmark(ctx, W, H, fondoQr);
 }
 
 /* ============================================================================
@@ -12962,7 +12937,7 @@ function dibujarTicket(ctx, W, H, resumen, unit) {
   // color-mix en todos los teléfonos): el color del día con tinta y con papel.
   const rgb = (c) => `rgb(${c.join(",")})`;
   const tonos = [rgb(mezclarHex(dia, TINTA, 0.75)), rgb(mezclarHex(dia, PAPEL, 0.58)), rgb(mezclarHex(dia, PAPEL, 0.34)), "#cfcfca"];
-  ctx.fillStyle = "#0b0b0d"; ctx.fillRect(0, 0, W, H);
+  const fondoTicket = COLORES_COMPARTIR.naranja; drawShareCardBase(ctx, W, H, fondoTicket);
   const lineas = (resumen.lineas || []).slice(0, 6);
   const maxLinea = Math.max(1, ...lineas.map((l) => l.volumen || 0));
   const prs = (resumen.prs || []).slice(0, 3);
@@ -13081,8 +13056,8 @@ function dibujarTicket(ctx, W, H, resumen, unit) {
   ctx.fillStyle = TINTA;
   barras.forEach((w, i) => { if (i % 7 !== 3) ctx.fillRect(bx, y, w * 2.4, 54); bx += w * 2.4 + 2.4; });
   // Al pie, la marca de la app.
-  ctx.textAlign = "center"; ctx.fillStyle = "#9d9ea4"; ctx.font = `600 20px ${F}`;
-  ctx.fillText("modus fit", W / 2, H - 46);
+  
+  drawWordmark(ctx, W, H, fondoTicket);
 }
 
 /* ============================================================================
@@ -14207,6 +14182,39 @@ function MedallasDelAnio({ meses = [] }) {
   );
 }
 
+// LA PORTADA DEL MES (27/11, pedido: "me gustó la estética del wrap; mejorá
+// el resumen mensual"): el resumen de un mes abre como una historia de Tu año.
+// Un color lleno por mes, los discos de fondo, el nombre del mes enorme, los
+// días, la medalla con sus rayos y, si el mes cerró, el botón de las historias.
+const COLORES_DE_LOS_MESES = ["#2747ff", "#ff3d8e", "#00a86b", "#ff7a00", "#8f3dff", "#00b2c9", "#ff4f2b", "#ffc31f", "#2747ff", "#ff3d8e", "#00a86b", "#8f3dff"];
+function PortadaDelMes({ data, enCurso, contra, onHistorias }) {
+  const [anio, mes] = String(data.prefijo).split("-").map(Number);
+  const color = COLORES_DE_LOS_MESES[((mes || 1) - 1) % 12];
+  const claro = esFondoClaro(color);
+  return (
+    <header className={`mes-portada ${claro ? "tinta-oscura" : ""}`} style={{ "--mes-c": color }}>
+      <DiscoDeFondo className="uno" />
+      <DiscoDeFondo className="dos" />
+      <div className="mes-portada-texto">
+        <p className="mes-portada-ceja">{enCurso ? "Cómo vas este mes" : "Mes cerrado"}</p>
+        <h2 className="mes-portada-mes">{capitalizar(NOMBRES_MES[(mes || 1) - 1])}</h2>
+        <p className="mes-portada-dias num-display"><b>{data.dias}</b> {data.dias === 1 ? "día" : "días"}<span> · {anio}</span></p>
+        {typeof data.vsAnterior === "number" && (
+          <p className="mes-portada-vs">{data.vsAnterior >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}{conSigno(data.vsAnterior, 0)} % de volumen que {contra}</p>
+        )}
+      </div>
+      {!enCurso && <div className="mes-portada-medalla"><Rayos /><MedallaMes prefijo={data.prefijo} numero={data.dias} /></div>}
+      {onHistorias && (
+        <button onClick={onHistorias} className="mes-portada-boton">
+          <span className="resumen-portada-barras" aria-hidden="true"><i /><i /><i /><i /><i /></span>
+          <span>Verlo en historias</span>
+          <span className="mes-portada-play" aria-hidden="true"><Play size={14} fill="currentColor" /></span>
+        </button>
+      )}
+    </header>
+  );
+}
+
 function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, enCurso = false }) {
   useAndroidBack(onClose);
   const unit = useWeightUnit();
@@ -14267,8 +14275,10 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
         {/* El año, en grande, como la tapa de un anuario. */}
         {periodo === "anio" && data.prefijo && <p className="anuario-numero num-display" aria-hidden="true">{data.prefijo}</p>}
         {/* Un mes cerrado trae su medalla, colgada arriba. */}
-        {periodo === "mes" && !enCurso && data.prefijo && <div className="resumen-medalla"><MedallaMes prefijo={data.prefijo} numero={data.dias} /></div>}
-        <header className="resumen-cabeza">
+        {periodo === "mes" && data.prefijo && (
+          <PortadaDelMes data={data} enCurso={enCurso} contra={contra} onHistorias={enCurso ? null : () => setHistorias(true)} />
+        )}
+        {periodo !== "mes" && <header className="resumen-cabeza">
           <h2 className="resumen-titulo">{est.titulo}</h2>
           <p className="resumen-bajada">{bajada}</p>
           {typeof data.vsAnterior === "number" && (
@@ -14277,20 +14287,8 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
               {conSigno(data.vsAnterior, 0)} % de volumen que {contra}
             </p>
           )}
-        </header>
+        </header>}
 
-        {/* Un mes cerrado abre con la portada de sus historias, como un Wrapped chico. */}
-        {periodo === "mes" && !enCurso && data.prefijo && (
-          <button onClick={() => setHistorias(true)} className="resumen-portada">
-            <DiscoDeFondo />
-            <span className="resumen-portada-texto">
-              <span className="resumen-portada-barras" aria-hidden="true"><i /><i /><i /><i /><i /></span>
-              <b>Tu {NOMBRES_MES[Number(String(data.prefijo).slice(5, 7)) - 1]} en historias</b>
-              <small>{data.dias} {data.dias === 1 ? "día" : "días"}{data.records ? `, ${data.records} ${data.records === 1 ? "marca nueva" : "marcas nuevas"}` : ""} y tu medalla</small>
-            </span>
-            <span className="resumen-portada-play" aria-hidden="true"><Play size={18} fill="currentColor" /></span>
-          </button>
-        )}
         {periodo === "semana" && <PuntajesSemana p={data.puntajes} encendido={encendido} />}
         {periodo === "semana" && data.diasDetalle?.length > 0 && <TarjetaSemana data={data} />}
         {periodo === "semana" && data.rachaSemanas >= 2 && (
@@ -20856,7 +20854,7 @@ function dibujarManoAMano(ctx, W, H, d) {
   const yo = mezclarHex(d.colorYo, "#8a8c92", 0.62), el = mezclarHex(d.colorEl, "#8a8c92", 0.62);
   const css = (c, a = 1) => `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
   const angosto = (si) => { if ("fontStretch" in ctx) ctx.fontStretch = si ? "condensed" : "normal"; };
-  ctx.fillStyle = "#0b0b0d"; ctx.fillRect(0, 0, W, H);
+  drawShareCardBase(ctx, W, H, COLORES_COMPARTIR.social);
   // La luz de cada uno en su esquina.
   [[0, yo], [W, el]].forEach(([x, c]) => {
     const g = ctx.createRadialGradient(x, 130, 0, x, 130, 430);
@@ -20864,20 +20862,20 @@ function dibujarManoAMano(ctx, W, H, d) {
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   });
   ctx.textAlign = "center";
-  ctx.fillStyle = "#f2f2f4"; ctx.font = `800 44px ${F}`; ctx.fillText("Mano a mano", W / 2, 100);
+  ctx.fillStyle = "#f6f4ec"; letraCompartir(ctx, 900, 76, true); ctx.fillText("Mano a mano", W / 2, 112); letraCompartir(ctx, 700, 20);
   // Las dos caras.
   const cara = (x, inicial, nombre, rango, color) => {
     ctx.beginPath(); ctx.arc(x, 228, 60, 0, Math.PI * 2); ctx.fillStyle = "#1c1d21"; ctx.fill();
     ctx.lineWidth = 6; ctx.strokeStyle = css(color); ctx.stroke();
     ctx.fillStyle = "#f2f2f4"; ctx.font = `750 48px ${F}`; ctx.fillText(inicial, x, 245);
     ctx.font = `700 28px ${F}`; ctx.fillText(nombre.length > 12 ? `${nombre.slice(0, 11)}.` : nombre, x, 332);
-    ctx.fillStyle = css(color); ctx.font = `650 21px ${F}`; ctx.fillText(rango || "Sin rango", x, 364);
+    ctx.fillStyle = "rgba(246,244,236,.8)"; ctx.font = `650 21px ${F}`; ctx.fillText(rango || "Sin rango", x, 364);
   };
   cara(140, d.inicialYo, "Vos", d.rangoYo, yo);
   cara(W - 140, d.inicialEl, d.nombre, d.rangoEl, el);
-  ctx.fillStyle = "#8d8f96"; ctx.font = `600 22px ${F}`; ctx.fillText("contra", W / 2, 236);
+  ctx.fillStyle = "rgba(246,244,236,.8)"; ctx.font = `600 22px ${F}`; ctx.fillText("contra", W / 2, 236);
   // La barra en equilibrio: baja del lado que tiene más discos.
-  const cy = 520, largo = 470;
+  const cy = 500, largo = 470;
   ctx.fillStyle = "#34363c";
   ctx.beginPath(); ctx.moveTo(W / 2, cy + 8); ctx.lineTo(W / 2 - 44, cy + 116); ctx.lineTo(W / 2 + 44, cy + 116); ctx.closePath(); ctx.fill();
   ctx.save();
@@ -20900,19 +20898,19 @@ function dibujarManoAMano(ctx, W, H, d) {
   // El marcador, con el veredicto al medio.
   angosto(true);
   ctx.fillStyle = "#f2f2f4"; ctx.font = `800 84px ${F}`;
-  ctx.fillText(String(d.gano), 140, 742); ctx.fillText(String(d.pierdo), W - 140, 742);
+  ctx.fillText(String(d.gano), 140, 706); ctx.fillText(String(d.pierdo), W - 140, 706);
   angosto(false);
-  ctx.font = `500 21px ${F}`; ctx.fillStyle = "#a3a5ab";
-  ctx.fillText("para vos", 140, 778); ctx.fillText(`para ${d.nombre.length > 12 ? `${d.nombre.slice(0, 11)}.` : d.nombre}`, W - 140, 778);
+  ctx.font = `500 21px ${F}`; ctx.fillStyle = "rgba(246,244,236,.85)";
+  ctx.fillText("para vos", 140, 740); ctx.fillText(`para ${d.nombre.length > 12 ? `${d.nombre.slice(0, 11)}.` : d.nombre}`, W - 140, 740);
   ctx.font = `700 22px ${F}`;
   const ancho = ctx.measureText(d.veredicto).width + 44;
-  ctx.fillStyle = "#1f2024"; ctx.beginPath(); ctx.roundRect(W / 2 - ancho / 2, 708, ancho, 46, 23); ctx.fill();
-  ctx.fillStyle = "#f2f2f4"; ctx.fillText(d.veredicto, W / 2, 739);
+  ctx.fillStyle = "#1f2024"; ctx.beginPath(); ctx.roundRect(W / 2 - ancho / 2, 768, ancho, 46, 23); ctx.fill();
+  ctx.fillStyle = "#f2f2f4"; ctx.fillText(d.veredicto, W / 2, 799);
   // El fuerte de cada uno.
-  ctx.font = `500 20px ${F}`; ctx.fillStyle = "#8d8f96";
-  if (d.fuerteYo) ctx.fillText(`Tu fuerte: ${d.fuerteYo}`, W / 2, 846);
-  if (d.fuerteEl) ctx.fillText(`El de ${d.nombre}: ${d.fuerteEl}`, W / 2, d.fuerteYo ? 876 : 846);
-  ctx.fillStyle = "#9d9ea4"; ctx.font = `600 20px ${F}`; ctx.fillText("modus fit", W / 2, H - 40);
+  ctx.font = `500 20px ${F}`; ctx.fillStyle = "rgba(246,244,236,.8)";
+  if (d.fuerteYo) ctx.fillText(`Tu fuerte: ${d.fuerteYo}`, W / 2, 850);
+  if (d.fuerteEl) ctx.fillText(`El de ${d.nombre}: ${d.fuerteEl}`, W / 2, d.fuerteYo ? 876 : 850);
+  drawWordmark(ctx, W, H, COLORES_COMPARTIR.social);
 }
 
 // La pizarra del grupo como imagen para compartir: un renglón por
@@ -20921,17 +20919,18 @@ function dibujarPizarra(ctx, W, H, filas, unidad) {
   const F = "'Mona Sans Variable', system-ui, sans-serif";
   const corto = (t, n) => (t.length > n ? `${t.slice(0, n - 1)}.` : t);
   const angosto = (si) => { if ("fontStretch" in ctx) ctx.fontStretch = si ? "condensed" : "normal"; };
-  ctx.fillStyle = "#0b0b0d"; ctx.fillRect(0, 0, W, H);
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#f2f2f4"; ctx.font = `800 40px ${F}`; ctx.fillText("La pizarra del grupo", W / 2, 84);
-  ctx.fillStyle = "#8d8f96"; ctx.font = `500 19px ${F}`; ctx.fillText("Quién tiene la mejor serie de cada ejercicio", W / 2, 114);
+  drawShareCardBase(ctx, W, H, COLORES_COMPARTIR.social);
+  ctx.textAlign = "left";
+  ctx.fillStyle = "rgba(246,244,236,.8)"; letraCompartir(ctx, 700, 26); ctx.fillText("Los récords del grupo", 44, 110);
+  ctx.fillStyle = "#f6f4ec"; letraCompartir(ctx, 900, 84, true); ctx.fillText("La pizarra", 44, 184);
+  letraCompartir(ctx, 500, 19);
   // La pizarra: una placa con su marco.
   // La pizarra mide lo que sus renglones, y queda centrada en el alto.
   const lista = filas.slice(0, 7);
-  const espacio = H - 236;
+  const espacio = H - 300;
   const paso = Math.min(96, (espacio - 24) / Math.max(1, lista.length));
   const x0 = 32, w = W - 64, h = Math.round(24 + lista.length * paso);
-  const y0 = 146 + Math.round((espacio - h) / 2);
+  const y0 = 220 + Math.round((espacio - h) / 2);
   ctx.fillStyle = "#16171a"; ctx.beginPath(); ctx.roundRect(x0, y0, w, h, 26); ctx.fill();
   ctx.strokeStyle = "rgba(255, 255, 255, 0.09)"; ctx.lineWidth = 2; ctx.stroke();
   lista.forEach((p, i) => {
@@ -20949,7 +20948,7 @@ function dibujarPizarra(ctx, W, H, filas, unidad) {
     ctx.fillText(`${p.primero.marca.reps} × ${conComa(kgToDisplay(p.primero.marca.kg, unidad))}`, x0 + w - 24, y + 52);
     angosto(false);
   });
-  ctx.textAlign = "center"; ctx.fillStyle = "#9d9ea4"; ctx.font = `600 20px ${F}`; ctx.fillText("modus fit", W / 2, H - 40);
+  drawWordmark(ctx, W, H, COLORES_COMPARTIR.social);
 }
 
 // Una de las dos caras del mano a mano: la foto con el aro de su rango.
@@ -36940,4 +36939,10 @@ function RecoveredBanner({ onClose }) {
 
 function ImportRoutineErrorBanner({ onClose }) {
   return <AvisoArriba tipo="error" icono={<AlertTriangle size={18} />} titulo="No pudimos abrir esa rutina" texto="Puede que el enlace ya no exista. Pedile a quien te la mandó que la comparta de nuevo." onCerrar={onClose} />;
+}
+
+// Sólo en desarrollo: las funciones que dibujan las imágenes para compartir,
+// para sacarles fotos sin recorrer cada pantalla (.taste-skill/compartir-fotos.mjs).
+if (import.meta.env.DEV && typeof window !== "undefined") {
+  window.__dibujos = { drawPRShareCard, drawCycleShareCard, drawPeriodShareCard, drawMuscleRankShareCard, drawSocialProfileShareCard, drawSocialProfileQrCard, dibujarTicket, dibujarManoAMano, dibujarPizarra, dibujarHojaRutina, armarTicket: typeof armarTicket === "function" ? armarTicket : null };
 }

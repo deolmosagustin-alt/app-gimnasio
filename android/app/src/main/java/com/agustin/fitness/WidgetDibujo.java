@@ -72,9 +72,10 @@ public final class WidgetDibujo {
     }
 
     static final int F1 = 0xFF232529, F2 = 0xFF17181B, BORDE = 0xFF2D2F35;
-    static final int FUERTE = 0xFFF2F2EF, SUAVE = 0xFFA2A6AD, HUNDIDO = 0xFF26282D, BOTON = 0xFF2C2E34, RAYA = 0xFF3B3E45, TINTA = 0xFF101214;
+    // Lo que va encima de la placa es translúcido, así queda bien sobre el color de cada widget.
+    static final int FUERTE = 0xFFF6F4EC, SUAVE = 0xC8F6F4EC, HUNDIDO = 0x3D000000, BOTON = 0x24FFFFFF, RAYA = 0x2EFFFFFF, TINTA = 0xFF101214;
     static final int VERDE = 0xFF6FD39A, GRIS = 0xFF8A8C92, ACENTO = 0xFF7BD0BD;
-    static final int AZUL = 0xFF6C9BF2, ORO = 0xFFE8C36A, TIZA = 0xFFE9E7DF, CLARO = 0xFFDADCE0, TENUE = 0xFF7F838B;
+    static final int AZUL = 0xFF6C9BF2, ORO = 0xFFE8C36A, TIZA = 0xFFE9E7DF, CLARO = 0xFFDADCE0, TENUE = 0x99F6F4EC;
 
     private static Typeface ANGOSTA, TEXTO;
 
@@ -161,21 +162,44 @@ public final class WidgetDibujo {
         c.drawRoundRect(rr, r, r, b);
     }
 
-    /** La placa con la luz tenue de su tono arriba, como cada pestaña de la app, y el brillo del canto. */
+    /**
+     * LA PLACA CON LA ESTÉTICA DE TU AÑO (27/11, pedido: "me gustó la estética
+     * del wrap; mejorá la de los widgets"): el color del widget lleno y profundo
+     * (para que la letra clara y lo que tiene color se lean), dos discos que
+     * asoman, como en las historias, y el grano de papel impreso. Sin tono, el
+     * turquesa de la app.
+     */
     private static void fondo(Canvas c, int w, int h, float d, float r, int tono) {
-        fondo(c, w, h, d, r, F1, F2, BORDE);
-        if (tono != 0) {
-            Path clip = new Path();
-            clip.addRoundRect(new RectF(d, d, w - d, h - d), r, r, Path.Direction.CW);
-            c.save();
-            c.clipPath(clip);
-            int base = tono & 0x00FFFFFF;
-            Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-            p.setShader(new RadialGradient(w * 0.08f, -h * 0.3f, Math.max(w * 0.8f, h * 1.5f), new int[]{base | 0x3D000000, base | 0x14000000, base}, new float[]{0f, 0.5f, 1f}, Shader.TileMode.CLAMP));
-            c.drawRect(0, 0, w, h, p);
-            c.restore();
+        int t = tono == 0 ? ACENTO : (tono | 0xFF000000);
+        int arriba = mezcla(t, 0xFF0B0C0E, 0.70f), abajo = mezcla(t, 0xFF0B0C0E, 0.50f);
+        fondo(c, w, h, d, r, arriba, abajo, mezcla(t, 0xFF0B0C0E, 0.62f));
+        Path clip = new Path();
+        clip.addRoundRect(new RectF(d, d, w - d, h - d), r, r, Path.Direction.CW);
+        c.save();
+        c.clipPath(clip);
+        float grande = Math.max(w, h) * 0.62f;
+        disco(c, d, w * 0.98f, h * 1.02f, grande, abajo);
+        disco(c, d, -w * 0.02f, -h * 0.04f, Math.max(w, h) * 0.26f, arriba);
+        // El grano: puntos fijos, claros y oscuros.
+        Paint g = new Paint();
+        int s = 7;
+        int n = Math.min(900, (int) (w * h / (60 * d * d)));
+        for (int k = 0; k < n; k++) {
+            s = (s * 16807) % 2147483647; float x = (s % 10000) / 10000f * w;
+            s = (s * 16807) % 2147483647; float y = (s % 10000) / 10000f * h;
+            g.setColor((k & 1) == 0 ? 0x12FFFFFF : 0x14000000);
+            c.drawRect(x, y, x + 1.2f * d, y + 1.2f * d, g);
         }
-        c.drawLine(r * 0.9f, 1.25f * d, w - r * 0.9f, 1.25f * d, trazo(0x18FFFFFF, d));
+        c.restore();
+        c.drawLine(r * 0.9f, 1.25f * d, w - r * 0.9f, 1.25f * d, trazo(0x22FFFFFF, d));
+    }
+
+    /** Un disco visto de frente: el aro, la raya punteada, la maza y el agujero. */
+    private static void disco(Canvas c, float d, float cx, float cy, float ra, int fondo) {
+        c.drawCircle(cx, cy, ra, pincel(0x17FFFFFF));
+        c.drawCircle(cx, cy, ra * 0.88f, trazo(0x1F000000, Math.max(d, ra * 0.03f)));
+        c.drawCircle(cx, cy, ra * 0.3f, pincel(0x24000000));
+        c.drawCircle(cx, cy, ra * 0.14f, pincel(fondo));
     }
 
     private static JSONObject delDia(JSONArray agenda, String f) {
@@ -716,7 +740,7 @@ public final class WidgetDibujo {
 
     /** La tecla de un tiempo; los dos tuyos (el corto y el largo de Perfil), en el tono. */
     private static void chip(Canvas c, float d, RectF rr, String s, float tam, boolean tuyo) {
-        c.drawRoundRect(rr, 14 * d, 14 * d, pincel(tuyo ? mezcla(ACENTO, BOTON, 0.14f) : BOTON));
+        c.drawRoundRect(rr, 14 * d, 14 * d, pincel(tuyo ? 0x407BD0BD : BOTON));
         c.drawLine(rr.left + 12 * d, rr.top + 0.75f * d, rr.right - 12 * d, rr.top + 0.75f * d, trazo(0x14FFFFFF, d));
         Paint pt = texto(tuyo ? pastel(ACENTO) : FUERTE, tam, ANGOSTA);
         alCentro(c, s, rr.centerX(), rr.centerY() + tam * 0.36f, pt);
@@ -977,7 +1001,7 @@ public final class WidgetDibujo {
     private static void celdaMes(Canvas c, float d, RectF rr, String hex, boolean esHoy, boolean futuro, String n) {
         float rd = Math.min(5.5f * d, rr.width() / 3.2f);
         boolean fue = hex != null;
-        c.drawRoundRect(rr, rd, rd, pincel(fue ? mezcla(color(hex, ACENTO), GRIS, 0.62f) : futuro ? 0xFF24262B : 0xFF32353B));
+        c.drawRoundRect(rr, rd, rd, pincel(fue ? mezcla(color(hex, ACENTO), GRIS, 0.62f) : futuro ? 0x1FFFFFFF : 0x33FFFFFF));
         if (esHoy) c.drawRoundRect(new RectF(rr.left + 0.7f * d, rr.top + 0.7f * d, rr.right - 0.7f * d, rr.bottom - 0.7f * d), rd, rd, trazo(0xFFE6E6E2, 1.4f * d));
         if (n != null) {
             Paint pn = texto(fue ? TINTA : esHoy ? 0xFFE6E6E2 : futuro ? 0xFF53565D : TENUE, rr.height() * 0.46f, TEXTO);
@@ -1089,7 +1113,7 @@ public final class WidgetDibujo {
         for (int i = 0; i < n; i++) {
             float x = x0 + i * (cw + sep);
             float al = v[i] <= 0 ? 0 : Math.max(3 * d, (bottom - top) * v[i] / max);
-            if (al <= 0) { c.drawRoundRect(new RectF(x, bottom - 2 * d, x + cw, bottom), d, d, pincel(0xFF34363C)); continue; }
+            if (al <= 0) { c.drawRoundRect(new RectF(x, bottom - 2 * d, x + cw, bottom), d, d, pincel(0x33FFFFFF)); continue; }
             Path q = new Path();
             q.addRoundRect(new RectF(x, bottom - al, x + cw, bottom), new float[]{rd, rd, rd, rd, 0, 0, 0, 0}, Path.Direction.CW);
             c.drawPath(q, pincel(i == n - 1 ? pastel(AZUL) : 0xFF4D5058));
