@@ -3002,6 +3002,37 @@ const ANIMATION_CSS = letraEscalable(`
 .portada-meses i { width: 8px; height: calc(4px + var(--f, 0) * 50px); border-radius: 3px; background: #f6f4ec; transform-origin: bottom; animation: barraSube .6s cubic-bezier(.2, 1.3, .4, 1) both; animation-delay: inherit; }
 @keyframes barraSube { from { transform: scaleY(0); } }
 @media (prefers-reduced-motion: reduce) { .portada-fichas .si i, .portada-meses i { animation: none; } }
+/* LAS DOS CARAS DEL VISOR (28/11): el izquierdo adelante, el derecho atrás. */
+.giro-lado { position: relative; perspective: 1100px; }
+.giro-frente, .giro-dorso { backface-visibility: hidden; transition: transform .6s cubic-bezier(.3, 1.2, .45, 1); }
+.giro-lado.girado .giro-frente { transform: rotateY(-180deg); }
+.giro-dorso { position: absolute; left: 0; right: 0; bottom: 0; transform: rotateY(180deg); }
+.giro-lado.girado .giro-dorso { transform: rotateY(0); }
+.giro-dorso .foco-visor { margin-top: 0; }
+.foco-visor.cara-derecha { box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--c, var(--tono)) 55%, transparent); }
+.foco-input-fijo { display: grid; place-items: center; color: var(--text-muted); }
+.cara-derecha-nota { align-self: center; justify-self: center; font-size: 12px; color: var(--text-faint); }
+.lado-pestanas { position: absolute; right: 12px; top: 0; z-index: 2; display: inline-flex; padding: 2px; border-radius: 999px; transform: translateY(-55%); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--hairline); }
+.lado-pestanas button { position: relative; height: 24px; padding: 0 10px; border-radius: 999px; font-size: 11px; font-weight: 750; color: var(--text-muted); }
+.lado-pestanas button::after { content: ""; position: absolute; inset: -10px -2px; }
+.lado-pestanas button.on { color: color-mix(in oklab, var(--c, var(--tono)) 14%, #07080a); background: color-mix(in oklab, var(--c, var(--tono)) 72%, white); }
+@media (prefers-reduced-motion: reduce) { .giro-frente, .giro-dorso { transition: none; } }
+/* LA BARRA DE ABAJO, UNA SOLA FILA (28/11): el descanso y Finalizar. Sin
+   descanso, sólo Finalizar, chico y a la derecha. */
+.dock-una-fila { display: flex; align-items: center; }
+.dock-una-fila > .dock-descanso-embebido { flex: 1 1 auto; min-width: 0; border-bottom: 0; }
+.dock-una-fila > .boton-finalizar { flex: none; margin: 0 8px 0 2px; }
+.dock-una-fila:has(> .dock-descanso-embebido) > .boton-finalizar { position: relative; width: 44px; height: 44px; padding: 0; justify-content: center; gap: 0; border-left: 0; }
+.dock-una-fila:has(> .dock-descanso-embebido) > .boton-finalizar span { display: none; }
+.dock-una-fila:has(> .dock-descanso-embebido)::before { content: ""; order: 1; align-self: stretch; width: 1px; margin: 10px 2px; background: var(--hairline); }
+.dock-una-fila:has(> .dock-descanso-embebido) > .boton-finalizar { order: 2; }
+.session-bar-dock .dock-tarjeta:has(.dock-una-fila):not(:has(.dock-descanso-embebido)) { width: fit-content; margin-left: auto; border-radius: 999px; }
+.session-bar-dock .dock-tarjeta:has(.dock-una-fila):not(:has(.dock-descanso-embebido)) .boton-finalizar { margin: 4px; }
+/* El chip de arriba: el reloj de la sesión y las series. */
+.chip-reloj { gap: 7px; }
+.chip-reloj-tiempo { font-size: 1.05rem; font-weight: 750; font-stretch: 78%; color: var(--text-strong); font-variant-numeric: tabular-nums; }
+.chip-reloj-series { font-size: 11px; font-weight: 650; color: var(--text-muted); }
+button.chip-reloj { cursor: pointer; }
 /* Los dos puntajes de la semana (PuntajesSemana). */
 .puntajes-semana { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 14px 0 4px; }
 .puntaje { display: grid; gap: 6px; align-content: start; padding: 14px 14px 12px; border-radius: 20px; background: var(--surface-2); box-shadow: var(--placa-canto); }
@@ -12352,6 +12383,12 @@ function EntreLados({ exercise, accent, timerId, serie = null, series = null, se
     setEligiendo(false);
   };
   const corriendo = estado === "running" || estado === "paused";
+  // Mientras corre, el reloj está en el visor dado vuelta: acá no va nada.
+  if (corriendo && !eligiendo) return null;
+  // 28/11: con el descanso entre lados prendido, el lado se cambia arriba del
+  // visor (Izq. y Der.) y el tiempo se elige en el armado de la rutina: acá
+  // no queda nada. Sólo se ofrece prenderlo en un ejercicio a un lado.
+  if (seg > 0 && !eligiendo) return null;
   return (
     <div className="entre-lados" style={{ "--c": accent }}>
       {seg > 0 ? (
@@ -12365,7 +12402,7 @@ function EntreLados({ exercise, accent, timerId, serie = null, series = null, se
               // dock mostraba ése: el reloj del cambio de lado quedaba oculto.
               Object.keys(ACTIVE_REST_TIMERS).forEach((id) => { if (!id.startsWith("lado:") && !id.startsWith("cardio_")) terminarDescanso(id); });
               iniciarDescanso(idLado, { segundos: seg, ejercicio: exercise.name || null, siguiente: "el otro lado", color: accent, serie, series }); }}>
-            <ArrowLeftRight size={15} /> {corriendo ? "Cambiando de lado" : "Cambio de lado"}
+            <ArrowLeftRight size={15} /> Otro lado
           </button>
           {onUpdateSettings && <button className="entre-lados-tiempo num-display" onClick={() => setEligiendo((v) => !v)} aria-expanded={eligiendo} aria-label={`Descanso entre lados: ${relojCorto(seg)}. Cambiar`}>{relojCorto(seg)}</button>}
         </div>
@@ -12424,7 +12461,7 @@ function FilaDescansoDock({ timerId, embebido = false }) {
   const enPausa = estado === "paused";
   const relojGrande = grande && <RelojDescansoGrande timerId={timerId} onClose={() => setGrande(false)} />;
   const envolver = (contenido) => (embebido
-    ? <div className="dock-descanso dock-descanso-embebido relative" style={{ "--c": color }}>{contenido}{relojGrande}</div>
+    ? <div className="dock-descanso dock-descanso-embebido relative" style={{ "--c": color, "--fraccion": listo ? 0 : fraccion }}>{contenido}{relojGrande}</div>
     : <div className="dock-tarjeta dock-descanso session-bar-in" style={{ "--c": color }}>{contenido}{relojGrande}</div>);
   // UNA SOLA FILA: el reloj chico (tocarlo lo agranda: ahí están el ±15), el
   // tiempo, y pausa, reiniciar y cerrar (pedidos: "cambiar el +15 por el
@@ -12452,7 +12489,11 @@ function FilaDescansoDock({ timerId, embebido = false }) {
           </BotonDescanso>
         )}
         <BotonDescanso onClick={() => reiniciarDescanso(timerId)} label="Reiniciar el descanso" sutil={!listo}><RotateCcw size={16} /></BotonDescanso>
-        <BotonDescanso onClick={() => terminarDescanso(timerId)} label="Cerrar el descanso" sutil><X size={17} /></BotonDescanso>
+        {/* 28/11 (pedido: "sacá la x de la barra"): en la barra de la sesión no
+            va la cruz; el descanso se cierra solo al arrancar otro, desde el
+            reloj grande o a la media hora. Sin sesión, la tarjeta suelta la
+            conserva. */}
+        {!embebido && <BotonDescanso onClick={() => terminarDescanso(timerId)} label="Cerrar el descanso" sutil><X size={17} /></BotonDescanso>}
       </div>
     </div>,
   );
@@ -15337,6 +15378,39 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   // bloques de abajo lo necesitan antes de que se declare el local del
   // render, así que se calcula una sola vez acá.
   const yaRegistradaHoy = history.find((h) => h.date === today && !h.deload) || null;
+  // LAS DOS CARAS DEL VISOR (28/11, pedido: "que se pueda poner cuántas
+  // repeticiones hiciste con cada mano"; "el tiempo entre una mano y la otra
+  // ya está en el cronómetro de abajo, no lo repetiría"). En un ejercicio a un
+  // lado (con el descanso entre lados prendido), el visor tiene dos caras: la
+  // del izquierdo y la del derecho, cada una con sus reps; el peso es el mismo.
+  // Al tocar "Otro lado" (que arranca el reloj de abajo) el visor gira solo a
+  // la cara del derecho; las pestañas Izq. y Der. lo dan vuelta cuando quieras.
+  // Se guardan las dos (lados: { i, d }) y, para la progresión y los récords,
+  // cuenta el lado que hizo menos.
+  const ladoId = activa ? relojDeLado(restTimerId) : null;
+  const lado = useRelojDescanso(ladoId || "__sin__");
+  const porLado = !!fieldSettings?.entreLados?.[exerciseId] && !cardio;
+  const [ladoVisible, setLadoVisible] = useState("i");
+  const [estadoLadoVisto, setEstadoLadoVisto] = useState(lado.estado);
+  if (estadoLadoVisto !== lado.estado) {
+    setEstadoLadoVisto(lado.estado);
+    if (porLado && lado.estado === "running" && estadoLadoVisto === "idle") setLadoVisible("d");
+  }
+  const girado = porLado && ladoVisible === "d";
+  // Pasar al derecho arranca el descanso entre lados en la barra de abajo (y
+  // cierra el de entre series: ya hiciste el primer lado). Volver al izquierdo
+  // sólo da vuelta el visor.
+  const pasarALado = (l) => {
+    haptic(8);
+    if (l === "d" && ladoVisible !== "d" && ladoId) {
+      const seg = Number(fieldSettings?.entreLados?.[exerciseId]) || 0;
+      if (seg > 0 && lado.estado !== "running" && lado.estado !== "paused") {
+        Object.keys(ACTIVE_REST_TIMERS).forEach((id) => { if (!id.startsWith("lado:") && !id.startsWith("cardio_")) terminarDescanso(id); });
+        iniciarDescanso(ladoId, { segundos: seg, ejercicio: exerciseName || null, siguiente: "el otro lado", color: accent, serie: setIndex + 1, series: totalSets });
+      }
+    }
+    setLadoVisible(l);
+  };
   const draftGuardado = drafts[key] || EMPTY_OBJ;
   // Lo que tocaste se ve al instante (vivo) y el resto de la pantalla se pone
   // al día después, en una transición: así el + no se traba (27/11).
@@ -15420,6 +15494,13 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     onUpdateSettings({ saltosDePeso: saltos });
     setVerSaltos(false);
     haptic(10);
+  };
+  // Las reps del lado derecho: si no las tocaste, las mismas que el izquierdo.
+  const repsD = draft.repsD ?? reps;
+  const ajustarD = (delta) => {
+    const n = parseFloat(repsD || "0");
+    updateDraft({ repsD: String(Math.max(0, Math.round((isNaN(n) ? 0 : n) + delta))) });
+    haptic(8);
   };
   const ajustar = (campo, delta) => {
     const actual = campo === "reps" ? (reps || sugerido?.reps || "0") : (kg || sugerido?.kg || "0");
@@ -15542,6 +15623,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     }
   };
   const handleSave = () => {
+    setLadoVisible("i");
     if (cardio) {
       // Si el cronómetro estuvo corriendo, usar el tiempo transcurrido
       const autoMinutes = cardioElapsed > 0 ? Math.round(cardioElapsed / 60 * 10) / 10 : null;
@@ -15603,7 +15685,10 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       setFeedback({ type: fbC.type, msg: fbC.msg, noSession });
       return;
     }
-    const r = parseFloat(reps), kDisplay = parseFloat(kg);
+    const rI = parseFloat(reps), kDisplay = parseFloat(kg);
+    // A un lado: las reps de cada uno; cuenta el que hizo menos.
+    const rD = porLado && repsD !== "" ? parseFloat(repsD) : NaN;
+    const r = rD > 0 && rI > 0 ? Math.min(rI, rD) : rI;
     // kDisplay puede ser 0 (peso corporal, sin agregado) — solo se rechaza si
     // está vacío (NaN) o es negativo, no si es cero.
     if (!r || isNaN(r) || r < 0 || isNaN(kDisplay) || kDisplay < 0) { setFeedback({ type: "error", msg: `Completá reps y ${weightLabel(unit)} (podés poner 0 si es a peso corporal).` }); return; }
@@ -15623,6 +15708,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     // ejemplo para cargar un récord viejo). El récord se guarda igual, pero
     // ese día NO cuenta como entrenado en el historial ni en la racha.
     const entry = { date: today, reps: r, kg: k };
+    if (rD > 0 && rI > 0) entry.lados = { i: rI, d: rD };
     if (exerciseName) entry.exName = exerciseName;
     if (exerciseMuscle) entry.exMuscle = exerciseMuscle;
     if (rpe != null) entry.rpe = rpe;
@@ -16035,7 +16121,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           </span>
           {hechaHoy ? (
             <span className="serie-linea-valor">
-              <b>{hecho.reps}</b><i>×</i><b>{conComa(hecho.kg)}</b><small>{u}</small>
+              <b>{yaRegistradaHoy?.lados ? `${yaRegistradaHoy.lados.i}/${yaRegistradaHoy.lados.d}` : hecho.reps}</b><i>×</i><b>{conComa(hecho.kg)}</b><small>{u}</small>
               {yaRegistradaHoy.rpe && <span className="serie-valor-rpe">{formatEffort(yaRegistradaHoy.rpe, fieldSettings.rpeDisplayMode)}</span>}
             </span>
           ) : (
@@ -16156,7 +16242,15 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       {/* El visor: reps × kilos en grande y el ✓. Vienen propuestos con lo de
           la vez pasada: si no cambió nada, es un solo toque. Si lo escrito ya
           es récord, el visor se enciende en dorado. */}
+      <div className={`giro-lado ${girado ? "girado" : ""}`}>
+      <div className="giro-frente" inert={girado || undefined}>
       <div className="foco-visor" onFocus={() => setRowFocus(true)} onBlur={() => setRowFocus(false)} data-enfocado={rowFocus || undefined}>
+        {porLado && (
+          <span className="lado-pestanas" role="group" aria-label="Qué lado anotás">
+            <button onClick={() => pasarALado("i")} aria-pressed={ladoVisible === "i"} className={ladoVisible === "i" ? "on" : ""}>Izq.</button>
+            <button onClick={() => pasarALado("d")} aria-pressed={ladoVisible === "d"} className={ladoVisible === "d" ? "on" : ""}>Der.</button>
+          </span>
+        )}
         {/* Si lo escrito ya es récord, un sello arriba del visor: sin sumar un
             renglón, así la tarjeta no salta al tocar el + (27/11). */}
         {liveBeats && <span className="foco-record-sello" role="status"><Trophy size={11} /> es récord</span>}
@@ -16198,6 +16292,40 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           </div>
         </div>
       )}
+      </div>
+      {porLado && (
+        <div className="giro-dorso" aria-hidden={!girado || undefined} inert={!girado || undefined}>
+          <div className="foco-visor cara-derecha">
+            {porLado && (
+              <span className="lado-pestanas" role="group" aria-label="Qué lado anotás">
+                <button onClick={() => pasarALado("i")} aria-pressed={ladoVisible === "i"} className={ladoVisible === "i" ? "on" : ""}>Izq.</button>
+                <button onClick={() => pasarALado("d")} aria-pressed={ladoVisible === "d"} className={ladoVisible === "d" ? "on" : ""}>Der.</button>
+              </span>
+            )}
+            <div className="foco-campo">
+              <input type="number" inputMode="decimal" aria-label="Repeticiones del lado derecho" placeholder="–" value={repsD} onFocus={seleccionarAlEnfocar} onChange={(e) => updateDraft({ repsD: e.target.value })} className="foco-input" />
+              <span className="foco-campo-rotulo" aria-hidden="true">reps</span>
+            </div>
+            <span className="foco-por" aria-hidden="true">×</span>
+            <div className="foco-campo">
+              <span className="foco-input foco-input-fijo" aria-label={`El mismo peso: ${String(kg).replace(".", ",")} ${u}`}>{String(kg).replace(".", ",") || "–"}</span>
+              <span className="foco-campo-rotulo" aria-hidden="true">{u}</span>
+            </div>
+            <button onClick={handleSave} aria-label="Guardar la serie con los dos lados" className={`foco-guardar ${saved ? "hecha" : ""}`}>
+              <Check size={24} strokeWidth={2.6} />
+            </button>
+          </div>
+          <div className="foco-ajustes-fila">
+            <div className="foco-ajustes">
+              <button onClick={() => ajustarD(-1)} aria-label="Restar una repetición al lado derecho"><Minus size={17} /></button>
+              <button onClick={() => ajustarD(1)} aria-label="Sumar una repetición al lado derecho"><Plus size={17} /></button>
+            </div>
+            <span aria-hidden="true" />
+            <p className="cara-derecha-nota">El mismo peso</p>
+          </div>
+        </div>
+      )}
+      </div>
       {verSaltos && (
         <div className="foco-saltos bounce-in" role="group" aria-label="De a cuánto sube el peso en este ejercicio">
           <p>{exerciseName ? `${exerciseName} sube de a` : "Sube de a"}</p>
@@ -34362,32 +34490,36 @@ function HeaderAvatar({ profileName, onClick }) {
    cerraría la sesión y borraría lo que tenías escrito sin guardar. La
    confirmación se cancela sola a los 5s para no quedar trabada.
 ============================================================================ */
-function ActiveSessionBar({ startedAt, dayLabel, color, done, total, conProgreso, enRutina, onEnd, onCancel, onGoToRoutine, descanso = null }) {
-  // El tiempo transcurrido se guarda en estado y lo actualiza el intervalo.
-  // Leer el reloj durante el render es impuro (y el linter de React Compiler
-  // lo rechaza): el primer valor llega en el siguiente turno del event loop
-  // — imperceptible, y así el render no depende de la hora.
-  const [ms, setMs] = useState(0);
-  const [confirmando, setConfirmando] = useState(false);
+// EL TIEMPO DE LA SESIÓN, ARRIBA (28/11, pedido: "arriba del todo, en la
+// barra, un reloj con el tiempo en el que estás y, chiquito, cuántas series
+// vas"). Ocupa el lugar del "?" mientras hay una sesión; tocarlo desde otra
+// pestaña te lleva a tu entrenamiento.
+function ChipSesion({ startedAt, color, dia, done = 0, total = 0, onClick = null }) {
+  const [seg, setSeg] = useState(0);
   useEffect(() => {
-    const calcular = () => setMs(Math.max(0, Date.now() - new Date(startedAt).getTime()));
+    const calcular = () => setSeg(Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000)));
     const id = setInterval(calcular, 1000);
     const primero = setTimeout(calcular, 0);
     return () => { clearInterval(id); clearTimeout(primero); };
   }, [startedAt]);
+  const Tag = onClick ? "button" : "div";
+  return (
+    <Tag onClick={onClick || undefined} className="chip-sesion chip-reloj session-chip-in" style={{ "--c": color }} aria-label={`${dia ? `${dia}, ` : ""}${relojCorto(seg)} de sesión, ${Math.min(done, total)} de ${total} series${onClick ? ". Volver a tu entrenamiento" : ""}`}>
+      <span className="galleta sesion-dock-latido" aria-hidden="true" />
+      <span className="num-display chip-reloj-tiempo" aria-hidden="true">{seg >= 3600 ? `${Math.floor(seg / 3600)}:${String(Math.floor(seg / 60) % 60).padStart(2, "0")}:${String(seg % 60).padStart(2, "0")}` : relojCorto(seg)}</span>
+      {total > 0 && <small className="chip-reloj-series" aria-hidden="true">{Math.min(done, total)}/{total}</small>}
+    </Tag>
+  );
+}
+
+function ActiveSessionBar({ color, done, total, conProgreso, onEnd, onCancel, descanso = null }) {
+  const [confirmando, setConfirmando] = useState(false);
   useEffect(() => {
     if (!confirmando) return;
     const id = setTimeout(() => setConfirmando(false), 5000);
     return () => clearTimeout(id);
   }, [confirmando]);
 
-  const hs = Math.floor(ms / 3600000), min = Math.floor(ms / 60000) % 60, seg = Math.floor(ms / 1000) % 60;
-  // El reloj corre al segundo a propósito: es la señal de que la sesión está
-  // viva. Pasada la hora se agrega el campo de horas en vez de seguir
-  // contando minutos hasta 90.
-  const reloj = hs > 0
-    ? `${hs}:${String(min).padStart(2, "0")}:${String(seg).padStart(2, "0")}`
-    : `${min}:${String(seg).padStart(2, "0")}`;
   const completo = conProgreso && total > 0 && done >= total;
 
   // Sólo la tarjeta: el lugar en la pantalla lo pone DockInferior, que la
@@ -34414,42 +34546,16 @@ function ActiveSessionBar({ startedAt, dayLabel, color, done, total, conProgreso
           <button onClick={onEnd} className="boton-pildora shrink-0" style={{ minHeight: 40, padding: "0 16px", fontSize: "calc(13px * var(--escala-letra, 1))" }}>Sí, finalizar</button>
         </div>
       ) : (
-        <>
-        {descanso}
-        {/* UNA FILA (pedido: "mejoremos la estética de la barra fija con el
-            cronómetro, capaz sacando la barra sólo ahí"): el tiempo de la
-            sesión, el día en su color con cuántas series llevás, y Finalizar.
-            La barra cargada queda en la placa del día; acá se repetía en
-            chico, con discos que no se llegaban a ver. */}
-        <div className="sesion-dock">
-          {/* Tocarla te lleva a Rutina, si no estás ahí. */}
-          <button
-            onClick={enRutina ? undefined : onGoToRoutine}
-            disabled={enRutina}
-            aria-label={enRutina ? undefined : "Volver a tu entrenamiento"}
-            className="sesion-dock-cuerpo"
-          >
-            <span role="timer" aria-label={`Sesión: ${reloj}`} className="num-display sesion-dock-reloj"><RelojQueGira segundos={Math.floor(ms / 1000)} sube /></span>
-            <span className="sesion-dock-texto">
-              {dayLabel && <span className="sesion-dock-nombre">{dayLabel}</span>}
-              {conProgreso && total > 0 ? (
-                <span className={`sesion-dock-avance ${completo ? "completo" : ""}`}>
-                  <span aria-hidden="true"><NumberFlow value={Math.min(done, total)} /> de {total} series</span>
-                  <span className="sr-only">{Math.min(done, total)} de {total} series</span>
-                </span>
-              ) : (
-                <span className="sesion-dock-avance">Sesión en curso</span>
-              )}
-            </span>
-            {!enRutina && <ChevronRight size={16} className="sesion-dock-volver" aria-hidden="true" />}
-          </button>
-          {/* Finalizar: con todo hecho pasa a relleno pleno, es lo único que
-              te queda. */}
-          <button onClick={() => setConfirmando(true)} className={`boton-finalizar ${completo ? "listo" : ""}`}>
-            <Check size={15} /> Finalizar
+        // 28/11 (pedido: "mantener la actual pero sacándole la mitad de
+        // abajo, e incorporar el botón de finalizar"): el tiempo de la sesión y
+        // cuántas series llevás pasaron arriba (ChipSesion). Acá queda la fila
+        // del descanso con Finalizar en la punta; sin descanso, sólo Finalizar.
+        <div className="dock-una-fila">
+          {descanso}
+          <button onClick={() => setConfirmando(true)} aria-label="Finalizar la sesión" className={`boton-finalizar ${completo ? "listo" : ""}`}>
+            <Check size={16} strokeWidth={2.6} /> <span>Finalizar</span>
           </button>
         </div>
-        </>
       )}
     </div>
   );
@@ -36933,10 +37039,7 @@ export default function App() {
             {/* Durante una sesión activa, el chip de "entrenando X" ocupa el
                 lugar del "?" (así no lo tapa). Sin sesión, el "?" normal. */}
             {sessionTintColor && sessionDayLabel ? (
-              <div className="chip-sesion session-chip-in" style={{ "--c": sessionTintColor }}>
-                <span className="galleta sesion-dock-latido" aria-hidden="true" />
-                <span className="sesion-dock-dia">{sessionDayLabel}</span>
-              </div>
+              <ChipSesion startedAt={profile.activeSession.startedAt} color={sessionTintColor} dia={sessionDayLabel} done={sessionProgress.done} total={sessionProgress.total} onClick={tab === "rutina" ? null : () => { if (profile.activeSession.deload) setDeloadDismissed(false); setDescargaPrevia(false); setTab("rutina"); }} />
             ) : (
               tab !== "perfil" && <button onClick={() => { if (RECORRIDOS[tab]) setBienvenidaRecorrido(tab); else { setHelpStartTab(tab); setShowHelp(true); } }} aria-label="Ayuda: recorrido de esta pestaña" className="boton-redondo"><HelpCircle size={18} /></button>
             )}
