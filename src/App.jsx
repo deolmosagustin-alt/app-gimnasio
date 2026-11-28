@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, createContext, useContext, useSyncExternalStore, useId, useTransition } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, createContext, useContext, useSyncExternalStore, useId, useTransition, startTransition } from "react";
 import { createPortal, flushSync } from "react-dom";
 // Terminación: los dígitos de los relojes ruedan (NumberFlow) y las series se
 // acomodan deslizándose al guardar (Motion), en vez de saltar.
@@ -1158,7 +1158,27 @@ function loadAndMigrateProfiles() {
 }
 
 function loadProfiles() { return loadAndMigrateProfiles(); }
-function saveProfiles(p) { try { localStorage.setItem(PROFILES_KEY, JSON.stringify(p)); } catch { /* ignorado a propósito */ } idbPut("profiles", p); }
+// Lo que tipeás sin guardar (los drafts) se guarda un momento después y no en
+// cada toque (27/11, "hay un pequeño glitch cuando tocás para cambiar las
+// reps"): guardar el perfil entero en cada + tardaba lo que se notaba. Un
+// guardado normal cancela el pendiente (trae todo, más nuevo), y al irse de la
+// app se guarda lo que haya.
+const EMPTY_OBJ = Object.freeze({});
+let GUARDADO_PENDIENTE = null;
+function saveProfiles(p) {
+  if (GUARDADO_PENDIENTE) { clearTimeout(GUARDADO_PENDIENTE.t); GUARDADO_PENDIENTE = null; }
+  try { localStorage.setItem(PROFILES_KEY, JSON.stringify(p)); } catch { /* ignorado a propósito */ }
+  idbPut("profiles", p);
+}
+function saveProfilesPronto(p) {
+  if (GUARDADO_PENDIENTE) clearTimeout(GUARDADO_PENDIENTE.t);
+  GUARDADO_PENDIENTE = { p, t: setTimeout(() => { const x = GUARDADO_PENDIENTE; GUARDADO_PENDIENTE = null; if (x) saveProfiles(x.p); }, 700) };
+}
+if (typeof window !== "undefined") {
+  const vaciar = () => { if (GUARDADO_PENDIENTE) saveProfiles(GUARDADO_PENDIENTE.p); };
+  window.addEventListener("pagehide", vaciar);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") vaciar(); });
+}
 function loadActive() { try { return localStorage.getItem(ACTIVE_KEY) || null; } catch { return null; } }
 function saveActive(n) { try { n ? localStorage.setItem(ACTIVE_KEY, n) : localStorage.removeItem(ACTIVE_KEY); } catch { /* ignorado a propósito */ } idbPut("active", n); }
 function loadCycleStart() { try { const raw = localStorage.getItem(CYCLE_START_KEY); return raw ? new Date(raw) : null; } catch { return null; } }
@@ -2962,6 +2982,56 @@ const ANIMATION_CSS = letraEscalable(`
 .mes-portada-play { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 999px; color: #f6f4ec; background: var(--mes-c); }
 .mes-portada.tinta-oscura .mes-portada-play { color: #121316; }
 @media (prefers-reduced-motion: reduce) { .mes-portada-mes, .mes-portada-medalla { animation: none; } }
+/* EL DOCK, MÁS FINO Y DISTINTO (27/11, pedido: "diferenciar la sección del
+   cronómetro del resto de la pestaña de rutina, y achicarla, hacerla más
+   fina"). En vez del mismo grafito de las tarjetas, el color profundo del día
+   (como los widgets y Tu año), con un disco que asoma; la fila de la sesión y
+   la del descanso, más bajas. Los botones siguen agarrando 44 px. */
+.session-bar-dock .dock-tarjeta {
+  border-radius: 22px; border-color: color-mix(in oklab, var(--c, var(--tono)) 40%, transparent);
+  background:
+    radial-gradient(130px 130px at calc(100% + 30px) 120%, rgba(255,255,255,.08) 0 60%, transparent 61%),
+    radial-gradient(120% 140% at 0% 0%, color-mix(in oklab, var(--c, var(--tono)) 42%, #0b0c0e), color-mix(in oklab, var(--c, var(--tono)) 24%, #0b0c0e) 70%);
+}
+.light-mode .session-bar-dock .dock-tarjeta {
+  background:
+    radial-gradient(130px 130px at calc(100% + 30px) 120%, rgba(0,0,0,.05) 0 60%, transparent 61%),
+    radial-gradient(120% 140% at 0% 0%, color-mix(in oklab, var(--c, var(--tono)) 30%, white), color-mix(in oklab, var(--c, var(--tono)) 16%, white) 70%);
+}
+.session-bar-dock .sesion-dock { padding: 4px 6px 4px 0; }
+.session-bar-dock .sesion-dock-cuerpo { min-height: 40px; padding-left: 14px; gap: 10px; }
+.session-bar-dock .sesion-dock-reloj { font-size: 1.4rem; }
+.session-bar-dock .sesion-dock-texto { gap: 1px; padding-left: 10px; border-left-color: rgba(255,255,255,.14); }
+.light-mode .session-bar-dock .sesion-dock-texto { border-left-color: rgba(0,0,0,.12); }
+.session-bar-dock .sesion-dock-nombre { color: #f6f4ec; }
+.light-mode .session-bar-dock .sesion-dock-nombre { color: color-mix(in oklab, var(--c, var(--tono)) 60%, black); }
+.session-bar-dock .boton-finalizar { position: relative; height: 36px; padding: 0 14px; background: rgba(255,255,255,.12); }
+.light-mode .session-bar-dock .boton-finalizar { background: rgba(0,0,0,.07); }
+.session-bar-dock .boton-finalizar::after { content: ""; position: absolute; inset: -4px 0; }
+.session-bar-dock .dock-descanso-embebido { border-bottom-color: rgba(255,255,255,.12); }
+.session-bar-dock .dock-reloj { padding-top: 4px; padding-bottom: 4px; }
+.session-bar-dock .descanso-dial.chico { width: 42px; height: 42px; }
+.session-bar-dock .descanso-tiempo-dock { font-size: 1.6rem; }
+/* Las secciones del ticket (27/11): un rótulo impreso en negativo. */
+.ticket-seccion { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 14px -4px 8px; padding: 4px 8px; border-radius: 3px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: none; color: #f3f3ef; background: #1d1d1f; }
+.ticket-seccion.record { color: #1c1505; background: var(--record); }
+.ticket-seccion.falta { color: #1d1d1f; background: transparent; box-shadow: inset 0 0 0 1.5px #1d1d1f; }
+.ticket-fila.falto span:first-child { text-decoration: line-through; text-decoration-thickness: 1.5px; color: #6b6b70; }
+.ticket-fila.falto span:last-child { color: #6b6b70; }
+/* Las portadas de la semana y del año. */
+.portada-fichas { display: grid; grid-template-columns: repeat(7, 14px); gap: 4px; align-self: center; }
+.portada-fichas span { display: grid; justify-items: center; gap: 3px; }
+.portada-fichas small { font-size: 11px; font-weight: 700; opacity: .75; }
+.portada-fichas i { width: 14px; height: 34px; border-radius: 5px; background: rgba(255,255,255,.18); }
+.portada-fichas .si i { background: #f6f4ec; animation: casilleroSePrende .4s cubic-bezier(.2, 1.6, .4, 1) both; animation-delay: inherit; }
+.portada-anio-numero { font-size: clamp(3.4rem, 18vw, 4.6rem); }
+.de-semana .mes-portada-mes { font-size: clamp(2.3rem, 11.5vw, 2.9rem); white-space: nowrap; }
+.mes-portada-rango { font-size: 13px; font-weight: 650; opacity: .85; }
+.portada-meses { display: grid; grid-template-columns: repeat(12, 8px); gap: 3px; align-items: end; height: 70px; align-self: center; }
+.portada-meses span { display: grid; justify-items: center; gap: 3px; height: 100%; align-content: end; }
+.portada-meses i { width: 8px; height: calc(4px + var(--f, 0) * 50px); border-radius: 3px; background: #f6f4ec; transform-origin: bottom; animation: barraSube .6s cubic-bezier(.2, 1.3, .4, 1) both; animation-delay: inherit; }
+@keyframes barraSube { from { transform: scaleY(0); } }
+@media (prefers-reduced-motion: reduce) { .portada-fichas .si i, .portada-meses i { animation: none; } }
 /* Los dos puntajes de la semana (PuntajesSemana). */
 .puntajes-semana { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 14px 0 4px; }
 .puntaje { display: grid; gap: 6px; align-content: start; padding: 14px 14px 12px; border-radius: 20px; background: var(--surface-2); box-shadow: var(--placa-canto); }
@@ -4398,6 +4468,10 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 }
 .foco-ajustes button:active { transform: scale(.92); background: var(--velo); color: var(--text-strong); }
 .foco-record { display: flex; align-items: center; gap: 6px; margin: 8px 6px 0; font-size: 0.8125rem; font-weight: 600; color: var(--record); }
+.foco-visor { position: relative; }
+.foco-record-sello { position: absolute; left: 50%; top: 0; z-index: 1; display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 750; white-space: nowrap; color: #1c1505; background: var(--record); transform: translate(-50%, -55%); animation: selloRecord .35s var(--resorte, ease-out) both; pointer-events: none; }
+@keyframes selloRecord { from { opacity: 0; transform: translate(-50%, -55%) scale(.6); } }
+@media (prefers-reduced-motion: reduce) { .foco-record-sello { animation: none; } }
 .serie-foco .serie-aviso { margin: 8px 6px 0; }
 .foco-extras { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 /* EL TICKET: sale de una ranura, como el de la caja. Papel claro (es papel,
@@ -7918,7 +7992,19 @@ button.foco-ref.alterna:active .ref-interruptor { transform: scale(.94); }
 .entre-lados-fila { display: flex; align-items: stretch; gap: 6px; }
 .entre-lados-iniciar { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border-radius: 999px; font-size: 14px; font-weight: 700; color: color-mix(in oklab, var(--c, var(--tono)) 72%, white); background: color-mix(in oklab, var(--c, var(--tono)) 13%, transparent); transition: transform var(--dur-toque, .1s); }
 .entre-lados-iniciar:active { transform: scale(.97); }
-.entre-lados-iniciar:disabled { opacity: .5; }
+.entre-lados-iniciar { position: relative; overflow: hidden; isolation: isolate; }
+.entre-lados-iniciar:disabled { opacity: 1; }
+.entre-lados-relleno { position: absolute; inset: 0; z-index: -1; transform-origin: left; transform: scaleX(var(--avance, 0)); background: color-mix(in oklab, var(--c, var(--tono)) 72%, white); transition: transform 1s linear; }
+.entre-lados-iniciar.corriendo { color: color-mix(in oklab, var(--c, var(--tono)) 14%, #07080a); background: color-mix(in oklab, var(--c, var(--tono)) 34%, transparent); animation: ladoActiva .45s var(--resorte, ease-out); }
+.entre-lados-iniciar.corriendo .entre-lados-texto b { font-size: 1.1em; }
+.entre-lados-iniciar.listo { color: #08140d; background: #6fd39a; animation: ladoActiva .45s var(--resorte, ease-out); }
+.entre-lados-manos { display: inline-flex; align-items: center; gap: 4px; }
+.entre-lados-manos i { font-style: normal; font-size: 11px; font-weight: 800; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 999px; background: color-mix(in oklab, currentColor 16%, transparent); }
+.entre-lados-iniciar.corriendo .entre-lados-manos i:first-child { animation: ladoCruza .6s var(--resorte, ease-out) both; }
+.entre-lados-iniciar.corriendo .entre-lados-manos i:last-child { animation: ladoCruza .6s var(--resorte, ease-out) reverse both; }
+@keyframes ladoCruza { 0% { transform: translateX(0); } 50% { transform: translateX(22px) scale(1.25); } 100% { transform: translateX(0); } }
+@keyframes ladoActiva { 0% { transform: scale(1); } 35% { transform: scale(1.04); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .entre-lados-iniciar.corriendo, .entre-lados-iniciar.listo, .entre-lados-manos i, .entre-lados-relleno { animation: none !important; transition: none; } }
 .light-mode .entre-lados-iniciar { color: color-mix(in oklab, var(--c, var(--tono)) 70%, black); }
 .entre-lados-tiempo { min-width: 64px; min-height: 44px; padding: 0 12px; border-radius: 999px; font-size: 16px; font-weight: 750; color: var(--text-strong); background: var(--surface-2); }
 .entre-lados-opciones { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -8894,16 +8980,6 @@ function IconoCampana({ size = 14, className = "" }) {
     </svg>
   );
 }
-// La misma campana en un canvas (la imagen del ticket). x, y: la esquina de
-// arriba a la izquierda; lado: el tamaño del cuadrado.
-function campanaEnCanvas(ctx, x, y, lado, color) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(lado / 24, lado / 24);
-  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.lineJoin = "round";
-  TRAZO_CAMPANA.forEach((d) => ctx.stroke(new Path2D(d)));
-  ctx.restore();
-}
 
 /* ============================================================================
    COMPARTIR — dos mecanismos:
@@ -9583,40 +9659,108 @@ function drawCycleShareCard(ctx, W, H, { cycleNumber, daysTrained, totalVol, uni
   drawWordmark(ctx, W, H, color);
 }
 
-function drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained, totalSets, totalVol, calendarCells, unit = "kg" }) {
-  const color = COLORES_COMPARTIR.periodo;
+function drawPeriodShareCard(ctx, W, H, { periodo = "week", daysTrained, totalSets, totalVol, calendarCells, unit = "kg", records = 0, topEj = null, fechas = [], ejercicios = [] }) {
+  // 27/11 (pedidos: "el del historial, junto con el del muñeco, deberían ser
+  // los mejores" y "que el historial se pueda compartir el anual"): cada
+  // período con su color y su dibujo. Hoy, los ejercicios en renglones; la
+  // semana, siete casilleros altos; el mes, su calendario; el año, todos sus
+  // días en una grilla. Abajo, en la placa, series, kilos, récords y tu
+  // ejercicio.
+  const COLOR = { day: COLORES_COMPARTIR.naranja, week: COLORES_COMPARTIR.ciclo, month: COLORES_COMPARTIR.periodo, year: COLORES_COMPARTIR.perfil };
+  const color = COLOR[periodo] || COLORES_COMPARTIR.periodo;
   const { tinta, suave } = drawShareCardBase(ctx, W, H, color);
-  const x = 44;
+  const x = 44, ancho = W - 88;
+  const anio = todayStr().slice(0, 4);
   ctx.fillStyle = suave; letraCompartir(ctx, 700, 26);
-  wrapCanvasText(ctx, periodLabel ? capitalizar(periodLabel) : "Tu entrenamiento", x, 150, W - 88, 30, 2);
+  ctx.fillText(periodo === "year" ? "Mi año en el gimnasio" : periodo === "day" ? "Mi entrenamiento de hoy" : periodo === "week" ? "Mi semana en el gimnasio" : `Mi ${NOMBRES_MES[new Date().getMonth()]} en el gimnasio`, x, 110);
   ctx.fillStyle = tinta;
-  numeroGrande(ctx, String(daysTrained ?? 0), x, 380, W - 88 - 160, 230);
-  const anchoNum = ctx.measureText(String(daysTrained ?? 0)).width;
-  letraCompartir(ctx, 800, 48, true);
-  ctx.fillText(daysTrained === 1 ? "día" : "días", x + anchoNum + 12, 380);
-  // Los casilleros del período, como el año de Tu año.
-  let y = 430;
-  if (calendarCells && calendarCells.length) {
+  if (periodo === "year") {
+    numeroGrande(ctx, anio, x - 4, 300, ancho, 210);
+    letraCompartir(ctx, 800, 44, true);
+    ctx.fillText(`${daysTrained} ${daysTrained === 1 ? "día" : "días"}`, x, 362);
+  } else {
+    const n = periodo === "day" ? (totalSets ?? 0) : (daysTrained ?? 0);
+    numeroGrande(ctx, String(n), x, 330, ancho - 170, 230);
+    const anchoNum = ctx.measureText(String(n)).width;
+    letraCompartir(ctx, 800, 52, true);
+    ctx.fillText(periodo === "day" ? (n === 1 ? "serie" : "series") : (n === 1 ? "día" : "días"), x + anchoNum + 12, 330);
+  }
+  let y = 380;
+  if (periodo === "year") {
+    // Todos los días del año, una columna por semana.
+    const fui = new Set(fechas);
+    const d = new Date(Number(anio), 0, 1, 12);
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    const cols = [];
+    while (d.getFullYear() <= Number(anio) && cols.length < 54) {
+      const sem = [];
+      for (let k = 0; k < 7; k++) { sem.push(d.getFullYear() === Number(anio) ? localDateStr(d) : null); d.setDate(d.getDate() + 1); }
+      cols.push(sem);
+    }
+    const gap = 2, celda = (ancho - gap * (cols.length - 1)) / cols.length;
+    const y0 = 400;
+    cols.forEach((sem, c) => sem.forEach((iso, k) => {
+      if (!iso) return;
+      ctx.fillStyle = fui.has(iso) ? "#f6f4ec" : "rgba(255,255,255,.18)";
+      ctx.fillRect(x + c * (celda + gap), y0 + k * (celda + gap), celda, celda);
+    }));
+    ctx.fillStyle = suave; letraCompartir(ctx, 600, 15);
+    MESES_CORTOS.forEach((m, i) => { if (i % 3 === 0) ctx.fillText(m, x + (i / 12) * ancho, y0 + 7 * (celda + gap) + 18); });
+    y = y0 + 7 * (celda + gap) + 40;
+  } else if (periodo === "day") {
+    // Hoy: los ejercicios, en renglones.
+    const lista = ejercicios.slice(0, 6);
+    lista.forEach((e, i) => {
+      const yy = y + 14 + i * 50;
+      ctx.fillStyle = "rgba(0,0,0,.16)"; ctx.beginPath(); ctx.roundRect(x, yy - 32, ancho, 42, 12); ctx.fill();
+      ctx.fillStyle = tinta; letraCompartir(ctx, 800, 22, true);
+      ctx.fillText(e.nombre.length > 26 ? `${e.nombre.slice(0, 25)}.` : e.nombre, x + 16, yy - 4);
+      ctx.textAlign = "right"; ctx.fillText(`${e.series} ${e.series === 1 ? "serie" : "series"}`, x + ancho - 16, yy - 4); ctx.textAlign = "left";
+    });
+    y += lista.length * 50 + 20;
+  } else if (calendarCells && calendarCells.length) {
     const cols = 7, rows = Math.ceil(calendarCells.length / cols);
-    const gap = 8, cell = Math.min(rows > 1 ? 56 : 62, (W - 88 - gap * 6) / 7);
+    const gap = 8;
+    const cell = periodo === "week" ? (ancho - gap * 6) / 7 : Math.min(56, (ancho - gap * 6) / 7);
+    const alto = periodo === "week" ? cell * 1.7 : cell;
+    if (periodo === "week") {
+      ctx.fillStyle = suave; letraCompartir(ctx, 700, 16); ctx.textAlign = "center";
+      LETRAS_SEMANA.forEach((l, i) => ctx.fillText(l, x + i * (cell + gap) + cell / 2, y + 4));
+      ctx.textAlign = "left"; y += 18;
+    }
     calendarCells.forEach((c, i) => {
       if (c.isPad) return;
-      const cx = x + (i % cols) * (cell + gap), cy = y + Math.floor(i / cols) * (cell + gap);
-      ctx.fillStyle = c.trained ? "#f6f4ec" : "rgba(255,255,255,.16)";
-      ctx.beginPath(); ctx.roundRect(cx, cy, cell, cell, 10); ctx.fill();
+      const cx = x + (i % cols) * (cell + gap), cy = y + Math.floor(i / cols) * (alto + gap);
+      ctx.fillStyle = c.trained ? "#f6f4ec" : "rgba(255,255,255,.18)";
+      ctx.beginPath(); ctx.roundRect(cx, cy, cell, alto, 10); ctx.fill();
+      if (c.trained && periodo === "week") {
+        ctx.fillStyle = color; ctx.beginPath(); ctx.arc(cx + cell / 2, cy + alto / 2, cell * 0.18, 0, Math.PI * 2); ctx.fill();
+      }
     });
-    y += rows * (cell + gap) + 18;
+    y += rows * (alto + gap) + 18;
   }
   const volMostrado = Math.round(kgToDisplay(totalVol || 0, unit));
-  const py = Math.min(Math.max(y, 640), 770);
-  placaCompartir(ctx, x, py, W - 88, 92, -0.012);
+  const datos = [
+    [periodo === "day" ? String(ejercicios.length) : numeroAR(totalSets ?? 0), periodo === "day" ? "ejercicios" : "series"],
+    [volMostrado >= 1000 ? `${conComa(Math.round(volMostrado / 100) / 10)} t` : `${volMostrado} ${weightLabel(unit)}`, "levantados"],
+    [String(records || 0), records === 1 ? "récord" : "récords"],
+  ];
+  const ph = topEj ? 140 : 96;
+  const py = Math.min(Math.max(y, 600), H - 100 - ph);
+  placaCompartir(ctx, x, py, ancho, ph, -0.012);
   ctx.fillStyle = "#121316";
-  [[numeroAR(totalSets ?? 0), "series"], [volMostrado >= 1000 ? `${conComa(Math.round(volMostrado / 100) / 10)} t` : `${volMostrado} ${weightLabel(unit)}`, "levantados"]].forEach(([v, l], i) => {
-    const cx = x + 26 + i * ((W - 88) / 2);
-    letraCompartir(ctx, 900, 38, true); ctx.fillText(v, cx, py + 50);
-    ctx.fillStyle = "#5d6068"; letraCompartir(ctx, 650, 17); ctx.fillText(l, cx, py + 76);
+  datos.forEach(([v, l], i) => {
+    const cx = x + 24 + i * (ancho / 3);
+    letraCompartir(ctx, 900, 36, true); ctx.fillText(v, cx, py + 50);
+    ctx.fillStyle = "#5d6068"; letraCompartir(ctx, 650, 16); ctx.fillText(l, cx, py + 74);
     ctx.fillStyle = "#121316";
   });
+  if (topEj) {
+    ctx.fillStyle = "rgba(0,0,0,.1)"; ctx.fillRect(x + 22, py + 92, ancho - 44, 1.5);
+    ctx.fillStyle = "#5d6068"; letraCompartir(ctx, 650, 16); ctx.fillText("Mi ejercicio", x + 24, py + 122);
+    ctx.fillStyle = "#121316"; letraCompartir(ctx, 900, 24, true); ctx.textAlign = "right";
+    ctx.fillText(topEj.length > 24 ? `${topEj.slice(0, 23)}.` : topEj, x + ancho - 24, py + 122); ctx.textAlign = "left";
+  }
   drawWordmark(ctx, W, H, color);
 }
 
@@ -9824,22 +9968,55 @@ function ModeloFacetas({ data = [], type = "anterior", bodyColor = "#3c4146", hi
 }
 
 function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, sex = null }) {
-  const fondoRango = COLORES_COMPARTIR.rango;
-  const { tinta: tintaRango, suave: suaveRango } = drawShareCardBase(ctx, W, H, fondoRango);
-  ctx.fillStyle = suaveRango; letraCompartir(ctx, 700, 26);
-  ctx.fillText(modeLabel === "General" ? "Mi rango por músculo" : `Mi rango por músculo · ${modeLabel}`, 44, 110);
-  ctx.fillStyle = tintaRango; letraCompartir(ctx, 900, 84, true);
-  ctx.fillText("Mis rangos", 44, 180);
+  // LA MÁS ÉPICA (27/11, pedido: "el diseño de compartir el muñeco no me
+  // gustó, debería ser el más épico"): de noche, en el color de tu mejor
+  // rango; rayos y un aura detrás del muñeco, tu rango general enorme, el
+  // cinturón con sus dieciocho agujeros y tus tres mejores músculos en una
+  // placa de papel.
+  const conDatos = MUSCLE_GROUPS.filter((g) => !/cardio/i.test(`${g.key} ${g.label}`)).map((g) => ({ g, r: ranks?.[g.key] })).filter((x) => x.r?.hasData && x.r.levelIdx >= 0);
+  const mejorIdx = conDatos.length ? Math.max(...conDatos.map((x) => x.r.levelIdx)) : -1;
+  const tope = mejorIdx >= 0 ? RANK_TIERS[mejorIdx] : null;
+  const acento = tope?.color || COLORES_COMPARTIR.rango;
+  const rgbA = mezclarHex(acento, "#0b0c0e", 0.34), rgbB = mezclarHex(acento, "#0b0c0e", 0.12);
+  const css = (c, a = 1) => `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
+  const claroA = mezclarHex(acento, "#ffffff", 0.72);
+  const g0 = ctx.createLinearGradient(0, 0, 0, H);
+  g0.addColorStop(0, css(rgbA)); g0.addColorStop(1, css(rgbB));
+  ctx.fillStyle = g0; ctx.fillRect(0, 0, W, H);
+  // Los rayos, desde detrás del muñeco.
+  const cx0 = W / 2, cy0 = H * 0.47;
+  ctx.save();
+  for (let k = 0; k < 28; k++) {
+    const a0 = (k / 28) * Math.PI * 2, a1 = a0 + Math.PI / 56;
+    ctx.beginPath(); ctx.moveTo(cx0, cy0);
+    ctx.arc(cx0, cy0, H, a0, a1); ctx.closePath();
+    ctx.fillStyle = css(claroA, 0.05); ctx.fill();
+  }
+  const aura = ctx.createRadialGradient(cx0, cy0, 10, cx0, cy0, W * 0.62);
+  aura.addColorStop(0, css(claroA, 0.42)); aura.addColorStop(0.5, css(claroA, 0.12)); aura.addColorStop(1, css(claroA, 0));
+  ctx.fillStyle = aura; ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+  discoCompartir(ctx, W * 0.02, H * 0.08, W * 0.3, css(rgbA), false);
+  granoCompartir(ctx, W, H);
+  // Arriba: tu rango general, enorme.
+  ctx.textAlign = "left";
+  ctx.fillStyle = "rgba(246,244,236,.78)"; letraCompartir(ctx, 700, 24);
+  ctx.fillText(modeLabel === "General" ? "Mi rango" : `Mi rango · ${modeLabel}`, 44, 96);
+  ctx.save();
+  ctx.shadowColor = css(claroA, 0.7); ctx.shadowBlur = 30;
+  ctx.fillStyle = tope ? `rgb(${claroA.join(",")})` : "#f6f4ec";
+  numeroGrande(ctx, tope ? `${tope.tier} ${tope.sub}` : "Sin rango", 44, 178, W - 88, 92);
+  ctx.restore();
   ctx.textAlign = "center";
 
   // Dibujo DIRECTO de los polígonos en el canvas — sin SVG, sin Image,
   // sin drawImage. La conversión SVG→Image fallaba en los WebViews de
   // Android (el onload nunca disparaba o dibujaba 0×0) y por eso la
   // imagen del muñeco no se generaba nunca en el teléfono.
-  const NEUTRAL = "#3c4146";
-  const bodyW = Math.round(W * 0.36);
+  const NEUTRAL = "#33373c";
+  const bodyW = Math.round(W * 0.34);
   const bodyH = bodyW * 2;
-  const gap = Math.round(W * 0.08);
+  const gap = Math.round(W * 0.07);
   const startX = (W - (bodyW * 2 + gap)) / 2;
   const bodyY = Math.round(H * 0.235);
 
@@ -9901,13 +10078,39 @@ function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, sex = null }) {
   drawView(ANTERIOR_POLY_ORDER, mujer ? MUJER_ANTERIOR_POLY_POINTS : ANTERIOR_POLY_POINTS, "front", startX);
   drawView(POSTERIOR_POLY_ORDER, mujer ? MUJER_POSTERIOR_POLY_POINTS : POSTERIOR_POLY_POINTS, "back", startX + bodyW + gap);
 
-  const labelY = bodyY + bodyH + Math.round(H * 0.035);
-  ctx.fillStyle = suaveRango;
-  letraCompartir(ctx, 700, Math.round(W * 0.034));
-  ctx.fillText("De frente", startX + bodyW / 2, labelY);
-  ctx.fillText("De espalda", startX + bodyW + gap + bodyW / 2, labelY);
-
-  drawWordmark(ctx, W, H, fondoRango);
+  // El cinturón: dieciocho agujeros, la hebilla en tu nivel.
+  const cy = bodyY + bodyH + 46;
+  const bx0 = 44, bw = W - 88;
+  ctx.fillStyle = "#2a1d14"; ctx.beginPath(); ctx.roundRect(bx0, cy - 13, bw, 26, 6); ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,.12)"; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(bx0 + 6, cy - 8); ctx.lineTo(bx0 + bw - 6, cy - 8); ctx.moveTo(bx0 + 6, cy + 8); ctx.lineTo(bx0 + bw - 6, cy + 8); ctx.stroke(); ctx.setLineDash([]);
+  for (let k = 0; k < 18; k++) {
+    const hx = bx0 + 20 + (k * (bw - 40)) / 17;
+    ctx.beginPath(); ctx.arc(hx, cy, k <= mejorIdx ? 4.5 : 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = k <= mejorIdx ? RANK_TIERS[k].color : "#120c08"; ctx.fill();
+  }
+  if (mejorIdx >= 0) {
+    const hx = bx0 + 20 + (mejorIdx * (bw - 40)) / 17;
+    ctx.strokeStyle = "#e8e2cf"; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.roundRect(hx - 15, cy - 20, 30, 40, 6); ctx.stroke();
+  }
+  // Tus tres mejores músculos, en una placa de papel.
+  const top = conDatos.sort((x, y) => y.r.levelIdx - x.r.levelIdx).slice(0, 3);
+  const py = cy + 44, ph = 46 + top.length * 40;
+  placaCompartir(ctx, 44, py, W - 88, ph, -0.012);
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#5d6068"; letraCompartir(ctx, 700, 17);
+  ctx.fillText(top.length ? "Mis mejores músculos" : "Todavía sin marcas", 66, py + 32);
+  top.forEach((x, i) => {
+    const yy = py + 70 + i * 40;
+    const info = RANK_TIERS[x.r.levelIdx];
+    ctx.fillStyle = info.color; ctx.beginPath(); ctx.arc(74, yy - 8, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#121316"; letraCompartir(ctx, 800, 24, true); ctx.fillText(x.g.label, 92, yy);
+    ctx.textAlign = "right"; letraCompartir(ctx, 900, 24, true);
+    ctx.fillStyle = `rgb(${mezclarHex(info.color, "#121316", 0.55).join(",")})`;
+    ctx.fillText(`${info.tier} ${info.sub}`, W - 66, yy); ctx.textAlign = "left";
+  });
+  drawWordmark(ctx, W, H, "#2747ff");
 }
 
 // ============================== QR DE PERFIL ==============================
@@ -12179,7 +12382,7 @@ const relojDeLado = (timerId) => (timerId ? `lado:${timerId}` : null);
 function EntreLados({ exercise, accent, timerId, serie = null, series = null, settings, onUpdateSettings }) {
   const [eligiendo, setEligiendo] = useState(false);
   const idLado = relojDeLado(timerId);
-  const { estado } = useRelojDescanso(idLado || "__sin__");
+  const { estado, restante, fraccion } = useRelojDescanso(idLado || "__sin__");
   const seg = Number(settings?.entreLados?.[exercise.id]) || 0;
   if (!timerId || (!seg && !esUnilateral(exercise))) return null;
   const guardar = (v) => {
@@ -12194,17 +12397,25 @@ function EntreLados({ exercise, accent, timerId, serie = null, series = null, se
   return (
     <div className="entre-lados" style={{ "--c": accent }}>
       {seg > 0 ? (
+        // 27/11 (pedidos: "hacer más simple e intuitivo lo de cambiar de
+        // lado" y "que haya una animación que haga más evidente que se
+        // activó"): un solo botón. Al tocarlo, los dos lados se cruzan, el
+        // botón se llena del color del día y adentro cuenta lo que falta; al
+        // terminar dice "Al otro lado" en verde. El tiempo se cambia al costado.
         <div className="entre-lados-fila">
-          <button className="entre-lados-iniciar" disabled={corriendo}
+          <button className={`entre-lados-iniciar ${corriendo ? "corriendo" : ""} ${estado === "done" ? "listo" : ""}`} disabled={corriendo}
+            style={{ "--avance": corriendo ? 1 - fraccion : 0 }}
             onClick={() => {
-              haptic(15);
-              // 26/11 ("ver lo de los descansos en ejercicios unilaterales"):
-              // si tocás el cambio de lado, ya hiciste el primer lado, así que
-              // el descanso entre series terminó. Antes seguía corriendo y el
-              // dock mostraba ése: el reloj del cambio de lado quedaba oculto.
+              haptic([20, 40, 20]);
+              // 26/11: si tocás el cambio de lado, ya hiciste el primer lado,
+              // así que el descanso entre series terminó.
               Object.keys(ACTIVE_REST_TIMERS).forEach((id) => { if (!id.startsWith("lado:") && !id.startsWith("cardio_")) terminarDescanso(id); });
               iniciarDescanso(idLado, { segundos: seg, ejercicio: exercise.name || null, siguiente: "el otro lado", color: accent, serie, series }); }}>
-            <ArrowLeftRight size={15} /> {corriendo ? "Cambiando de lado" : "Cambio de lado"}
+            <span className="entre-lados-relleno" aria-hidden="true" />
+            <span key={corriendo ? "c" : "q"} className="entre-lados-manos" aria-hidden="true"><i>I</i><ArrowLeftRight size={15} /><i>D</i></span>
+            <span className="entre-lados-texto" role={corriendo ? "timer" : undefined}>
+              {corriendo ? <>Otro lado en <b className="num-display">{relojCorto(restante)}</b></> : estado === "done" ? "Al otro lado" : "Cambiar de lado"}
+            </span>
           </button>
           {onUpdateSettings && <button className="entre-lados-tiempo num-display" onClick={() => setEligiendo((v) => !v)} aria-expanded={eligiendo} aria-label={`Descanso entre lados: ${relojCorto(seg)}. Cambiar`}>{relojCorto(seg)}</button>}
         </div>
@@ -12589,8 +12800,8 @@ function deAPoco(metas, { base = null, repRange = null, salto = 2.5 } = {}) {
   });
   return out;
 }
-// El mejor de TODO el ejercicio, todas sus series (sin lo de hoy de esta
-// serie, que es lo que se está guardando), en 1RM estimado y, a peso
+// El mejor de TODO el ejercicio, todas sus series (sin lo de hoy, que es lo
+// que se está guardando), en 1RM estimado y, a peso
 // corporal, en reps. Con la progresión de un entrenador casi toda serie
 // supera la suya: la campana, el visor dorado y la imagen para compartir son
 // para superar al ejercicio entero.
@@ -12598,11 +12809,14 @@ function mejorDelEjercicio(logs, exerciseId, setIndex, hoy) {
   let rm = 0, reps = 0;
   Object.entries(logs || {}).forEach(([k, v]) => {
     const override = k.endsWith("_pr_override");
-    const { exerciseId: ex, setIndex: si } = parseLogKey(override ? k.slice(0, -"_pr_override".length) : k);
+    const { exerciseId: ex } = parseLogKey(override ? k.slice(0, -"_pr_override".length) : k);
     if (ex !== exerciseId) return;
     const lista = override ? (v?.manual ? [v] : []) : Array.isArray(v) ? v : [];
     lista.forEach((h) => {
-      if (!h?.reps || h.kg == null || h.deload || (!override && si === setIndex && h.date === hoy)) return;
+      // Contra lo de antes de hoy: si no, sólo sonaba en la primera serie
+      // (27/11, pedido: "que la campana y todo lo del récord no sea sólo para
+      // la 1.ª serie"); la segunda que también supera tu marca, suena.
+      if (!h?.reps || h.kg == null || h.deload || (!override && h.date === hoy)) return;
       if (h.kg > 0) rm = Math.max(rm, prScore(h.kg, h.reps));
       else reps = Math.max(reps, h.reps);
     });
@@ -12780,6 +12994,11 @@ function armarTicket({ logs, profile, cycleStart, fecha, dayKey, inicio = null, 
       if (ok) metas.cumplidas++;
     });
   }
+  // Lo que quedó sin hacer (27/11, pedido: "que te diga los ejercicios que no
+  // hiciste al final"): los del día de la rutina sin ninguna serie hoy.
+  const faltaron = dk && modelNow?.days?.[dk]
+    ? (modelNow.days[dk].exercises || []).filter((ex) => !ejercicios.has(ex.id)).map((ex) => ({ id: ex.id, nombre: ex.name, series: (ex.sets || []).length }))
+    : [];
   // Lo que imprime el ticket: cada ejercicio con sus series, el día y cuándo.
   const lineas = Object.keys(porEjercicioVol).map((nombre) => ({ nombre, series: porEjercicioSeries[nombre] || 0, volumen: porEjercicioVol[nombre] }));
   // Las últimas cinco veces que hiciste este día (el volumen de toda la
@@ -12802,7 +13021,7 @@ function armarTicket({ logs, profile, cycleStart, fecha, dayKey, inicio = null, 
     if (n && reg) porRegion[reg] = (porRegion[reg] || 0) + n;
   });
   const regiones = Object.entries(porRegion).sort((x, y) => y[1] - x[1]).map(([nombre, n]) => ({ nombre, series: n }));
-  return { descarga, volumen: Math.round(volumen), series, ejercicios: ejercicios.size, prs, minutos, entrada: inicio || null, salida: inicio ? (fin || new Date().toISOString()) : null, vsUltima, metas, lineas, historialDia, regiones, dia: dk ? ROUTINE[dk]?.label || null : null, color: dk ? ROUTINE[dk]?.color || null : null, fecha: fin ? new Date(fin).toISOString() : hoy === todayStr() ? new Date().toISOString() : new Date(`${hoy}T12:00:00`).toISOString() };
+  return { descarga, faltaron, volumen: Math.round(volumen), series, ejercicios: ejercicios.size, prs, minutos, entrada: inicio || null, salida: inicio ? (fin || new Date().toISOString()) : null, vsUltima, metas, lineas, historialDia, regiones, dia: dk ? ROUTINE[dk]?.label || null : null, color: dk ? ROUTINE[dk]?.color || null : null, fecha: fin ? new Date(fin).toISOString() : hoy === todayStr() ? new Date().toISOString() : new Date(`${hoy}T12:00:00`).toISOString() };
 }
 
 function SessionSummaryModal({ resumen, onClose }) {
@@ -12845,7 +13064,13 @@ function SessionSummaryModal({ resumen, onClose }) {
                   <hr />
                 </>
               )}
+              {/* 27/11 (pedido: "ordenar mejor y diferenciar las secciones del
+                  ticket del día"): cada parte con su rótulo impreso en negativo,
+                  como los de un ticket de caja, y en este orden: lo que hiciste,
+                  el total, los récords, contra las veces anteriores, dónde fue el
+                  trabajo y, al final, lo que quedó sin hacer. */}
               <p className="ticket-fila fuerte"><span>{resumen.dia || "Entrenamiento"}{resumen.descarga ? " · descarga" : ""}</span>{textoDuracion(resumen.minutos) && <span>{textoDuracion(resumen.minutos)}</span>}</p>
+              <p className="ticket-seccion">Lo que hiciste</p>
               {/* Cada ejercicio con sus series y, debajo, una raya impresa
                   del volumen que se llevó: se ve en qué se te fue la sesión. */}
               {lineas.map((l) => (
@@ -12854,18 +13079,25 @@ function SessionSummaryModal({ resumen, onClose }) {
                   <span className="ticket-raya" aria-hidden="true"><i style={{ width: `${Math.max(3, ((l.volumen || 0) / maxLinea) * 100)}%` }} /></span>
                 </div>
               ))}
-              <hr />
+              <p className="ticket-seccion">Total</p>
               <p className="ticket-fila"><span>Series</span><i aria-hidden="true" /><span>{resumen.series}</span></p>
-              <p className="ticket-fila"><span>Ejercicios</span><i aria-hidden="true" /><span>{resumen.ejercicios}</span></p>
+              <p className="ticket-fila"><span>Ejercicios</span><i aria-hidden="true" /><span>{resumen.ejercicios}{resumen.faltaron?.length ? ` de ${resumen.ejercicios + resumen.faltaron.length}` : ""}</span></p>
               {resumen.metas?.total > 0 && <p className="ticket-fila"><span>Metas del plan</span><i aria-hidden="true" /><span>{resumen.metas.cumplidas} de {resumen.metas.total}</span></p>}
               {resumen.minutos > 0 && resumen.volumen > 0 && <p className="ticket-fila"><span>Por minuto</span><i aria-hidden="true" /><span>{miles(kgToDisplay(resumen.volumen / resumen.minutos, unit))} {u}</span></p>}
               <p className="ticket-fila total"><span>Volumen</span><i aria-hidden="true" /><span>{miles(kgToDisplay(resumen.volumen, unit))} {u}</span></p>
+              {resumen.prs.length > 0 && (
+                <>
+                  <p className="ticket-seccion record"><IconoCampana size={13} className="campana-icono" /> {resumen.prs.length === 1 ? "Récord de la sesión" : "Récords de la sesión"}</p>
+                  {resumen.prs.map((pr) => (
+                    <p key={pr.id} className="ticket-fila record"><span>{pr.nombre}</span><i aria-hidden="true" /><span>{pr.marca.replace("×", " × ")}</span></p>
+                  ))}
+                </>
+              )}
               {/* Contra las últimas veces de este mismo día: columnas
                   impresas, la de hoy en el color del día. */}
               {historial.length > 1 && (
                 <>
-                  <hr />
-                  <p className="ticket-subtitulo">Tus últimos {resumen.dia || "entrenamientos"}</p>
+                  <p className="ticket-seccion">Tus últimos {resumen.dia || "entrenamientos"}</p>
                   <div className="ticket-columnas" role="img" aria-label={`Volumen de las últimas ${historial.length} sesiones de ${resumen.dia || "este día"}: ${historial.map((h) => miles(kgToDisplay(h.volumen, unit))).join(", ")} ${u}`}>
                     {historial.map((h) => (
                       <div key={h.fecha} className={`ticket-columna ${h.hoy ? "hoy" : ""}`}>
@@ -12880,8 +13112,7 @@ function SessionSummaryModal({ resumen, onClose }) {
               )}
               {regiones.length > 1 && (
                 <>
-                  <hr />
-                  <p className="ticket-subtitulo">Dónde fue el trabajo</p>
+                  <p className="ticket-seccion">Dónde fue el trabajo</p>
                   <div className="ticket-reparto" role="img" aria-label={regiones.map((r) => `${r.nombre}: ${r.series} series`).join(", ")}>
                     {regiones.map((r, i) => <i key={r.nombre} className={`t${i}`} style={{ flexGrow: r.series }} />)}
                   </div>
@@ -12890,12 +13121,11 @@ function SessionSummaryModal({ resumen, onClose }) {
                   </p>
                 </>
               )}
-              {resumen.prs.length > 0 && (
+              {resumen.faltaron?.length > 0 && (
                 <>
-                  <hr />
-                  <p className="ticket-titulo"><IconoCampana size={15} className="campana-icono" /> {resumen.prs.length === 1 ? "Récord de la sesión" : "Récords de la sesión"}</p>
-                  {resumen.prs.map((pr) => (
-                    <p key={pr.id} className="ticket-fila record"><span>{pr.nombre}</span><i aria-hidden="true" /><span>{pr.marca.replace("×", " × ")}</span></p>
+                  <p className="ticket-seccion falta">Quedó sin hacer</p>
+                  {resumen.faltaron.map((f) => (
+                    <p key={f.id} className="ticket-fila falto"><span>{f.nombre}</span><i aria-hidden="true" /><span>{f.series} {f.series === 1 ? "serie" : "series"}</span></p>
                   ))}
                 </>
               )}
@@ -12945,116 +13175,156 @@ function dibujarTicket(ctx, W, H, resumen, unit) {
   const maxHist = Math.max(1, ...historial.map((h) => h.volumen));
   const regiones = (resumen.regiones || []).slice(0, 4);
   const totalReg = regiones.reduce((t, r) => t + r.series, 0) || 1;
-  const conHist = historial.length > 1, conReg = regiones.length > 1;
+  const faltaron = (resumen.faltaron || []).slice(0, 4);
+  let conHist = historial.length > 1, conReg = regiones.length > 1;
   const px = 64, pw = W - 128;
   // Lo que ocupa cada parte, hasta el código de barras y un margen abajo.
-  const alto = 484 + (resumen.entrada ? 92 : 0) + lineas.length * 48 + (conHist ? 300 : 0) + (conReg ? 160 : 0) + (prs.length ? 84 + prs.length * 34 : 0);
-  // El papel, centrado en el alto (con aire para la marca de abajo): una
-  // sesión corta no deja el ticket colgando arriba de un vacío negro.
-  const py = Math.max(64, Math.round((H - 70 - alto) / 2));
-  // El papel, con el corte en zigzag abajo.
-  ctx.fillStyle = PAPEL;
-  ctx.beginPath();
-  ctx.moveTo(px, py); ctx.lineTo(px + pw, py); ctx.lineTo(px + pw, py + alto);
-  const diente = 12;
-  for (let x = px + pw; x > px; x -= diente) { ctx.lineTo(x - diente / 2, py + alto + 9); ctx.lineTo(Math.max(px, x - diente), py + alto); }
-  ctx.closePath(); ctx.fill();
-  // La ranura de arriba.
-  ctx.fillStyle = "#050506"; ctx.beginPath(); ctx.roundRect(px - 18, py - 12, pw + 36, 16, 8); ctx.fill();
-  let y = py + 58;
-  const centro = (t, font, color) => { ctx.font = font; ctx.fillStyle = color; ctx.textAlign = "center"; ctx.fillText(t, W / 2, y); };
-  const fila = (izq, der, font = `500 21px ${F}`, color = "#232326") => {
-    ctx.font = font; ctx.fillStyle = color; ctx.textAlign = "left"; ctx.fillText(izq, px + 26, y);
-    if (!der) return;
-    ctx.textAlign = "right"; ctx.fillText(der, px + pw - 26, y);
-    const a = ctx.measureText(der).width;
-    ctx.textAlign = "left";
-    const b = Math.min(ctx.measureText(izq).width, pw * 0.6);
-    ctx.strokeStyle = "#bdbdb8"; ctx.setLineDash([2, 5]); ctx.beginPath(); ctx.moveTo(px + 34 + b, y - 5); ctx.lineTo(px + pw - 34 - a, y - 5); ctx.stroke(); ctx.setLineDash([]);
+  const medir = () => 600 + (resumen.entrada ? 92 : 0) + lineas.length * 48 + (conHist ? 310 : 0) + (conReg ? 170 : 0) + (prs.length ? 76 + prs.length * 34 : 0) + (faltaron.length ? 70 + faltaron.length * 34 : 0);
+  // Si no entra en la imagen, primero se va el reparto y después las columnas.
+  if (medir() > H - 150) conReg = false;
+  if (medir() > H - 150) conHist = false;
+  // El alto exacto del papel: se dibuja una vez en borrador para medirlo
+  // (27/11: con las secciones nuevas, la cuenta a ojo cortaba el código de
+  // barras o dejaba papel en blanco) y después de verdad.
+  const pintar = (ctx, alto, escala) => {
+    const py = escala < 1 ? 34 : Math.max(64, Math.round((H - 70 - alto) / 2));
+    // El papel, con el corte en zigzag abajo.
+    ctx.fillStyle = PAPEL;
+    ctx.beginPath();
+    ctx.moveTo(px, py); ctx.lineTo(px + pw, py); ctx.lineTo(px + pw, py + alto);
+    const diente = 12;
+    for (let x = px + pw; x > px; x -= diente) { ctx.lineTo(x - diente / 2, py + alto + 9); ctx.lineTo(Math.max(px, x - diente), py + alto); }
+    ctx.closePath(); ctx.fill();
+    // La ranura de arriba.
+    ctx.fillStyle = "#050506"; ctx.beginPath(); ctx.roundRect(px - 18, py - 12, pw + 36, 16, 8); ctx.fill();
+    let y = py + 58;
+    const centro = (t, font, color) => { ctx.font = font; ctx.fillStyle = color; ctx.textAlign = "center"; ctx.fillText(t, W / 2, y); };
+    const fila = (izq, der, font = `500 21px ${F}`, color = "#232326") => {
+      ctx.font = font; ctx.fillStyle = color; ctx.textAlign = "left"; ctx.fillText(izq, px + 26, y);
+      if (!der) return;
+      ctx.textAlign = "right"; ctx.fillText(der, px + pw - 26, y);
+      const a = ctx.measureText(der).width;
+      ctx.textAlign = "left";
+      const b = Math.min(ctx.measureText(izq).width, pw * 0.6);
+      ctx.strokeStyle = "#bdbdb8"; ctx.setLineDash([2, 5]); ctx.beginPath(); ctx.moveTo(px + 34 + b, y - 5); ctx.lineTo(px + pw - 34 - a, y - 5); ctx.stroke(); ctx.setLineDash([]);
+    };
+    const corte = () => { y += 10; ctx.strokeStyle = "#b9b9b4"; ctx.setLineDash([7, 6]); ctx.beginPath(); ctx.moveTo(px + 22, y); ctx.lineTo(px + pw - 22, y); ctx.stroke(); ctx.setLineDash([]); y += 34; };
+    // El rótulo de cada sección, impreso en negativo (27/11).
+    const seccion = (t, estilo = "") => {
+      y += 4;
+      const fondo = estilo === "record" ? "#e8c36a" : estilo === "falta" ? null : TINTA;
+      ctx.beginPath(); ctx.roundRect(px + 20, y - 22, pw - 40, 32, 4);
+      if (fondo) { ctx.fillStyle = fondo; ctx.fill(); } else { ctx.strokeStyle = TINTA; ctx.lineWidth = 2; ctx.stroke(); }
+      ctx.font = `800 17px ${F}`; ctx.fillStyle = estilo === "record" ? "#1c1505" : estilo === "falta" ? TINTA : PAPEL; ctx.textAlign = "center";
+      ctx.fillText(t, W / 2, y); y += 40;
+    };
+    const corto = (t, n) => (t.length > n ? `${t.slice(0, n - 1)}.` : t);
+    centro("Modus Fit", `800 40px ${F}`, TINTA); y += 32;
+    centro(resumen.entrada ? diaDelTicket(resumen.fecha) : fechaDelTicket(resumen.fecha), `500 19px ${F}`, "#6b6b70"); y += 16;
+    corte();
+    if (resumen.entrada) {
+      ctx.font = `500 17px ${F}`; ctx.fillStyle = "#6b6b70";
+      ctx.textAlign = "left"; ctx.fillText("Entrada", px + 26, y);
+      ctx.textAlign = "right"; ctx.fillText("Salida", px + pw - 26, y);
+      y += 36;
+      ctx.font = `800 34px ${F}`; ctx.fillStyle = TINTA;
+      ctx.textAlign = "left"; ctx.fillText(horaDelTicket(resumen.entrada), px + 26, y);
+      ctx.textAlign = "right"; ctx.fillText(horaDelTicket(resumen.salida), px + pw - 26, y);
+      y += 6;
+      corte();
+    }
+    fila(`${resumen.dia || "Entrenamiento"}${resumen.descarga ? " · descarga" : ""}`, textoDuracion(resumen.minutos) || "", `700 24px ${F}`); y += 38;
+    seccion("Lo que hiciste");
+    lineas.forEach((l) => {
+      fila(corto(l.nombre, 24), `${l.series} ${l.series === 1 ? "serie" : "series"}`); y += 12;
+      ctx.fillStyle = tonos[1];
+      ctx.beginPath(); ctx.roundRect(px + 26, y, Math.max(8, ((l.volumen || 0) / maxLinea) * (pw - 52)), 6, 3); ctx.fill();
+      y += 36;
+    });
+    seccion("Total");
+    fila("Series", String(resumen.series)); y += 34;
+    fila("Ejercicios", faltaron.length ? `${resumen.ejercicios} de ${resumen.ejercicios + (resumen.faltaron || []).length}` : String(resumen.ejercicios)); y += 38;
+    fila("Volumen", `${miles(kgToDisplay(resumen.volumen, unit))} ${u}`, `800 27px ${F}`, TINTA); y += 18;
+    if (prs.length) {
+      y += 22;
+      seccion(prs.length === 1 ? "Récord de la sesión" : "Récords de la sesión", "record");
+      prs.forEach((pr) => { fila(corto(pr.nombre, 22), pr.marca.replace("×", " × "), `600 21px ${F}`, "#8a6a14"); y += 34; });
+    }
+    if (conHist) {
+      y += 22;
+      seccion(`Tus últimos ${resumen.dia || "entrenamientos"}`);
+      y -= 18;
+      const altoCol = 120, base = y + 28 + altoCol;
+      const paso = (pw - 52) / historial.length, ancho = Math.min(64, paso * 0.62);
+      historial.forEach((h, i) => {
+        const cx = px + 26 + paso * i + paso / 2;
+        const hh = Math.max(6, (h.volumen / maxHist) * altoCol);
+        ctx.fillStyle = h.hoy ? tonos[0] : tonos[3];
+        ctx.beginPath(); ctx.roundRect(cx - ancho / 2, base - hh, ancho, hh, [5, 5, 0, 0]); ctx.fill();
+        ctx.textAlign = "center";
+        if (h.hoy) { ctx.font = `700 18px ${F}`; ctx.fillStyle = TINTA; ctx.fillText(miles(kgToDisplay(h.volumen, unit)), cx, base - hh - 10); }
+        ctx.font = `${h.hoy ? 700 : 500} 17px ${F}`; ctx.fillStyle = h.hoy ? TINTA : "#6b6b70";
+        ctx.fillText(h.hoy && h.fecha === todayStr() ? "Hoy" : `${Number(h.fecha.slice(8, 10))}/${Number(h.fecha.slice(5, 7))}`, cx, base + 26);
+      });
+      y = base + 62;
+      if (resumen.vsUltima) { centro(textoVsUltima(resumen.vsUltima), `600 19px ${F}`, "#4a4a4e"); }
+      y += 14;
+    }
+    if (conReg) {
+      y += 4;
+      seccion("Dónde fue el trabajo");
+      y -= 18;
+      y += 6;
+      let x = px + 26;
+      const total = pw - 52 - (regiones.length - 1) * 4;
+      regiones.forEach((r, i) => {
+        const w = (r.series / totalReg) * total;
+        ctx.fillStyle = tonos[i];
+        ctx.beginPath(); ctx.roundRect(x, y, w, 16, i === 0 ? [8, 0, 0, 8] : i === regiones.length - 1 ? [0, 8, 8, 0] : 0); ctx.fill();
+        x += w + 4;
+      });
+      y += 48;
+      let lx = px + 26;
+      ctx.font = `500 18px ${F}`; ctx.textAlign = "left";
+      regiones.forEach((r, i) => {
+        const t = `${r.nombre} ${Math.round((r.series / totalReg) * 100)} %`;
+        ctx.fillStyle = tonos[i]; ctx.beginPath(); ctx.arc(lx + 6, y - 6, 6, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#4a4a4e"; ctx.fillText(t, lx + 18, y);
+        lx += 18 + ctx.measureText(t).width + 22;
+      });
+      y += 30;
+    }
+    if (faltaron.length) {
+      y += 14;
+      seccion("Quedó sin hacer", "falta");
+      faltaron.forEach((f) => {
+        fila(corto(f.nombre, 24), `${f.series} ${f.series === 1 ? "serie" : "series"}`, `500 21px ${F}`, "#8d8d92");
+        const w = Math.min(ctx.measureText(corto(f.nombre, 24)).width, pw * 0.6);
+        ctx.strokeStyle = "#8d8d92"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(px + 26, y - 7); ctx.lineTo(px + 26 + w, y - 7); ctx.stroke();
+        y += 34;
+      });
+    }
+    corte();
+    centro("Gracias por entrenar. Volvé pronto.", `500 19px ${F}`, "#6b6b70"); y += 26;
+    const barras = codigoDeBarras(`${resumen.fecha}${resumen.volumen}${resumen.series}`);
+    const ancho = barras.reduce((t, w) => t + w * 2.4 + 2.4, 0);
+    let bx = W / 2 - ancho / 2;
+    ctx.fillStyle = TINTA;
+    barras.forEach((w, i) => { if (i % 7 !== 3) ctx.fillRect(bx, y, w * 2.4, 54); bx += w * 2.4 + 2.4; });
+    return y;
   };
-  const corte = () => { y += 10; ctx.strokeStyle = "#b9b9b4"; ctx.setLineDash([7, 6]); ctx.beginPath(); ctx.moveTo(px + 22, y); ctx.lineTo(px + pw - 22, y); ctx.stroke(); ctx.setLineDash([]); y += 34; };
-  const subtitulo = (t) => { ctx.font = `700 19px ${F}`; ctx.fillStyle = "#4a4a4e"; ctx.textAlign = "left"; ctx.fillText(t, px + 26, y); y += 22; };
-  const corto = (t, n) => (t.length > n ? `${t.slice(0, n - 1)}.` : t);
-  centro("Modus Fit", `800 40px ${F}`, TINTA); y += 32;
-  centro(resumen.entrada ? diaDelTicket(resumen.fecha) : fechaDelTicket(resumen.fecha), `500 19px ${F}`, "#6b6b70"); y += 16;
-  corte();
-  if (resumen.entrada) {
-    ctx.font = `500 17px ${F}`; ctx.fillStyle = "#6b6b70";
-    ctx.textAlign = "left"; ctx.fillText("Entrada", px + 26, y);
-    ctx.textAlign = "right"; ctx.fillText("Salida", px + pw - 26, y);
-    y += 36;
-    ctx.font = `800 34px ${F}`; ctx.fillStyle = TINTA;
-    ctx.textAlign = "left"; ctx.fillText(horaDelTicket(resumen.entrada), px + 26, y);
-    ctx.textAlign = "right"; ctx.fillText(horaDelTicket(resumen.salida), px + pw - 26, y);
-    y += 6;
-    corte();
-  }
-  fila(`${resumen.dia || "Entrenamiento"}${resumen.descarga ? " · descarga" : ""}`, textoDuracion(resumen.minutos) || "", `700 24px ${F}`); y += 38;
-  lineas.forEach((l) => {
-    fila(corto(l.nombre, 24), `${l.series} ${l.series === 1 ? "serie" : "series"}`); y += 12;
-    ctx.fillStyle = tonos[1];
-    ctx.beginPath(); ctx.roundRect(px + 26, y, Math.max(8, ((l.volumen || 0) / maxLinea) * (pw - 52)), 6, 3); ctx.fill();
-    y += 36;
-  });
-  corte();
-  fila("Series", String(resumen.series)); y += 34;
-  fila("Ejercicios", String(resumen.ejercicios)); y += 38;
-  fila("Volumen", `${miles(kgToDisplay(resumen.volumen, unit))} ${u}`, `800 27px ${F}`, TINTA); y += 18;
-  if (conHist) {
-    corte();
-    subtitulo(`Tus últimos ${resumen.dia || "entrenamientos"}`);
-    const altoCol = 120, base = y + 28 + altoCol;
-    const paso = (pw - 52) / historial.length, ancho = Math.min(64, paso * 0.62);
-    historial.forEach((h, i) => {
-      const cx = px + 26 + paso * i + paso / 2;
-      const hh = Math.max(6, (h.volumen / maxHist) * altoCol);
-      ctx.fillStyle = h.hoy ? tonos[0] : tonos[3];
-      ctx.beginPath(); ctx.roundRect(cx - ancho / 2, base - hh, ancho, hh, [5, 5, 0, 0]); ctx.fill();
-      ctx.textAlign = "center";
-      if (h.hoy) { ctx.font = `700 18px ${F}`; ctx.fillStyle = TINTA; ctx.fillText(miles(kgToDisplay(h.volumen, unit)), cx, base - hh - 10); }
-      ctx.font = `${h.hoy ? 700 : 500} 17px ${F}`; ctx.fillStyle = h.hoy ? TINTA : "#6b6b70";
-      ctx.fillText(h.hoy && h.fecha === todayStr() ? "Hoy" : `${Number(h.fecha.slice(8, 10))}/${Number(h.fecha.slice(5, 7))}`, cx, base + 26);
-    });
-    y = base + 62;
-    if (resumen.vsUltima) { centro(textoVsUltima(resumen.vsUltima), `600 19px ${F}`, "#4a4a4e"); }
-    y += 14;
-  }
-  if (conReg) {
-    corte();
-    subtitulo("Dónde fue el trabajo");
-    y += 6;
-    let x = px + 26;
-    const total = pw - 52 - (regiones.length - 1) * 4;
-    regiones.forEach((r, i) => {
-      const w = (r.series / totalReg) * total;
-      ctx.fillStyle = tonos[i];
-      ctx.beginPath(); ctx.roundRect(x, y, w, 16, i === 0 ? [8, 0, 0, 8] : i === regiones.length - 1 ? [0, 8, 8, 0] : 0); ctx.fill();
-      x += w + 4;
-    });
-    y += 48;
-    let lx = px + 26;
-    ctx.font = `500 18px ${F}`; ctx.textAlign = "left";
-    regiones.forEach((r, i) => {
-      const t = `${r.nombre} ${Math.round((r.series / totalReg) * 100)} %`;
-      ctx.fillStyle = tonos[i]; ctx.beginPath(); ctx.arc(lx + 6, y - 6, 6, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "#4a4a4e"; ctx.fillText(t, lx + 18, y);
-      lx += 18 + ctx.measureText(t).width + 22;
-    });
-    y += 30;
-  }
-  if (prs.length) {
-    corte();
-    campanaEnCanvas(ctx, px + 24, y - 19, 22, "#8a6a14");
-    ctx.font = `700 21px ${F}`; ctx.fillStyle = "#8a6a14"; ctx.textAlign = "left"; ctx.fillText(prs.length === 1 ? "Récord de la sesión" : "Récords de la sesión", px + 54, y); y += 34;
-    prs.forEach((pr) => { fila(corto(pr.nombre, 22), pr.marca.replace("×", " × "), `600 21px ${F}`, "#8a6a14"); y += 34; });
-  }
-  corte();
-  centro("Gracias por entrenar. Volvé pronto.", `500 19px ${F}`, "#6b6b70"); y += 26;
-  const barras = codigoDeBarras(`${resumen.fecha}${resumen.volumen}${resumen.series}`);
-  const ancho = barras.reduce((t, w) => t + w * 2.4 + 2.4, 0);
-  let bx = W / 2 - ancho / 2;
-  ctx.fillStyle = TINTA;
-  barras.forEach((w, i) => { if (i % 7 !== 3) ctx.fillRect(bx, y, w * 2.4, 54); bx += w * 2.4 + 2.4; });
+  let alto = medir();
+  try {
+    const borrador = document.createElement("canvas"); borrador.width = W; borrador.height = 4000;
+    const fin = pintar(borrador.getContext("2d"), 3000, 1);
+    alto = Math.round(fin - 64 + 54 + 30);
+  } catch { /* con la cuenta a ojo */ }
+  // Si no entra, el ticket entero se achica hasta entrar.
+  const escala = Math.min(1, (H - 110) / (alto + 40));
+  ctx.save();
+  if (escala < 1) { ctx.translate(W / 2, 30); ctx.scale(escala, escala); ctx.translate(-W / 2, 0); }
+  pintar(ctx, alto, escala);
+  ctx.restore();
   // Al pie, la marca de la app.
   
   drawWordmark(ctx, W, H, fondoTicket);
@@ -14182,6 +14452,68 @@ function MedallasDelAnio({ meses = [] }) {
   );
 }
 
+// LA PORTADA DE LA SEMANA Y LA DEL AÑO (27/11, pedido: "que estén muy bien
+// diseñados el semanal, el mensual y el anual, con sus propias
+// características"): la misma pieza que la del mes, cada una con lo suyo. La
+// semana, en naranja, con su número y los siete días fichados como en la
+// tarjeta de cartón; el año, en violeta, con el año enorme y sus doce meses.
+function PortadaDeLaSemana({ data, enCurso, contra }) {
+  const lunes = data.lunes ? new Date(`${data.lunes}T12:00:00`) : lunesDe(new Date());
+  const domingo = new Date(lunes); domingo.setDate(lunes.getDate() + 6);
+  const jueves = new Date(lunes); jueves.setDate(lunes.getDate() + 3);
+  const inicioAnio = new Date(jueves.getFullYear(), 0, 1);
+  const numero = Math.ceil(((jueves - inicioAnio) / 86400000 + 1) / 7);
+  const fui = new Set((data.diasDetalle || []).map((d) => d.date));
+  const rango = lunes.getMonth() === domingo.getMonth()
+    ? `Del ${lunes.getDate()} al ${domingo.getDate()} de ${NOMBRES_MES[domingo.getMonth()]}`
+    : `Del ${lunes.getDate()} de ${NOMBRES_MES[lunes.getMonth()]} al ${domingo.getDate()} de ${NOMBRES_MES[domingo.getMonth()]}`;
+  return (
+    <header className="mes-portada de-semana" style={{ "--mes-c": "#ff7a00" }}>
+      <DiscoDeFondo className="uno" />
+      <DiscoDeFondo className="dos" />
+      <div className="mes-portada-texto">
+        <p className="mes-portada-ceja">{enCurso ? "Esta semana" : "Semana completa"}</p>
+        <h2 className="mes-portada-mes">Semana {numero}</h2>
+        <p className="mes-portada-rango">{rango}</p>
+        <p className="mes-portada-dias num-display"><b>{data.dias}</b> {data.dias === 1 ? "día" : "días"}</p>
+        {typeof data.vsAnterior === "number" && (
+          <p className="mes-portada-vs">{data.vsAnterior >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}{conSigno(data.vsAnterior, 0)} % de volumen que {contra}</p>
+        )}
+      </div>
+      <div className="portada-fichas" role="img" aria-label={`Fuiste ${data.dias} de 7 días`}>
+        {LETRAS_SEMANA.map((l, i) => {
+          const d = new Date(lunes); d.setDate(lunes.getDate() + i);
+          const si = fui.has(localDateStr(d));
+          return <span key={i} className={si ? "si" : ""} style={si ? { animationDelay: `${200 + i * 90}ms` } : undefined}><small>{l}</small><i /></span>;
+        })}
+      </div>
+    </header>
+  );
+}
+function PortadaDelAnio({ data, contra }) {
+  const meses = data.meses || [];
+  const max = Math.max(1, ...meses.map((m) => m.dias || 0));
+  return (
+    <header className="mes-portada de-anio" style={{ "--mes-c": "#8f3dff" }}>
+      <DiscoDeFondo className="uno" />
+      <DiscoDeFondo className="dos" />
+      <div className="mes-portada-texto">
+        <p className="mes-portada-ceja">Año completo</p>
+        <h2 className="mes-portada-mes portada-anio-numero">{data.prefijo}</h2>
+        <p className="mes-portada-dias num-display"><b>{data.dias}</b> {data.dias === 1 ? "día" : "días"}<span> · {meses.filter((m) => m.dias > 0).length} de 12 meses</span></p>
+        {typeof data.vsAnterior === "number" && (
+          <p className="mes-portada-vs">{data.vsAnterior >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}{conSigno(data.vsAnterior, 0)} % de volumen que {contra}</p>
+        )}
+      </div>
+      {meses.length > 0 && (
+        <div className="portada-meses" role="img" aria-label={meses.map((m) => `${NOMBRES_MES[m.mes]} ${m.dias} días`).join(", ")}>
+          {meses.map((m, i) => <span key={m.prefijo || i} style={{ "--f": (m.dias || 0) / max, animationDelay: `${150 + i * 60}ms` }}><i /></span>)}
+        </div>
+      )}
+    </header>
+  );
+}
+
 // LA PORTADA DEL MES (27/11, pedido: "me gustó la estética del wrap; mejorá
 // el resumen mensual"): el resumen de un mes abre como una historia de Tu año.
 // Un color lleno por mes, los discos de fondo, el nombre del mes enorme, los
@@ -14215,7 +14547,7 @@ function PortadaDelMes({ data, enCurso, contra, onHistorias }) {
   );
 }
 
-function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, enCurso = false }) {
+function WeeklyRecapModal({ data, onClose, periodo = "semana", enCurso = false }) {
   useAndroidBack(onClose);
   const unit = useWeightUnit();
   const [verTodasMarcas, setVerTodasMarcas] = useState(false);
@@ -14229,7 +14561,6 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
   // corriendo (lo abre el botón del historial). Decir "mes cerrado" de un
   // mes a mitad de camino sería mentir, así que cambian título y texto.
   const est = enCurso ? { ...base, titulo: "Cómo vas este mes", cta: "Seguir" } : base;
-  const bajada = enCurso ? `Lo que llevás de ${etiqueta || "este mes"}` : (est.bajada || `Así te fue en ${etiqueta || "el período"}`);
   const u = weightLabel(unit);
   const fmtKg = (v) => (v >= 1000 ? `${String((v / 1000).toFixed(v >= 10000 ? 0 : 1)).replace(".", ",")} mil` : String(v));
   const contra = periodo === "anio" ? "el año pasado" : periodo === "mes" ? "el mes pasado" : "la semana pasada";
@@ -14273,21 +14604,13 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
     <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div className={`resumen-periodo de-${periodo} modal-pop-in`} style={{ "--c": "var(--tono)" }} role="dialog" aria-modal="true" aria-label={est.titulo} onClick={(e) => e.stopPropagation()}>
         {/* El año, en grande, como la tapa de un anuario. */}
-        {periodo === "anio" && data.prefijo && <p className="anuario-numero num-display" aria-hidden="true">{data.prefijo}</p>}
+
         {/* Un mes cerrado trae su medalla, colgada arriba. */}
         {periodo === "mes" && data.prefijo && (
           <PortadaDelMes data={data} enCurso={enCurso} contra={contra} onHistorias={enCurso ? null : () => setHistorias(true)} />
         )}
-        {periodo !== "mes" && <header className="resumen-cabeza">
-          <h2 className="resumen-titulo">{est.titulo}</h2>
-          <p className="resumen-bajada">{bajada}</p>
-          {typeof data.vsAnterior === "number" && (
-            <p className={`resumen-vs ${data.vsAnterior >= 0 ? "sube" : ""}`}>
-              {data.vsAnterior >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
-              {conSigno(data.vsAnterior, 0)} % de volumen que {contra}
-            </p>
-          )}
-        </header>}
+        {periodo === "semana" && <PortadaDeLaSemana data={data} enCurso={enCurso} contra={contra} />}
+        {periodo === "anio" && data.prefijo && <PortadaDelAnio data={data} contra={contra} />}
 
         {periodo === "semana" && <PuntajesSemana p={data.puntajes} encendido={encendido} />}
         {periodo === "semana" && data.diasDetalle?.length > 0 && <TarjetaSemana data={data} />}
@@ -15064,7 +15387,18 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   // bloques de abajo lo necesitan antes de que se declare el local del
   // render, así que se calcula una sola vez acá.
   const yaRegistradaHoy = history.find((h) => h.date === today && !h.deload) || null;
-  const draft = drafts[key] || {};
+  const draftGuardado = drafts[key] || EMPTY_OBJ;
+  // Lo que tocaste se ve al instante (vivo) y el resto de la pantalla se pone
+  // al día después, en una transición: así el + no se traba (27/11).
+  const [vivo, setVivo] = useState(null);
+  const [draftVisto, setDraftVisto] = useState(draftGuardado);
+  // Cuando lo guardado alcanza a lo que tocaste, se suelta lo vivo; si en el
+  // medio llegó otra cosa (al guardar la serie se limpia), manda lo guardado.
+  if (draftVisto !== draftGuardado) {
+    setDraftVisto(draftGuardado);
+    if (vivo && (Object.keys(draftGuardado).length === 0 || Object.keys(vivo).every((k) => draftGuardado[k] === vivo[k]))) setVivo(null);
+  }
+  const draft = vivo ? { ...draftGuardado, ...vivo } : draftGuardado;
   // SERIE PRECARGADA. Los dos campos arrancaban VACÍOS en cada serie de cada
   // ejercicio de cada sesión: para anotar 8×70 había que abrir el teclado dos
   // veces y tipear los mismos números que la vez pasada. Y la app YA sabe
@@ -15109,7 +15443,11 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   const kg = draft.kg ?? sugerido?.kg ?? "";
   const rpe = draft.rpe ?? null;
   const minutes = draft.minutes ?? ""; const km = draft.km ?? "";
-  const updateDraft = (patch) => { if (setDrafts) setDrafts((prev) => ({ ...prev, [key]: { ...(prev[key] || {}), ...patch } })); };
+  const updateDraft = (patch) => {
+    if (!setDrafts) return;
+    setVivo((v) => ({ ...(v || {}), ...patch }));
+    startTransition(() => setDrafts((prev) => ({ ...prev, [key]: { ...(prev[key] || {}), ...patch } })));
+  };
   // Sumar o restar sin abrir el teclado. En Android el teclado numérico se
   // come media pantalla y tapa el botón de guardar, y el 90% de los ajustes
   // entre series son "una rep más" o "un disco más" — no vale abrirlo para
@@ -15418,8 +15756,12 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     // Con una meta cargada, el patrón de comparación es la meta. Alcanzarla
     // es hacer al menos los kilos Y las reps pedidas (no un 1RM equivalente:
     // 75×5 no es "haber hecho" 70×8).
-    const recordDelEjercicio = isPR && (isBodyweight ? r > mejorEj.reps : new1RM > mejorEj.rm);
+    // El récord del ejercicio entero, en cualquier serie: también en una serie
+    // que hacés por primera vez (una cuarta serie nueva que pasa tu marca).
+    const hayMarcaAntes = isBodyweight ? mejorEj.reps > 0 : mejorEj.rm > 0;
+    const recordDelEjercicio = hayMarcaAntes && (isBodyweight ? r > mejorEj.reps : new1RM > mejorEj.rm);
     const fb = describePlannedOutcome(metaHoy, { kg: k, reps: r }, recordDelEjercicio, unit)
+      || (recordDelEjercicio ? { type: "pr", msg: "Récord nuevo." } : null)
       || (isFirstEver ? { type: "first", msg: "Primera marca: desde acá se cuenta." }
         : isPR ? (recordDelEjercicio ? { type: "pr", msg: "Récord nuevo." } : { type: "pr-serie", msg: "Tu mejor marca en esta serie." })
           : new1RM === prev1RM ? { type: "tie", msg: "Igualaste tu récord." }
@@ -15673,11 +16015,8 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   // En vivo, antes de guardar: si lo que escribiste ya supera tu marca, el
   // tablero se enciende en verde (sabés que va a ser récord). A peso
   // corporal (0kg) el 1RM estimado da 0, así que ahí se compara por reps.
-  const liveBeats = enFoco && !isNaN(rNum) && !isNaN(kNum) && rNum > 0 && kNum >= 0 && !!currentPR
-    && (kNum === 0
-      ? currentPR.kg === 0 && rNum > currentPR.reps
-      : currentPR.kg > 0 && estimate1RM(displayToKg(kNum, unit), rNum) > estimate1RM(currentPR.kg, currentPR.reps))
-    && (kNum === 0 ? rNum > mejorEj.reps : prScore(displayToKg(kNum, unit), rNum) > mejorEj.rm);
+  const liveBeats = enFoco && !isNaN(rNum) && !isNaN(kNum) && rNum > 0 && kNum >= 0
+    && (kNum === 0 ? mejorEj.reps > 0 && rNum > mejorEj.reps : mejorEj.rm > 0 && prScore(displayToKg(kNum, unit), rNum) > mejorEj.rm);
   const rango = String(setDef.repRange || "").replace(/-/g, "–");
   const pesada = isHeavyRepRange(setDef.repRange);
   // Consejo al guardar (opción): contra la meta si hay una, si no contra el
@@ -15868,6 +16207,9 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           la vez pasada: si no cambió nada, es un solo toque. Si lo escrito ya
           es récord, el visor se enciende en dorado. */}
       <div className="foco-visor" onFocus={() => setRowFocus(true)} onBlur={() => setRowFocus(false)} data-enfocado={rowFocus || undefined}>
+        {/* Si lo escrito ya es récord, un sello arriba del visor: sin sumar un
+            renglón, así la tarjeta no salta al tocar el + (27/11). */}
+        {liveBeats && <span className="foco-record-sello" role="status"><Trophy size={11} /> es récord</span>}
         <div className="foco-campo">
           <input type="number" inputMode="decimal" enterKeyHint="next" aria-label="Repeticiones" placeholder="–" value={reps} onFocus={seleccionarAlEnfocar} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); kgInputRef.current?.focus(); } }} onChange={(e) => updateDraft({ reps: e.target.value })} className="foco-input" />
           <span className="foco-campo-rotulo" aria-hidden="true">reps</span>
@@ -15927,7 +16269,6 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           <p className="foco-saltos-nota">Las reps suben de a una hasta el tope del rango; ahí, el peso sube este salto.</p>
         </div>
       )}
-      {liveBeats && <p className="foco-record"><Trophy size={13} /> Si la guardás así, es récord</p>}
       {lineaFeedback}
       {avisosExtra}
 
@@ -18836,7 +19177,12 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             // última serie arranca el cronómetro que el ejercicio SIGUIENTE
             // ya tiene arriba de todo, y esa tarjeta se abre sola. Un solo
             // cronómetro, en el lugar al que vas a mirar.
-            const siguiente = groups[gi + 1];
+            // El que sigue es el próximo que falta, no el de abajo (27/11,
+            // reporte: "cuando hacés los ejercicios en desorden te dice que el
+            // próximo es bíceps martillo aunque ya lo hayas hecho"): primero
+            // los de abajo que faltan, después los de arriba.
+            const completoG = (g) => (modoDescarga ? grupoDescargaCompleto(g) : estaCompleto(g));
+            const siguiente = [...groups.slice(gi + 1), ...groups.slice(0, gi)].find((g) => !completoG(g)) || null;
             const entreActivo = settings.restBetweenExercises === true && !!sessionForThisDay;
             const nextRestTimerId = entreActivo ? timerIdDe(siguiente) : null;
             const nextRestSeconds = settings.restBetweenExercisesSec ?? 180;
@@ -18847,7 +19193,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             // Pedido: "que no se abran más automáticamente los ejercicios, sí
             // que se cierren cuando los completaste". No hay apertura
             // automática: el único que decide qué estás mirando sos vos.
-            const plegar = !!sessionForThisDay && (modoDescarga ? grupoDescargaCompleto(group) : estaCompleto(group));
+            const plegar = !!sessionForThisDay && completoG(group);
             if (group.length === 1) {
               const ex = group[0];
               return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} diaPropio={diaDe(ex)} fechasPorDia={fechasPorDia} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} cicloActual={cicloActual} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} nextExerciseName={nextExerciseName} nextObjetivo={nextObjetivo} orden={primeroDe[gi]} descarga={descargaParaTarjetas} onQuitarExtra={ex.extra ? () => guardarExtras(extrasDelDia.filter((e) => e.id !== ex.id)) : null} />;
@@ -19167,8 +19513,9 @@ function IndiceCuaderno({ sesiones, onAbrir }) {
 ============================================================================ */
 const SHARE_SUMMARY_PERIODS = [
   { k: "day", l: "Hoy" },
-  { k: "week", l: "Esta semana" },
-  { k: "month", l: "Este mes" },
+  { k: "week", l: "Semana" },
+  { k: "month", l: "Mes" },
+  { k: "year", l: "Año" },
 ];
 
 function ShareSummaryCard({ logs, trainingSessions = [] }) {
@@ -19193,6 +19540,20 @@ function ShareSummaryCard({ logs, trainingSessions = [] }) {
   // la misma grilla acá — sólo tiene sentido para "semana" y "mes"; para
   // "hoy" no hay grilla, es un solo día.
   const trainedDateSet = useMemo(() => new Set(periodSessions.map((s) => s.date)), [periodSessions]);
+  // Lo que suma la imagen: los récords, tu ejercicio y, hoy, la lista.
+  const extras = useMemo(() => {
+    const dias = {}, series = {};
+    let records = 0;
+    periodSessions.forEach((s) => (s.items || []).forEach((it) => {
+      if (it.recordDelEjercicio) records++;
+      const n = it.exerciseName || "";
+      if (!n) return;
+      series[n] = (series[n] || 0) + 1;
+      (dias[n] ||= new Set()).add(s.date);
+    }));
+    const topEj = Object.entries(dias).sort((a, b) => b[1].size - a[1].size || (series[b[0]] || 0) - (series[a[0]] || 0))[0]?.[0] || null;
+    return { records, topEj, ejercicios: Object.entries(series).map(([nombre, n]) => ({ nombre, series: n })), fechas: [...trainedDateSet] };
+  }, [periodSessions, trainedDateSet]);
   const calendarCells = useMemo(() => {
     const now = new Date();
     if (period === "week") {
@@ -19298,7 +19659,7 @@ function ShareSummaryCard({ logs, trainingSessions = [] }) {
           shareTitle="Modus Fit · Resumen"
           shareText="Mi resumen de entrenamiento 💪"
           accent="#3B82F6"
-          draw={(ctx, W, H) => drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained: periodStats.daysTrained, totalSets: periodStats.totalSets, totalVol: periodStats.totalVol, calendarCells, accent: "#3B82F6", unit })}
+          draw={(ctx, W, H) => drawPeriodShareCard(ctx, W, H, { periodo: period, periodLabel, daysTrained: periodStats.daysTrained, totalSets: periodStats.totalSets, totalVol: periodStats.totalVol, calendarCells, unit, ...extras, topEj: period === "day" ? null : extras.topEj })}
           onClose={() => setShowImage(false)}
         />
       )}
@@ -22566,6 +22927,7 @@ function getSessionsForPeriod(sessions, period) {
     return sessions.filter((s) => s.date >= mondayStr && s.date <= sundayStr);
   }
   if (period === "month") { const ym = todayStr().slice(0, 7); return sessions.filter((s) => s.date.startsWith(ym)); }
+  if (period === "year") { const y = todayStr().slice(0, 4); return sessions.filter((s) => s.date.startsWith(y)); }
   return sessions;
 }
 
@@ -35965,7 +36327,7 @@ export default function App() {
       // corrompía todo el guardado/lockeo de series.
       const nextDrafts = typeof newDraftsOrFn === "function" ? newDraftsOrFn(cur?.drafts || {}) : newDraftsOrFn;
       const np = { ...prev, [activeProfile]: { ...cur, drafts: nextDrafts } };
-      saveProfiles(np);
+      saveProfilesPronto(np);
       return np;
     });
   }, [activeProfile]);
@@ -36944,5 +37306,5 @@ function ImportRoutineErrorBanner({ onClose }) {
 // Sólo en desarrollo: las funciones que dibujan las imágenes para compartir,
 // para sacarles fotos sin recorrer cada pantalla (.taste-skill/compartir-fotos.mjs).
 if (import.meta.env.DEV && typeof window !== "undefined") {
-  window.__dibujos = { drawPRShareCard, drawCycleShareCard, drawPeriodShareCard, drawMuscleRankShareCard, drawSocialProfileShareCard, drawSocialProfileQrCard, dibujarTicket, dibujarManoAMano, dibujarPizarra, dibujarHojaRutina, armarTicket: typeof armarTicket === "function" ? armarTicket : null };
+  window.__dibujos = { drawPRShareCard, drawCycleShareCard, drawPeriodShareCard, drawMuscleRankShareCard, drawSocialProfileShareCard, drawSocialProfileQrCard, dibujarTicket, dibujarManoAMano, dibujarPizarra, dibujarHojaRutina, armarTicket: typeof armarTicket === "function" ? armarTicket : null, MUSCLE_GROUPS, RANK_TIERS };
 }
