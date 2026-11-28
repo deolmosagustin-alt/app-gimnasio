@@ -2982,36 +2982,6 @@ const ANIMATION_CSS = letraEscalable(`
 .mes-portada-play { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 999px; color: #f6f4ec; background: var(--mes-c); }
 .mes-portada.tinta-oscura .mes-portada-play { color: #121316; }
 @media (prefers-reduced-motion: reduce) { .mes-portada-mes, .mes-portada-medalla { animation: none; } }
-/* EL DOCK, MÁS FINO Y DISTINTO (27/11, pedido: "diferenciar la sección del
-   cronómetro del resto de la pestaña de rutina, y achicarla, hacerla más
-   fina"). En vez del mismo grafito de las tarjetas, el color profundo del día
-   (como los widgets y Tu año), con un disco que asoma; la fila de la sesión y
-   la del descanso, más bajas. Los botones siguen agarrando 44 px. */
-.session-bar-dock .dock-tarjeta {
-  border-radius: 22px; border-color: color-mix(in oklab, var(--c, var(--tono)) 40%, transparent);
-  background:
-    radial-gradient(130px 130px at calc(100% + 30px) 120%, rgba(255,255,255,.08) 0 60%, transparent 61%),
-    radial-gradient(120% 140% at 0% 0%, color-mix(in oklab, var(--c, var(--tono)) 42%, #0b0c0e), color-mix(in oklab, var(--c, var(--tono)) 24%, #0b0c0e) 70%);
-}
-.light-mode .session-bar-dock .dock-tarjeta {
-  background:
-    radial-gradient(130px 130px at calc(100% + 30px) 120%, rgba(0,0,0,.05) 0 60%, transparent 61%),
-    radial-gradient(120% 140% at 0% 0%, color-mix(in oklab, var(--c, var(--tono)) 30%, white), color-mix(in oklab, var(--c, var(--tono)) 16%, white) 70%);
-}
-.session-bar-dock .sesion-dock { padding: 4px 6px 4px 0; }
-.session-bar-dock .sesion-dock-cuerpo { min-height: 40px; padding-left: 14px; gap: 10px; }
-.session-bar-dock .sesion-dock-reloj { font-size: 1.4rem; }
-.session-bar-dock .sesion-dock-texto { gap: 1px; padding-left: 10px; border-left-color: rgba(255,255,255,.14); }
-.light-mode .session-bar-dock .sesion-dock-texto { border-left-color: rgba(0,0,0,.12); }
-.session-bar-dock .sesion-dock-nombre { color: #f6f4ec; }
-.light-mode .session-bar-dock .sesion-dock-nombre { color: color-mix(in oklab, var(--c, var(--tono)) 60%, black); }
-.session-bar-dock .boton-finalizar { position: relative; height: 36px; padding: 0 14px; background: rgba(255,255,255,.12); }
-.light-mode .session-bar-dock .boton-finalizar { background: rgba(0,0,0,.07); }
-.session-bar-dock .boton-finalizar::after { content: ""; position: absolute; inset: -4px 0; }
-.session-bar-dock .dock-descanso-embebido { border-bottom-color: rgba(255,255,255,.12); }
-.session-bar-dock .dock-reloj { padding-top: 4px; padding-bottom: 4px; }
-.session-bar-dock .descanso-dial.chico { width: 42px; height: 42px; }
-.session-bar-dock .descanso-tiempo-dock { font-size: 1.6rem; }
 /* Las secciones del ticket (27/11): un rótulo impreso en negativo. */
 .ticket-seccion { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 14px -4px 8px; padding: 4px 8px; border-radius: 3px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: none; color: #f3f3ef; background: #1d1d1f; }
 .ticket-seccion.record { color: #1c1505; background: var(--record); }
@@ -7992,19 +7962,7 @@ button.foco-ref.alterna:active .ref-interruptor { transform: scale(.94); }
 .entre-lados-fila { display: flex; align-items: stretch; gap: 6px; }
 .entre-lados-iniciar { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border-radius: 999px; font-size: 14px; font-weight: 700; color: color-mix(in oklab, var(--c, var(--tono)) 72%, white); background: color-mix(in oklab, var(--c, var(--tono)) 13%, transparent); transition: transform var(--dur-toque, .1s); }
 .entre-lados-iniciar:active { transform: scale(.97); }
-.entre-lados-iniciar { position: relative; overflow: hidden; isolation: isolate; }
-.entre-lados-iniciar:disabled { opacity: 1; }
-.entre-lados-relleno { position: absolute; inset: 0; z-index: -1; transform-origin: left; transform: scaleX(var(--avance, 0)); background: color-mix(in oklab, var(--c, var(--tono)) 72%, white); transition: transform 1s linear; }
-.entre-lados-iniciar.corriendo { color: color-mix(in oklab, var(--c, var(--tono)) 14%, #07080a); background: color-mix(in oklab, var(--c, var(--tono)) 34%, transparent); animation: ladoActiva .45s var(--resorte, ease-out); }
-.entre-lados-iniciar.corriendo .entre-lados-texto b { font-size: 1.1em; }
-.entre-lados-iniciar.listo { color: #08140d; background: #6fd39a; animation: ladoActiva .45s var(--resorte, ease-out); }
-.entre-lados-manos { display: inline-flex; align-items: center; gap: 4px; }
-.entre-lados-manos i { font-style: normal; font-size: 11px; font-weight: 800; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 999px; background: color-mix(in oklab, currentColor 16%, transparent); }
-.entre-lados-iniciar.corriendo .entre-lados-manos i:first-child { animation: ladoCruza .6s var(--resorte, ease-out) both; }
-.entre-lados-iniciar.corriendo .entre-lados-manos i:last-child { animation: ladoCruza .6s var(--resorte, ease-out) reverse both; }
-@keyframes ladoCruza { 0% { transform: translateX(0); } 50% { transform: translateX(22px) scale(1.25); } 100% { transform: translateX(0); } }
-@keyframes ladoActiva { 0% { transform: scale(1); } 35% { transform: scale(1.04); } 100% { transform: scale(1); } }
-@media (prefers-reduced-motion: reduce) { .entre-lados-iniciar.corriendo, .entre-lados-iniciar.listo, .entre-lados-manos i, .entre-lados-relleno { animation: none !important; transition: none; } }
+.entre-lados-iniciar:disabled { opacity: .5; }
 .light-mode .entre-lados-iniciar { color: color-mix(in oklab, var(--c, var(--tono)) 70%, black); }
 .entre-lados-tiempo { min-width: 64px; min-height: 44px; padding: 0 12px; border-radius: 999px; font-size: 16px; font-weight: 750; color: var(--text-strong); background: var(--surface-2); }
 .entre-lados-opciones { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -12382,7 +12340,7 @@ const relojDeLado = (timerId) => (timerId ? `lado:${timerId}` : null);
 function EntreLados({ exercise, accent, timerId, serie = null, series = null, settings, onUpdateSettings }) {
   const [eligiendo, setEligiendo] = useState(false);
   const idLado = relojDeLado(timerId);
-  const { estado, restante, fraccion } = useRelojDescanso(idLado || "__sin__");
+  const { estado } = useRelojDescanso(idLado || "__sin__");
   const seg = Number(settings?.entreLados?.[exercise.id]) || 0;
   if (!timerId || (!seg && !esUnilateral(exercise))) return null;
   const guardar = (v) => {
@@ -12397,25 +12355,17 @@ function EntreLados({ exercise, accent, timerId, serie = null, series = null, se
   return (
     <div className="entre-lados" style={{ "--c": accent }}>
       {seg > 0 ? (
-        // 27/11 (pedidos: "hacer más simple e intuitivo lo de cambiar de
-        // lado" y "que haya una animación que haga más evidente que se
-        // activó"): un solo botón. Al tocarlo, los dos lados se cruzan, el
-        // botón se llena del color del día y adentro cuenta lo que falta; al
-        // terminar dice "Al otro lado" en verde. El tiempo se cambia al costado.
         <div className="entre-lados-fila">
-          <button className={`entre-lados-iniciar ${corriendo ? "corriendo" : ""} ${estado === "done" ? "listo" : ""}`} disabled={corriendo}
-            style={{ "--avance": corriendo ? 1 - fraccion : 0 }}
+          <button className="entre-lados-iniciar" disabled={corriendo}
             onClick={() => {
-              haptic([20, 40, 20]);
-              // 26/11: si tocás el cambio de lado, ya hiciste el primer lado,
-              // así que el descanso entre series terminó.
+              haptic(15);
+              // 26/11 ("ver lo de los descansos en ejercicios unilaterales"):
+              // si tocás el cambio de lado, ya hiciste el primer lado, así que
+              // el descanso entre series terminó. Antes seguía corriendo y el
+              // dock mostraba ése: el reloj del cambio de lado quedaba oculto.
               Object.keys(ACTIVE_REST_TIMERS).forEach((id) => { if (!id.startsWith("lado:") && !id.startsWith("cardio_")) terminarDescanso(id); });
               iniciarDescanso(idLado, { segundos: seg, ejercicio: exercise.name || null, siguiente: "el otro lado", color: accent, serie, series }); }}>
-            <span className="entre-lados-relleno" aria-hidden="true" />
-            <span key={corriendo ? "c" : "q"} className="entre-lados-manos" aria-hidden="true"><i>I</i><ArrowLeftRight size={15} /><i>D</i></span>
-            <span className="entre-lados-texto" role={corriendo ? "timer" : undefined}>
-              {corriendo ? <>Otro lado en <b className="num-display">{relojCorto(restante)}</b></> : estado === "done" ? "Al otro lado" : "Cambiar de lado"}
-            </span>
+            <ArrowLeftRight size={15} /> {corriendo ? "Cambiando de lado" : "Cambio de lado"}
           </button>
           {onUpdateSettings && <button className="entre-lados-tiempo num-display" onClick={() => setEligiendo((v) => !v)} aria-expanded={eligiendo} aria-label={`Descanso entre lados: ${relojCorto(seg)}. Cambiar`}>{relojCorto(seg)}</button>}
         </div>
