@@ -3026,6 +3026,10 @@ const ANIMATION_CSS = letraEscalable(`
 .dock-una-fila:has(> .dock-descanso-embebido) > .boton-finalizar span { display: none; }
 .dock-una-fila:has(> .dock-descanso-embebido)::before { content: ""; order: 1; align-self: stretch; width: 1px; margin: 10px 2px; background: var(--hairline); }
 .dock-una-fila:has(> .dock-descanso-embebido) > .boton-finalizar { order: 2; }
+/* Un leve tinte del color del día (28/11, pedido: "diferenciala un poco con
+   algún leve cambio de color"): se distingue de las tarjetas sin gritar. */
+.session-bar-dock .dock-tarjeta { background: color-mix(in oklab, var(--c, var(--tono)) 11%, var(--dock-bg)); border-color: color-mix(in oklab, var(--c, var(--tono)) 30%, transparent); }
+.light-mode .session-bar-dock .dock-tarjeta { background: color-mix(in oklab, var(--c, var(--tono)) 9%, var(--dock-bg)); }
 .session-bar-dock .dock-tarjeta:has(.dock-una-fila):not(:has(.dock-descanso-embebido)) { width: fit-content; margin-left: auto; border-radius: 999px; }
 .session-bar-dock .dock-tarjeta:has(.dock-una-fila):not(:has(.dock-descanso-embebido)) .boton-finalizar { margin: 4px; }
 /* El chip de arriba: el reloj de la sesión y las series. */
